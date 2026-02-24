@@ -245,6 +245,25 @@ class NodeRole(StrEnum):
 
 
 @unique
+class DefaultStateSpace(StrEnum):
+    """Allowed state spaces for node definitions."""
+    Z = "z"
+    RAW = "raw"
+    PROBABILITY = "probability"
+    ZERO_ONE = "0_1"
+
+
+@unique
+class StateUpdateScale(StrEnum):
+    """Temporal update scales for node state estimation."""
+    STATIC = "static"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    STUDY_WINDOW = "study_window"
+
+
+@unique
 class RelationType(StrEnum):
     """Edge causal status."""
     CAUSAL = "causal"
@@ -393,7 +412,7 @@ class ActionClass(StrEnum):
     NUTRITION = "nutrition"
     MEDICATION_SUPPORT_NONRX = "medication_support_nonrx"
     COGNITIVE_TRAINING = "cognitive_training"
-    SOCIAL = "social"
+    SOCIAL_ENGAGEMENT = "social_engagement"
     CLINICAL_FOLLOWUP = "clinical_followup"
     OTHER = "other"
 

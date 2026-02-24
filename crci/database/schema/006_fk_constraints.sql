@@ -32,8 +32,8 @@ ALTER TABLE measure_definitions_v1
 
 -- A7. predictor_alignment_rules_v1
 ALTER TABLE predictor_alignment_rules_v1
-    ADD CONSTRAINT fk_par_target_measure
-        FOREIGN KEY (target_measure_id) REFERENCES measure_definitions_v1(measure_id);
+    ADD CONSTRAINT fk_par_outcome_measure
+        FOREIGN KEY (outcome_measure_id) REFERENCES measure_definitions_v1(measure_id);
 
 -- A8. literary_mechanistic_priors_v1
 ALTER TABLE literary_mechanistic_priors_v1
