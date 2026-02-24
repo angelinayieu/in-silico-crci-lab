@@ -485,3 +485,25 @@ CREATE TABLE IF NOT EXISTS extraction_audit_v1 (
     operator_id                     TEXT,
     notes                           TEXT
 );
+
+
+-- ───────────────────────────────────────────────────────────────
+-- B13. acquisition_queue_v1
+-- Purpose: Operational queue for directed acquisition.
+--          Tracks candidate papers through the retrieval lifecycle.
+-- SYS_EXTRACTION_COMPLETE.md lines 2635-2655
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS acquisition_queue_v1 (
+    queue_id                        TEXT        PRIMARY KEY,
+    candidate_doi                   TEXT,
+    candidate_pmid                  TEXT,
+    candidate_title                 TEXT,
+    target_edge_ids_json            JSONB,
+    aps_score                       REAL,
+    aps_components_json             JSONB,
+    source_annotation_ids_json      JSONB,
+    retrieval_tool                  TEXT,
+    status                          TEXT        NOT NULL DEFAULT 'queued',
+    created_at                      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

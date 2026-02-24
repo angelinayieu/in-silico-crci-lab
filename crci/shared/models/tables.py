@@ -1872,3 +1872,41 @@ class ExtractionRun(Base):
     stages_completed_json = Column(JSONB, default="[]")
     error_message = Column(Text)
     notes = Column(Text)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CLASS A EXTENSION: Search Term Reference
+# ═══════════════════════════════════════════════════════════════
+
+
+class NodeSearchTerm(Base):
+    """A34. Search synonyms per node for automated retrieval."""
+    __tablename__ = "node_search_terms_v1"
+
+    node_id = Column(Text, primary_key=True)
+    term = Column(Text, primary_key=True)
+    term_type = Column(Text, nullable=False)
+    active = Column(Integer, nullable=False, default=1)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CLASS B EXTENSION: Acquisition Queue
+# ═══════════════════════════════════════════════════════════════
+
+
+class AcquisitionQueue(Base):
+    """B13. Operational queue for directed acquisition."""
+    __tablename__ = "acquisition_queue_v1"
+
+    queue_id = Column(Text, primary_key=True)
+    candidate_doi = Column(Text)
+    candidate_pmid = Column(Text)
+    candidate_title = Column(Text)
+    target_edge_ids_json = Column(JSONB)
+    aps_score = Column(Float)
+    aps_components_json = Column(JSONB)
+    source_annotation_ids_json = Column(JSONB)
+    retrieval_tool = Column(Text)
+    status = Column(Text, nullable=False, default="queued")
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now())

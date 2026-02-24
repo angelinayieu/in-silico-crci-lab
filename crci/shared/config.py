@@ -414,6 +414,45 @@ LLM_RETRY_BASE_DELAY_SECONDS: float = 2.0
 LLM_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
 LLM_DEFAULT_MAX_TOKENS: int = 4096
 
+# ═══════════════════════════════════════════════════════════════
+#  AUTOMATED RETRIEVAL (AUTOMATED_RETRIEVAL_PLAN.md Part 9)
+# ═══════════════════════════════════════════════════════════════
+
+# Daily budget caps
+RETRIEVAL_MAX_QUERIES_PER_DAY: int = 500
+RETRIEVAL_MAX_CANDIDATES_SCORED_PER_DAY: int = 2000
+RETRIEVAL_MAX_FULLTEXT_PER_DAY: int = 100
+RETRIEVAL_MAX_EXTRACTIONS_PER_DAY: int = 50
+RETRIEVAL_MAX_LLM_COST_USD_PER_DAY: float = 20.0
+
+# Per-source rate limits (requests per second)
+PUBMED_RPS: int = 3          # 10 with API key
+CROSSREF_RPS: int = 50
+OPENALEX_RPS: int = 10
+EUROPE_PMC_RPS: int = 5
+UNPAYWALL_RPD: int = 100_000  # per day
+UNPAYWALL_RPS_THROTTLE: float = 10.0  # per-second throttle for base adapter interface
+
+# Full-text source priority order
+FULLTEXT_SOURCE_PRIORITY: list[str] = [
+    "europe_pmc", "unpaywall", "manual", "abstract_only",
+]
+
+# Acquisition loop
+ACQUISITION_LOOP_HOURS: int = 6
+AUTHOR_GAP_BOOST_MULTIPLIER: float = 1.5
+
+# Workstream priority (higher = searched first)
+WORKSTREAM_PRIORITY: list[str] = [
+    "instrument_psychometrics",
+    "population_norms",
+    "edge_evidence",
+    "context_priors",
+    "recovery_parameters",
+    "intervention_kernels",
+    "correlations",
+]
+
 
 @dataclass(frozen=True)
 class CRCIConfig:
