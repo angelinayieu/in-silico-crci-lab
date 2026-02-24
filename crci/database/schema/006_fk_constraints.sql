@@ -35,10 +35,7 @@ ALTER TABLE predictor_alignment_rules_v1
     ADD CONSTRAINT fk_par_outcome_measure
         FOREIGN KEY (outcome_measure_id) REFERENCES measure_definitions_v1(measure_id);
 
--- A8. literary_mechanistic_priors_v1
-ALTER TABLE literary_mechanistic_priors_v1
-    ADD CONSTRAINT fk_lmp_target_edge
-        FOREIGN KEY (target_edge_relation_id) REFERENCES edge_relations_definitions_v1(edge_relation_id);
+-- A8. literary_mechanistic_priors_v1 — polymorphic target_ref; FK enforced at application level
 
 -- A10. contraindication_rules_v1
 ALTER TABLE contraindication_rules_v1
