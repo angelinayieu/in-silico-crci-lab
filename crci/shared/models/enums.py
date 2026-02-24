@@ -155,6 +155,7 @@ class PipelineStage(StrEnum):
     P4_AGGREGATION = "P4_aggregation"
     P5_SUFFICIENCY = "P5_sufficiency"
     P6_DEPLOYMENT_VALIDATION = "P6_deployment_validation"
+    P7_COMPILATION = "P7_compilation"
 
 
 @unique

@@ -11,7 +11,7 @@ Formulas: None (orchestrator)
 Reads: PDF file path (from CLI)
 Writes: extraction_runs (B12), orchestrates all downstream writes
 Gates: Idempotency check (skip if same paper_hash + config_version exists)
-Downstream: Every extraction chain (P0 -> P1 -> TB -> P2 -> P3 -> P4 -> P4B -> P5 -> P6)
+Downstream: Every extraction chain (P0 -> P1 -> TB -> P2 -> P3 -> P4 -> P4B -> P5 -> P6 -> P7)
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 #  PIPELINE VERSION — used for idempotency checks and provenance
 # ═══════════════════════════════════════════════════════════════
 
-PIPELINE_VERSION: str = "2.0.0"
+PIPELINE_VERSION: str = "2.1.0"
 
 # Ordered chain definitions: (stage_enum, human_label, import_path, function_name)
 # Each chain is called in sequence per SYS_EX lines 22-78 macro chain diagram.
@@ -102,6 +102,12 @@ _CHAIN_SEQUENCE: list[tuple[PipelineStage, str, str, str]] = [
         "P6: Deployment Validation",
         "crci.extraction.p6_deployment.runner",
         "run_p6_deployment_validation",
+    ),
+    (
+        PipelineStage.P7_COMPILATION,
+        "P7: Full-Spectrum Parameter Compilation",
+        "crci.extraction.p7_compilers.runner",
+        "run_p7_compilation",
     ),
 ]
 
@@ -409,8 +415,8 @@ def run_extraction_pipeline(
 ) -> ExtractionRun:
     """Run the full extraction pipeline for a single paper.
 
-    Orchestrates P0 -> P1 -> TB -> P2 -> P3 -> P4 -> P4B -> P5 -> P6
-    in strict sequence per SYS_EX lines 22-78 macro chain diagram.
+    Orchestrates P0 -> P1 -> TB -> P2 -> P3 -> P4 -> P4B -> P5 -> P6 -> P7
+    in strict sequence per SYS_EX lines 22-78 + SYS_EXTRACTION_ADDENDUM Part 8.
 
     Steps:
       1. Compute PDF hash for idempotency
