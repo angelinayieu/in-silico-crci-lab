@@ -1,0 +1,626 @@
+# VERIFIED: types match SYS_EX lines 330-370, 460-490, 1135-1180
+# VERIFIED: types match SYS_ALG lines 1075-1200, 1630-1680, 2100-2160
+# VERIFIED: imports — pydantic + shared.models.enums
+# VERIFIED: downstream — passed between subsystems within chains
+"""
+Component: Layer 0 — Intermediate Pipeline States
+Spec: SYS_EXTRACTION lines 330-370 (PaperMap, SectionSegment, SpanLabel)
+      SYS_EXTRACTION lines 460-490 (RawAnnotationEmission, ReconciliationDec.)
+      SYS_EXTRACTION lines 1135-1180 (GroupedEvidence, ResolvedEvidence)
+      SYS_ALGORITHM lines 1075-1200 (PooledEdge, PriorSpec)
+      SYS_ALGORITHM lines 1630-1680 (PreparedObservation, ModifiedState)
+      SYS_ALGORITHM lines 2100-2160 (MCDraw, PerDrawEffect, SimResults)
+Purpose: Pydantic models for ALL intermediate pipeline states.
+         These are in-memory only — not persisted to DB.
+Reads: Nothing (data structure definitions)
+Writes: Nothing (instantiated by pipeline modules)
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+from .enums import (
+    AdjudicationStatus,
+    AnnotationCategory,
+    AnnotationMaturity,
+    BiasRisk,
+    BoundType,
+    ConversionGateResult,
+    EffectScale,
+    ExtractionMode,
+    FailureMode,
+    HarmonizationStatusInMem,
+    OverlapDecision,
+    ParseStatus,
+    PlausibilityStatus,
+    PriorSource,
+    PriorTypePaper,
+    ProxyValidity,
+    SESource,
+    SafeMode,
+    StabilityClass,
+    SufficiencyRecommendation,
+    TargetScale,
+    TriageDecision,
+    TriageTier,
+)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P0: TRIAGE
+# ═══════════════════════════════════════════════════════════════
+
+
+class TriageResult(BaseModel):
+    """Output of P0 triage: accept/reject decision + extraction mode."""
+
+    paper_id: str
+    decision: TriageDecision
+    relevance_score: float = Field(ge=0.0, le=1.0)
+    extraction_mode: ExtractionMode | None = None
+    paper_subtype: str | None = None
+    rejection_reason: str | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P1: EXTRACTION — Canonical Reader outputs
+# ═══════════════════════════════════════════════════════════════
+
+
+class SectionSegment(BaseModel):
+    """A labeled section of the paper."""
+
+    section_type: str  # abstract, methods, results, discussion, etc.
+    heading: str | None = None
+    char_start: int
+    char_end: int
+    text: str
+
+
+class TableEntry(BaseModel):
+    """A detected table in the paper."""
+
+    table_id: str
+    caption: str | None = None
+    section_type: str | None = None
+    char_start: int
+    char_end: int
+    raw_text: str
+
+
+class FigureEntry(BaseModel):
+    """A detected figure in the paper."""
+
+    figure_id: str
+    caption: str | None = None
+    section_type: str | None = None
+
+
+class CandidateSpan(BaseModel):
+    """A detected numeric claim or statistical result."""
+
+    span_id: str
+    char_start: int
+    char_end: int
+    text: str
+    section_type: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+
+
+class PaperMap(BaseModel):
+    """CR output: structured paper representation shared by all agents.
+
+    This is the key v2 efficiency improvement — one read, many agents.
+    SYS_EX lines 330-370.
+    """
+
+    paper_id: str
+    title: str | None = None
+    full_text: str
+    sections: list[SectionSegment] = Field(default_factory=list)
+    tables: list[TableEntry] = Field(default_factory=list)
+    figures: list[FigureEntry] = Field(default_factory=list)
+    candidate_spans: list[CandidateSpan] = Field(default_factory=list)
+    n_total: int | None = None
+    study_design: str | None = None
+    arms: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P1: EXTRACTION — Agent outputs
+# ═══════════════════════════════════════════════════════════════
+
+
+class SpanLabel(BaseModel):
+    """AG5 output: labeled statistical span.
+
+    SYS_EX lines 312-330 (40 label types).
+    """
+
+    span_id: str
+    label_type: str  # One of 40 span_label_type values
+    value: str | None = None
+    numeric_value: float | None = None
+    char_start: int
+    char_end: int
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+    source_section: str | None = None
+    source_table_id: str | None = None
+
+
+class RawAnnotationEmission(BaseModel):
+    """AG10 output: extracted annotation from Discussion/Limitations.
+
+    SYS_EX lines 460-490.
+    """
+
+    annotation_id: str
+    category: AnnotationCategory
+    content: str
+    evidence_strength: str | None = None
+    extraction_snippet: str | None = None
+    source_span_id: str | None = None
+
+
+class ReconciliationDecision(BaseModel):
+    """Output of AG9/reconciliation: conflict resolution decision."""
+
+    entity_pair: tuple[str, str]
+    decision: OverlapDecision
+    kept_entity_id: str | None = None
+    reason: str
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-TB: TRUST BOUNDARY
+# ═══════════════════════════════════════════════════════════════
+
+
+class ParsedNumeric(BaseModel):
+    """Trust boundary parser output.
+
+    SYS_EX Trust Boundary spec.
+    """
+
+    span_id: str
+    value_type: str  # stat_type (37 values)
+    parse_status: ParseStatus
+    raw_text: str
+    parsed_value: float | None = None
+    parsed_lower: float | None = None
+    parsed_upper: float | None = None
+    unit: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
+
+
+class TypedNumericValue(BaseModel):
+    """Typed numeric value with bound information.
+
+    SYS_EX Trust Boundary — after parsing.
+    """
+
+    value: float
+    bound_type: BoundType = BoundType.EXACT
+    original_text: str
+    se: float | None = None
+    ci_lower: float | None = None
+    ci_upper: float | None = None
+    p_value: float | None = None
+    n: int | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P2: HARMONIZATION (in-memory)
+# ═══════════════════════════════════════════════════════════════
+
+
+class ValidatedNumeric(BaseModel):
+    """After plausibility bounds check (S1)."""
+
+    span_id: str
+    value: TypedNumericValue
+    plausibility_status: PlausibilityStatus
+    plausibility_note: str | None = None
+
+
+class RoutedNumeric(BaseModel):
+    """After scale routing (CG1-CG4 gate)."""
+
+    span_id: str
+    value: TypedNumericValue
+    target_scale: TargetScale
+    conversion_gate_result: ConversionGateResult
+    blocked_reason: str | None = None
+
+
+class ScaledNumeric(BaseModel):
+    """After scale conversion with SE."""
+
+    span_id: str
+    beta: float
+    se: float | None = None
+    se_source: SESource
+    scale: EffectScale
+    direction_aligned: bool = False
+
+
+class HarmonizedClaim(BaseModel):
+    """Final harmonized evidence claim per study-edge pair."""
+
+    ler_id: str
+    edge_relation_id: str
+    profile_id: str
+    study_id: str
+    harmonized_beta: float
+    harmonized_se: float | None = None
+    harmonized_scale: EffectScale
+    harmonization_status: HarmonizationStatusInMem
+    quality_rating: str = "moderate"
+    se_source: SESource = SESource.SE_DIRECT
+    n_effect: int | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P3: HETEROGENEITY (7-layer SE system)
+# ═══════════════════════════════════════════════════════════════
+
+
+class LayeredSEResult(BaseModel):
+    """Output of the 7-layer SE inflation system.
+
+    Formulas P3-1 through P3-8.
+    """
+
+    ler_id: str
+    se_base: float
+    layer_multipliers: dict[str, float] = Field(default_factory=dict)
+    se_effective: float
+    layers_applied: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P3.5: DOUBLE COUNTING / GROUPING
+# ═══════════════════════════════════════════════════════════════
+
+
+class GroupedEvidence(BaseModel):
+    """Evidence grouped by edge after overlap resolution.
+
+    SYS_EX lines 1135-1180.
+    """
+
+    edge_relation_id: str
+    claims: list[HarmonizedClaim]
+    overlap_decisions: list[ReconciliationDecision] = Field(default_factory=list)
+    k: int = 0  # number of independent claims
+
+
+class ResolvedEvidence(BaseModel):
+    """Evidence after double-counting resolution.
+
+    Ready for meta-analysis.
+    """
+
+    edge_relation_id: str
+    claims: list[HarmonizedClaim]
+    k: int = 0
+    total_n: int = 0
+    resolution_notes: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P4: AGGREGATION (meta-analysis)
+# ═══════════════════════════════════════════════════════════════
+
+
+class PooledEstimate(BaseModel):
+    """Output of IVW meta-analysis.
+
+    Formula P4-1: β̂_IVW = Σ(β_i/SE²_i) / Σ(1/SE²_i)
+    Formula P4-2: τ² (DerSimonian-Laird)
+    Formula P4-3: I²
+    """
+
+    edge_relation_id: str
+    beta_pooled: float
+    se_pooled: float
+    tau_squared: float = 0.0
+    i_squared: float = 0.0
+    k: int = 0
+    total_n: int = 0
+    aggregation_method: str = "IVW_random"
+    individual_weights: list[float] = Field(default_factory=list)
+
+
+class PriorSpec(BaseModel):
+    """Prior specification for Bayesian update.
+
+    SYS_ALG lines 1170-1190.
+    """
+
+    edge_relation_id: str | None = None
+    node_id: str | None = None
+    prior_source: PriorSource
+    prior_type: PriorTypePaper | None = None
+    mean: float = 0.0
+    sd: float = 1.0
+    dist_family: str = "normal"
+    provenance: str | None = None
+
+
+class CompiledEdge(BaseModel):
+    """Fully compiled edge ready for runtime.
+
+    Combines pooled estimate + prior + publication bias adjustment.
+    """
+
+    edge_param_id: str
+    edge_relation_id: str
+    beta_mean: float
+    beta_se: float
+    effect_scale: EffectScale
+    prior_source: PriorSource
+    prior_type: PriorTypePaper | None = None
+    aggregation_method: str
+    k: int
+    total_n: int
+    i_squared: float = 0.0
+    tau_squared: float = 0.0
+    pub_bias_risk: BiasRisk = BiasRisk.LOW
+    se_inflation_pub_bias: float = 1.0
+    coherence_flag: TriageTier | None = None
+    se_inflation_coherence: float = 1.0
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EX-P5: SUFFICIENCY & COHERENCE
+# ═══════════════════════════════════════════════════════════════
+
+
+class SufficiencyReport(BaseModel):
+    """Output of sufficiency check.
+
+    SYS_EX P5 — evidence base verdict.
+    """
+
+    recommendation: SufficiencyRecommendation
+    total_edges_compiled: int
+    edges_sufficient: int
+    edges_marginal: int
+    edges_insufficient: int
+    coverage_by_pathway: dict[str, float] = Field(default_factory=dict)
+    gaps: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ChainValidationResult(BaseModel):
+    """Single pathway chain-vs-direct comparison.
+
+    §2.13 chain-vs-direct triage.
+    """
+
+    pathway_id: str
+    chain_length: int
+    beta_chain: float
+    se_chain: float
+    beta_direct: float | None = None
+    se_direct: float | None = None
+    z_statistic: float | None = None
+    triage_tier: TriageTier
+    failure_mode: FailureMode = FailureMode.NONE
+    se_inflation_applied: float = 1.0
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-A: GRAPH ASSEMBLY & INTAKE
+# ═══════════════════════════════════════════════════════════════
+
+
+class CalibratedRecord(BaseModel):
+    """Calibrated observation ready for Bayesian update.
+
+    SYS_ALG Chain A output.
+    """
+
+    node_id: str
+    feature_id: str | None = None
+    z_value: float
+    observation_noise_sd: float
+    proxy_validity: ProxyValidity = ProxyValidity.DIRECT
+    timestamp: str | None = None
+    source_type: str | None = None  # instrument, measure, derived_feature
+
+
+class StandardizedFeatureVector(BaseModel):
+    """Complete patient feature vector in z-space."""
+
+    subject_ref: str
+    timestamp: str
+    features: dict[str, CalibratedRecord] = Field(default_factory=dict)
+    coverage_fraction: float = 0.0
+    missing_node_ids: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-C: BAYESIAN UPDATE
+# ═══════════════════════════════════════════════════════════════
+
+
+class NodeBelief(BaseModel):
+    """Posterior belief for a single node."""
+
+    node_id: str
+    mean: float
+    sd: float
+    prior_mean: float
+    prior_sd: float
+    n_observations: int = 0
+    conflict_score: float = 0.0
+
+
+class PosteriorState(BaseModel):
+    """Full posterior state after Bayesian update.
+
+    SYS_ALG Chain C output.
+    """
+
+    state_id: str
+    run_id: str
+    subject_ref: str
+    state_time: str
+    beliefs: dict[str, NodeBelief] = Field(default_factory=dict)
+    obs_used_count: int = 0
+    conflict_inflation_applied: bool = False
+    missingness_inflation_applied: bool = False
+    sigma_floor_applied: bool = False
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-D: SCENARIO CONSTRUCTION + ALG-E: MODIFIER RESOLUTION
+# ═══════════════════════════════════════════════════════════════
+
+
+class PreparedObservation(BaseModel):
+    """Observation prepared for simulation.
+
+    SYS_ALG lines 1630-1680.
+    """
+
+    node_id: str
+    z_value: float
+    noise_sd: float
+    source: str
+
+
+class ModifiedEdge(BaseModel):
+    """Edge with modifiers applied for a specific patient."""
+
+    edge_param_id: str
+    beta_original: float
+    beta_modified: float
+    se_modified: float
+    modifiers_applied: list[str] = Field(default_factory=list)
+    cumulative_multiplier: float = 1.0
+
+
+class ModifiedState(BaseModel):
+    """State with all modifiers resolved.
+
+    SYS_ALG lines 1630-1680.
+    """
+
+    run_id: str
+    subject_ref: str
+    modified_edges: dict[str, ModifiedEdge] = Field(default_factory=dict)
+    modifier_trace: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-F: MC SIMULATION
+# ═══════════════════════════════════════════════════════════════
+
+
+class MCDraw(BaseModel):
+    """Single Monte Carlo draw.
+
+    SYS_ALG lines 2100-2160.
+    """
+
+    draw_index: int
+    sampled_betas: dict[str, float] = Field(default_factory=dict)
+    seed_offset: int = 0
+
+
+class PerDrawEffect(BaseModel):
+    """Per-node effect from a single MC draw."""
+
+    draw_index: int
+    node_id: str
+    delta_z: float
+    contributions: dict[str, float] = Field(default_factory=dict)
+
+
+class NodeEffectSummary(BaseModel):
+    """Summary statistics for one node across all MC draws."""
+
+    node_id: str
+    mean_delta_z: float
+    sd_delta_z: float
+    p10: float
+    p25: float
+    median: float
+    p75: float
+    p90: float
+    p_worsening: float = 0.0  # P(delta_z > 0 for higher_worse)
+
+
+class SimulationResults(BaseModel):
+    """Aggregated simulation results across all MC draws.
+
+    SYS_ALG lines 2100-2160.
+    """
+
+    scenario_id: str
+    n_draws: int
+    seed_used: int
+    node_summaries: dict[str, NodeEffectSummary] = Field(default_factory=dict)
+    edges_used: list[str] = Field(default_factory=list)
+    bridges_used: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RUNTIME: OPTIMIZATION & SCORING
+# ═══════════════════════════════════════════════════════════════
+
+
+class SAFEScore(BaseModel):
+    """SAFE score for a candidate schedule.
+
+    §2.16.3 — Mode A: E[Δz]/uncertainty. Mode B: SAFE·burden·adherence.
+    """
+
+    schedule_id: str
+    mode: SafeMode
+    score: float
+    expected_benefit: float
+    uncertainty: float
+    burden_penalty: float = 0.0
+    adherence_factor: float = 1.0
+    stability_class: StabilityClass = StabilityClass.STABLE
+    p_rank_1: float = 0.0
+    bootstrap_ci_low: float | None = None
+    bootstrap_ci_high: float | None = None
+
+
+class RankedSchedule(BaseModel):
+    """A ranked schedule with scores."""
+
+    rank: int
+    schedule_id: str
+    scenario_id: str
+    safe_a: SAFEScore | None = None
+    safe_b: SAFEScore | None = None
+    utility_score: float = 0.0
+    is_primary: bool = False
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Gate Violation Exception
+# ═══════════════════════════════════════════════════════════════
+
+
+class GateViolation(Exception):
+    """Raised when a pipeline gate check fails.
+
+    Gates must raise, not log.
+    """
+
+    def __init__(self, gate_id: str, message: str, context: dict[str, Any] | None = None):
+        self.gate_id = gate_id
+        self.context = context or {}
+        super().__init__(f"Gate {gate_id} violated: {message}")
