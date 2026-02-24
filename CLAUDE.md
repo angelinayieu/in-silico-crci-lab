@@ -14,6 +14,9 @@ docs/
 ├── FILE_CONTEXT_MANIFEST.md             — Per-file spec lines, formulas, tables, gates
 ├── PROMPT_SEQUENCE.md                   — 31 ordered prompts (your build sequence)
 ├── CODE_QUALITY_ENFORCEMENT.md          — 12 rules + verification prompts + red flags
+├── TABLE_FILL_ORDER.md                  — When each table gets populated, by what, dependencies
+├── INTERFACE_SCHEMA_LOCK.md             — Field-level definitions for ALL intermediate states
+├── PARAMETER_PROVENANCE_AND_CURATION.md — GREEN/YELLOW/RED classification, curation protocol, G0 gate
 ├── SYS_EXTRACTION_COMPLETE.md           — Extraction spec (2,764 lines)
 ├── SYS_ALGORITHM_COMPLETE.md            — Algorithm spec (4,418 lines)
 ├── SYS_RUNTIME_COMPLETE.md              — Runtime spec (752 lines)
@@ -47,6 +50,13 @@ e. Re-read these anchor files to maintain naming consistency:
    - `shared/models/intermediate_states.py`
    (Skip this step during Phase 0 when these don't exist yet)
 f. Read the 12 enforcement rules in `docs/CODE_QUALITY_ENFORCEMENT.md` Section 1
+g. For any file that reads or writes database tables, consult
+   `docs/TABLE_FILL_ORDER.md` to verify the table is populated
+   at this stage and its dependencies exist
+h. For any file that produces or consumes an intermediate state
+   (TypedNumericValue, HarmonizedClaim, CalibratedRecord, etc.),
+   consult `docs/INTERFACE_SCHEMA_LOCK.md` for exact field definitions.
+   Your output types MUST match these schemas.
 
 ### 2. PLAN (think before coding)
 
