@@ -297,6 +297,44 @@ EMAX_DEFAULT_MAX: float = 1.0
 SYNERGY_GAMMA_CAP_DEFAULT: float = 0.40
 
 # ═══════════════════════════════════════════════════════════════
+#  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
+# ═══════════════════════════════════════════════════════════════
+
+# Gate P7-G1: Every compiled α must be based on ≥1 study with N≥20
+P7_MIN_N_FOR_ALPHA: int = 20
+
+# Compiler 1 (psychometric): tau-equivalent assumption fallback
+P7_DEFAULT_NUM_ITEMS: int = 10  # fallback if instrument num_items unknown
+
+# Compiler 2 (prior): Level 4 uninformative prior SE inflation
+P7_UNINFORMATIVE_SE_INFLATION: float = 2.0
+
+# Compiler 3 (temporal): minimum timepoints for curve fitting
+P7_MIN_TIMEPOINTS_CURVE: int = 3
+
+# Gate P7-G3: Recovery parameter constraints
+P7_RECOVERY_R_INF_MIN: float = 0.0
+P7_RECOVERY_R_INF_MAX: float = 1.0
+P7_RECOVERY_TAU_R_MIN: float = 0.0
+
+# Compiler 4 (dose-response): minimum dose levels for Emax fitting
+P7_MIN_DOSE_LEVELS_EMAX: int = 3
+P7_HILL_COEFFICIENT_DEFAULT: float = 1.0
+P7_EMAX_E0_DEFAULT: float = 0.0
+
+# Gate P7-G4: Dose-response constraints
+P7_HILL_MIN: float = 0.0
+P7_ED50_MIN: float = 0.0
+
+# Compiler 5 (modifier): ALG-C4b guardrails
+P7_MODIFIER_CLAMP_LOW: float = 0.7
+P7_MODIFIER_CLAMP_HIGH: float = 1.5
+
+# Gate P7-G6: Synergy γ bounds
+P7_SYNERGY_GAMMA_MIN: float = -1.0
+P7_SYNERGY_GAMMA_MAX: float = 1.0
+
+# ═══════════════════════════════════════════════════════════════
 #  OPTIMIZATION (§2.16.3) — SAFE score
 # ═══════════════════════════════════════════════════════════════
 
