@@ -577,21 +577,361 @@ Prompt:
 Output: 7 Python files
 
 
+PROMPT 3.5 — AG11 (InstrumentValidationAgent) + Extended Agent Prompts
+─────────────────────────────────────────────────────────────────────
+Context: E + F + A (SYS_EX lines 408-430) + SYS_EXTRACTION_ADDENDUM.md Parts 3-4
+
+Prompt:
+  [paste SYS_EXTRACTION_ADDENDUM.md Parts 3 and 4 (new agent + extensions)]
+  [paste base_agent.py for reference]
+
+  Create:
+  - extraction/p1_extraction/agents/ag11_instrument_validation.py
+    New agent following base_agent pattern. Extracts:
+    CRONBACHS_ALPHA, FACTOR_LOADING, TEST_RETEST_RELIABILITY,
+    INSTRUMENT_NAME, etc. (12 new SpanLabel types from addendum Part 3)
+
+  - llm/prompts/ag11_instrument_validation.txt
+
+  Update existing prompt templates to add extended SpanLabel types:
+  - llm/prompts/ag03_cohort.txt (add POPULATION_COGNITIVE_MEAN/SD/etc.)
+  - llm/prompts/ag05_stats_label.txt (add SUBGROUP_/INTERACTION_)
+  - llm/prompts/ag06_exposure.txt (add DOSE_LEVEL/EFFECT_AT_DOSE/etc.)
+  - llm/prompts/ag08_temporal.txt (add EFFECT_AT_TIMEPOINT/RECOVERY_*)
+
+  Update shared/models/enums.py:
+    Add all new SpanLabel types to SpanLabelEnum (~25 new values).
+
+  Update P0 paper_type_classifier.py:
+    Add 4 new paper subtypes (PSYCHOMETRIC_VALIDATION, NORMATIVE_COHORT,
+    DOSE_RESPONSE_STUDY, LONGITUDINAL_FOLLOWUP).
+
+  Update P0 mode_selection.py:
+    Route new subtypes to appropriate agent configurations.
+
+Output: 1 new agent + 1 new prompt + 4 updated prompts + enum updates
+        + P0 routing updates
+
+
+PROMPT 3.6 — Trust Boundary Extensions
+──────────────────────────────────────
+Context: E + F + SYS_EXTRACTION_ADDENDUM.md Part 5
+
+Prompt:
+  [paste SYS_EXTRACTION_ADDENDUM.md Part 5 (TB extensions)]
+  [paste existing numeric_parser.py and consistency_checker.py]
+
+  Extend:
+  - extraction/tb_trust_boundary/numeric_parser.py
+    Add parsing rules for psychometric values (α ∈ (0,1)),
+    factor loadings, population norms, dose-response pairs,
+    temporal curve points, subgroup interactions.
+
+  - extraction/tb_trust_boundary/consistency_checker.py
+    Add TB-PSYCH, TB-NORMS, TB-DOSE, TB-TEMPORAL, TB-SUBGROUP
+    cross-validation rule sets per addendum.
+
+Output: 2 updated Python files
+
+
+PROMPT 3.7 — New Intermediate Evidence Tables
+─────────────────────────────────────────────
+Context: E + F + G + SYS_EXTRACTION_ADDENDUM.md Part 7
+
+Prompt:
+  [paste SYS_EXTRACTION_ADDENDUM.md Part 7]
+
+  Add to database/schema/002_class_b_evidence.sql:
+  - instrument_evidence_v1 (psychometric extractions per study)
+  - population_norms_v1 (population cognitive scores per study)
+  - temporal_evidence_v1 (timepoint × effect data per study)
+  - dose_evidence_v1 (dose × effect data per study)
+  - subgroup_evidence_v1 (subgroup interaction data per study)
+
+  All 5 share base columns: id, study_id (FK), extraction_run_id (FK),
+  created_at, provenance_status, provenance_ref.
+  Plus type-specific columns per addendum Part 7.
+
+  Update shared/models/tables.py with ORM models for new tables.
+
+Output: Updated SQL schema + updated ORM models
+
+
+PROMPT 3.8 — Compilers 1-3 (Psychometric, Prior, Temporal)
+──────────────────────────────────────────────────────────
+Context: E + F + SYS_EXTRACTION_ADDENDUM.md Part 6 (Compilers 1-3)
+         + B (SYS_ALG lines for instruments_v1, context_matched_priors,
+         intervention_kernels, recovery_params schemas)
+
+Prompt:
+  [paste SYS_EXTRACTION_ADDENDUM.md Part 6, Compilers 1-3]
+
+  Create:
+  - extraction/p7_compilers/psychometric_compiler.py
+    Reads instrument_evidence_v1 → weighted mean of α by N → derives b_k
+    → writes instruments_v1 {a_k, b_k, alpha_k}
+    Gate P7-G1: each α must be based on N≥20 study.
+
+  - extraction/p7_compilers/prior_compiler.py
+    Reads population_norms_v1 → z-scores → weighted mean per node
+    → builds Σ_prior → Λ_prior via Cholesky
+    → writes context_matched_priors_v1
+    Gate P7-G2: Λ_prior must be positive definite.
+
+  - extraction/p7_compilers/temporal_compiler.py
+    Reads temporal_evidence_v1 → fits trapezoidal kernel via
+    IVW-weighted timepoints → fits stretched exponential for recovery
+    → writes intervention_kernels_v1 + recovery_params_v1
+    Gate P7-G3: onset < peak; r_∞ ∈ (0,1]; τ_R > 0.
+
+  Import ALL constants from config.py. Use scipy for curve fitting.
+
+Output: 3 Python files (highest-impact compilers)
+
+
+PROMPT 3.9 — Compilers 4-6 (Dose-Response, Modifier, Synergy)
+─────────────────────────────────────────────────────────────
+Context: E + F + SYS_EXTRACTION_ADDENDUM.md Part 6 (Compilers 4-6)
+
+Prompt:
+  [paste SYS_EXTRACTION_ADDENDUM.md Part 6, Compilers 4-6]
+
+  Create:
+  - extraction/p7_compilers/dose_response_compiler.py
+    Reads dose_evidence_v1 → fits Hill/Emax via NLLS
+    → writes dose_response_params_v1 {E0, Emax, ED50, hill}
+    Gate P7-G4: Emax same sign as effect direction; ED50 > 0.
+
+  - extraction/p7_compilers/modifier_compiler.py
+    Reads subgroup_evidence_v1 → pools interactions via IVW
+    → converts to multiplicative modifier → writes modifier_registry_v1
+    Clamp to [0.7, 1.5] per ALG-C4b guardrails.
+
+  - extraction/p7_compilers/synergy_compiler.py
+    Reads factorial trial data → computes γ coefficient
+    → writes synergy_registry_v1
+    Gate P7-G6: γ ∈ (-1, 1).
+
+Output: 3 Python files
+
+
+PROMPT 3.10 — Pipeline Extension for Full-Spectrum Extraction
+────────────────────────────────────────────────────────────
+Context: E + F + SYS_EXTRACTION_ADDENDUM.md Part 8 + pipeline.py
+
+Prompt:
+  [paste pipeline.py (existing)]
+  [paste SYS_EXTRACTION_ADDENDUM.md Part 8]
+
+  Update extraction/pipeline.py to:
+  1. Route papers through AG11 when paper_subtype is
+     PSYCHOMETRIC_VALIDATION
+  2. Activate AG03-EXT, AG06-EXT, AG08-EXT, AG05-EXT based on
+     paper subtype (see addendum Part 2 routing table)
+  3. After P6 validation passes, run P7 compilers:
+     Run all 6 compilers. Each reads from its intermediate evidence
+     table and writes to the corresponding Class A table.
+  4. Report: compilation results per compiler (rows updated, gates
+     passed/failed, provenance_status counts)
+
+  Update scripts/run_extraction.py to report full-spectrum results:
+  edge evidence rows + instrument compilations + prior compilations +
+  kernel compilations + dose compilations + modifier updates.
+
+Output: 2 updated Python files
+
+
+PROMPT 3.11 — Source Adapter Base + PubMed + Europe PMC
+─────────────────────────────────────────────────────
+Context: E + F + SYS_EX lines 1983-2010 (EX-ACQ-RET)
+         + AUTOMATED_RETRIEVAL_PLAN.md Part 4
+
+Prompt:
+  [paste AUTOMATED_RETRIEVAL_PLAN.md Part 4 (adapter specs)]
+
+  Create retrieval/adapters/base.py — abstract SourceAdapter with:
+    search(query, filters, max_results) → CandidateMetadata[]
+    fetch_metadata(identifier) → PaperMetadata
+    check_fulltext(doi_or_pmid) → FullTextAvailability
+    retrieve_fulltext(identifier) → bytes | None
+    health() → AdapterStatus
+
+  Create retrieval/adapters/pubmed.py:
+    Uses NCBI E-utilities (esearch.fcgi, efetch.fcgi)
+    API key from env NCBI_API_KEY (optional, affects rate limit)
+    Rate limit: 3 req/s without key, 10 req/s with key
+    Parses XML responses into CandidateMetadata
+    Supports PubMed Boolean query syntax
+    Handles pagination (retstart, retmax)
+
+  Create retrieval/adapters/europe_pmc.py:
+    Search endpoint + fullTextXML/{pmcid} for OA articles
+    Returns structured full text when available
+    Converts XML to clean text sections for Canonical Reader
+
+  Create retrieval/models.py with Pydantic models:
+    CandidateMetadata, PaperMetadata, FullTextAvailability,
+    RetrievalResult, AdapterStatus
+
+Output: 4 Python files
+
+
+PROMPT 3.12 — Crossref + OpenAlex + Unpaywall Adapters
+──────────────────────────────────────────────────────
+Context: E + F + AUTOMATED_RETRIEVAL_PLAN.md Part 4
+
+Prompt:
+  Create retrieval/adapters/crossref.py:
+    /works?query=... for search, /works/{doi} for lookup
+    Polite pool: include mailto in User-Agent
+    Normalize to CandidateMetadata schema
+
+  Create retrieval/adapters/openalex.py:
+    /works?search=... for discovery
+    Related works expansion for citation graph
+    Polite pool with email
+
+  Create retrieval/adapters/unpaywall.py:
+    /v2/{doi}?email=... for OA route resolution
+    Returns best_oa_location URL for PDF download
+
+Output: 3 Python files
+
+
+PROMPT 3.13 — Query Generator + node_search_terms_v1
+────────────────────────────────────────────────────
+Context: E + F + G (table schemas) + AUTOMATED_RETRIEVAL_PLAN.md Part 3
+
+Prompt:
+  Add node_search_terms_v1 to database/schema/001_class_a_knowledge.sql:
+    node_id (FK), term (TEXT), term_type (ENUM: primary, synonym,
+    abbreviation, mesh_heading), active (BOOL)
+
+  Create retrieval/query_generator.py:
+    Reads: edge_relations_definitions_v1,
+    biomarker_node_definitions_v1, instrument_definitions_v1,
+    action_catalog_v1, correlation_registry_v1, node_search_terms_v1
+
+    For each of the 7 workstreams, generates APSQueryRequest[]
+    using the template patterns in AUTOMATED_RETRIEVAL_PLAN.md Part 3.
+
+    Key methods:
+      generate_edge_queries(edge_ids=None) → APSQueryRequest[]
+      generate_instrument_queries(inst_ids=None) → APSQueryRequest[]
+      generate_norms_queries() → APSQueryRequest[]
+      generate_prior_queries(contexts) → APSQueryRequest[]
+      generate_recovery_queries() → APSQueryRequest[]
+      generate_kernel_queries() → APSQueryRequest[]
+      generate_correlation_queries() → APSQueryRequest[]
+      generate_all() → APSQueryRequest[]
+
+    Uses node_search_terms_v1 for synonym expansion in queries.
+    All constants from shared/config.py.
+
+Output: 1 SQL addition + 1 Python file
+
+
+PROMPT 3.14 — Search Coordinator + APS Scorer + Full-Text Retriever
+──────────────────────────────────────────────────────────────────
+Context: E + F + SYS_EX lines 1899-2013 (full EX-ACQ chain card)
+         + AUTOMATED_RETRIEVAL_PLAN.md Parts 4-6
+
+Prompt:
+  Create retrieval/search_coordinator.py:
+    Takes APSQueryRequest[], dispatches to source adapters,
+    collects CandidateMetadata[], deduplicates against
+    study_registry_v1 (DOI + PMID match), returns unique candidates.
+
+  Create retrieval/aps_scorer.py:
+    Implements EX-ACQ-APS formula:
+    APS = 0.35·EdgeGap + 0.20·DesignBonus + 0.20·PopMatch
+        + 0.15·Recency + 0.10·SourceQuality
+    Author-gap boost: APS × 1.5 (capped at 1.0)
+    Gate: APS ≥ 0.40 → DISPATCH, < 0.40 → DEFER
+    All constants from shared/config.py
+
+  Create retrieval/fulltext_retriever.py:
+    Source priority: Europe PMC → Unpaywall → abstract_only
+    Downloads PDF to data/retrieval_cache/{hash}.pdf
+    Writes/updates acquisition_queue_v1 rows
+    Respects rate limits per adapter
+
+  Create retrieval/config.py:
+    API keys (from env), rate limits, budget caps, source priority,
+    cache paths, max papers/day
+
+Output: 4 Python files
+
+
+PROMPT 3.15 — Acquisition Scheduler + Manual Upload + CLI Scripts
+───────────────────────────────────────────────────────────────
+Context: E + F + AUTOMATED_RETRIEVAL_PLAN.md Parts 5, 7, 9
+
+Prompt:
+  Create retrieval/acquisition_scheduler.py:
+    Full acquisition cycle:
+    1. query_generator.generate_all()
+    2. search_coordinator.search(queries)
+    3. aps_scorer.score(candidates)
+    4. fulltext_retriever.retrieve(scored, budget)
+    5. Feed retrieved PDFs to extraction pipeline
+    6. Report results summary
+    Modes: single_run, continuous, dry_run
+    Budget-aware: stops when daily cap reached
+
+  Create retrieval/manual_upload_watcher.py:
+    Watches data/manual_uploads/ for new files
+    PDFs → register + feed to EX-P0
+    CSVs → validate against template → write to evidence table
+    search_overrides → fetch specific DOIs → feed to pipeline
+
+  Create scripts/run_acquisition.py:
+    --workstream {edge|instruments|norms|priors|recovery|kernels|
+                  correlations|all}
+    --max-papers N (default: 50)
+    --dry-run (show queries, don't fetch)
+    --manual (process manual_uploads/)
+    --cycle (full: search + retrieve + extract + compile)
+
+  Create scripts/run_manual_import.py:
+    --type {pdf|csv|override}
+    --validate-only
+
+  Create CSV templates in data/templates/
+  (6 templates per AUTOMATED_RETRIEVAL_PLAN.md Part 5)
+
+Output: 4 Python files + 6 CSV templates
+
+
 ═══════════════════════════════════════════════════════════════════════════
- PHASE 4: BATCH EXTRACTION (no new prompts — this is RUNNING the system)
- Enforcement: Use DEBUG prompt template below when issues arise
- After phase: edges_v1 must pass P6 validation before proceeding
+ PHASE 4: AUTOMATED + MANUAL EXTRACTION
+ The system finds papers AND you can drop your own in.
+ START THIS WHILE BUILDING PHASE 5 (algorithm) IN PARALLEL.
+ Run validate_deployment_readiness.py (G0) to check coverage.
 ═══════════════════════════════════════════════════════════════════════════
 
-No LLM prompts for building code. You are now:
-  1. Collecting ~50-200 papers
-  2. Running: python scripts/run_extraction.py papers/*.pdf
-  3. Reviewing edge_evidence_v1 for errors
-  4. Tuning prompts in llm/prompts/*.txt as needed
-  5. Re-running failed/bad extractions
-  6. Iterating until edges_v1 passes P6 validation
+Phase 4 is RUNNING the system, not building code. Two parallel tracks:
 
-If you hit issues, your debugging prompt is:
+TRACK A — AUTOMATED (system finds papers):
+  python scripts/run_acquisition.py --workstream instruments --max-papers 10 --cycle
+  python scripts/run_acquisition.py --workstream edge --max-papers 20 --cycle
+  python scripts/run_acquisition.py --workstream all --max-papers 50 --cycle
+
+TRACK B — MANUAL (you supplement):
+  Drop PDFs into data/manual_uploads/pdfs/
+  Fill CSV templates in data/manual_uploads/structured/
+  python scripts/run_manual_import.py --type pdf
+
+TRACK C — ALGORITHM (parallel with extraction):
+  Build Phase 5 (ALG-A→F) while extraction populates evidence tables.
+  Re-run algorithm with real parameters when extraction delivers.
+
+ITERATION:
+  1. Run automated acquisition
+  2. Review extraction quality, tune prompts
+  3. Supplement with manual uploads for paywalled papers
+  4. Run G0: python scripts/validate_deployment_readiness.py
+  5. If NOT_READY → run more cycles. If READY → validate algorithm.
 
 PROMPT 4.DEBUG — Fix Extraction Issue
   Context: E + F + A (relevant chain lines) + the error output
@@ -863,15 +1203,15 @@ Output: 1 test file
 Phase 0: 8 prompts (foundation)
 Phase 1: 6 prompts (LLM client + extraction skeleton)
 Phase 2: 3 prompts (trust boundary + harmonization + calibration)
-Phase 3: 4 prompts (aggregation + compilation)
-Phase 4: 0 prompts (running the system, debugging as needed)
+Phase 3: 15 prompts (aggregation + compilers + full-spectrum + retrieval)
+Phase 4: 0 prompts (running the automated pipeline + manual supplements)
 Phase 5: 6 prompts (algorithm — the science)
 Phase 6: 2 prompts (runtime + presentation)
 Phase 7: 2 prompts (integration + CLI)
 ────────────────────────────────────────
-TOTAL: 31 prompts to build the entire v1 system
+TOTAL: 42 prompts to build the entire v1 system
 
-+ Debug prompts as needed during Phase 4 iteration
+* Debug prompts as needed during Phase 4 iteration
 
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -909,11 +1249,10 @@ Integration / debugging — also attach:
   ✓ CONFLICT_ANALYSIS.md (J) — if hitting σ²_struct / P_inclusion /
     acquisition_queue issues specifically
 
-
 IF CONTEXT WINDOW IS TOO SMALL:
   Priority order: F (Manifest) → relevant spec lines only (not full
   spec) → E (Blueprint) → code of upstream/downstream files
-  
+
   The manifest tells you exactly which 50-100 spec lines matter.
   Paste THOSE LINES, not the entire 2,764-line spec.
 
