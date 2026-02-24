@@ -26,6 +26,8 @@ from crci.shared.config import (
     COHERENCE_Z_ALARM,
     COHERENCE_Z_MONITOR,
     COHERENCE_Z_PASS,
+    HETEROGENEITY_HIGH_THRESHOLD,
+    SIGMA_SQ_STRUCTURAL_DEFAULT,
 )
 from crci.shared.models.enums import FailureMode, TriageTier
 from crci.shared.models.intermediate_states import (
@@ -232,7 +234,7 @@ def classify_discrepancy(
             return FailureMode.MEDIATION_LEAK
 
     # FM2: Unmeasured confounding — direct edge has high heterogeneity
-    if direct_edge is not None and direct_edge.i_squared > 75.0:
+    if direct_edge is not None and direct_edge.i_squared > HETEROGENEITY_HIGH_THRESHOLD:
         logger.warning(
             "P5-S4 FM2: Possible unmeasured confounding in pathway '%s' "
             "(direct edge I^2=%.1f%%)",
@@ -253,7 +255,7 @@ def classify_discrepancy(
         return FailureMode.SCALE_INCOMPATIBILITY
 
     # FM4: Population heterogeneity — high tau-squared across chain edges
-    high_tau_edges = [e for e in edges_in_chain if e.tau_squared > 0.25]
+    high_tau_edges = [e for e in edges_in_chain if e.tau_squared > SIGMA_SQ_STRUCTURAL_DEFAULT]
     if len(high_tau_edges) > len(edges_in_chain) / 2:
         logger.warning(
             "P5-S4 FM4: Population heterogeneity in pathway '%s' "

@@ -157,6 +157,11 @@ def check_idempotency(
         )
         .where(ExtractionRun.pdf_hash == paper_hash)
         .where(ExtractionRun.status == "completed")
+        # REVIEW: Spec (SYS_EX line 139) says "same paper hash + version",
+        # but ExtractionRun (B12) has no pipeline_version column.
+        # Currently dedupes on hash + completed status only.
+        # If version-aware idempotency is needed, add pipeline_version
+        # to the ExtractionRun schema or use policy_snapshot_id.
     )
     row = session.execute(stmt).first()
     if row is not None:
