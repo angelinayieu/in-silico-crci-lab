@@ -16,7 +16,13 @@ docs/
 ├── CODE_QUALITY_ENFORCEMENT.md          — 12 rules + verification prompts + red flags
 ├── TABLE_FILL_ORDER.md                  — When each table gets populated, by what, dependencies
 ├── INTERFACE_SCHEMA_LOCK.md             — Field-level definitions for ALL intermediate states
-├── PARAMETER_PROVENANCE_AND_CURATION.md — GREEN/YELLOW/RED classification, curation protocol, G0 gate
+├── PARAMETER_PROVENANCE_AND_CURATION.md — GREEN/YELLOW/RED classification, G0 gate
+├── SYS_EXTRACTION_ADDENDUM.md           — Full-spectrum extraction: AG11 + 6 compilers
+├── AUTOMATED_RETRIEVAL_PLAN.md          — Source adapters, query gen, acquisition loop, manual input
+├── HETEROGENEOUS_PAPER_TREATMENT_PROTOCOL.md — Multi-yield extraction, precision cascade, completeness tracking
+├── CONVERSION_VALIDITY_AND_HARDENING.md      — Conversion matrix, verification escalation, shared-control, freshness policies
+├── PAPER_TYPE_ROUTING_AND_ACQUISITION.md     — 27 study_subtypes, MA multi-product, double-counting, LLM guardrails
+├── PAPER_INTELLIGENCE_MAXIMIZATION.md        — 22 content dimensions, study_annotations_v1, annotation lifecycle
 ├── SYS_EXTRACTION_COMPLETE.md           — Extraction spec (2,764 lines)
 ├── SYS_ALGORITHM_COMPLETE.md            — Algorithm spec (4,418 lines)
 ├── SYS_RUNTIME_COMPLETE.md              — Runtime spec (752 lines)
