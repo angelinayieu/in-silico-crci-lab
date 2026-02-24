@@ -1702,6 +1702,157 @@ class BuildManifest(Base):
     version = Column(Integer, default=1)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  B10-B14: New Intermediate Evidence Tables
+#  SYS_EXTRACTION_ADDENDUM Part 7
+# ═══════════════════════════════════════════════════════════════
+
+
+class InstrumentEvidence(Base):
+    """B10. Raw psychometric extractions per study.
+
+    Written by AG11 → consumed by psychometric_compiler.
+    """
+    __tablename__ = "instrument_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    instrument_id = Column(Text)
+    instrument_name = Column(Text, nullable=False)
+    instrument_subscale = Column(Text)
+    population_descriptor = Column(Text)
+    cancer_type = Column(Text)
+    treatment_phase = Column(Text)
+    N = Column(Integer)
+    cronbachs_alpha = Column(Float)
+    se_alpha = Column(Float)
+    factor_loading_mean = Column(Float)
+    factor_loading_per_subscale = Column(JSONB)
+    test_retest_reliability = Column(Float)
+    sem_value = Column(Float)
+    convergent_validity = Column(Float)
+    discriminant_validity = Column(Float)
+    factor_structure = Column(Text)
+    measurement_invariance = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class PopulationNorms(Base):
+    """B11. Raw population cognitive scores per study.
+
+    Written by AG03-EXT → consumed by prior_compiler.
+    """
+    __tablename__ = "population_norms_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    cancer_type = Column(Text)
+    treatment_phase = Column(Text)
+    node_id = Column(Text)
+    instrument_id = Column(Text)
+    instrument_name = Column(Text)
+    cognitive_domain = Column(Text)
+    population_descriptor = Column(Text)
+    mean_raw = Column(Float)
+    sd_raw = Column(Float)
+    mean_z = Column(Float)
+    sd_z = Column(Float)
+    N = Column(Integer)
+    percentile = Column(Float)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class TemporalEvidence(Base):
+    """B12. Raw timepoint x effect data per study.
+
+    Written by AG08-EXT → consumed by temporal_compiler.
+    """
+    __tablename__ = "temporal_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    action_id = Column(Text)
+    intervention_type = Column(Text)
+    timepoint_weeks = Column(Float, nullable=False)
+    effect = Column(Float)
+    se = Column(Float)
+    is_recovery = Column(Integer, default=0)
+    N = Column(Integer)
+    study_design = Column(Text)
+    onset_observed = Column(Text)
+    peak_observed = Column(Text)
+    decay_observed = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class DoseEvidence(Base):
+    """B13. Raw dose x effect data per study.
+
+    Written by AG06-EXT → consumed by dose_response_compiler.
+    """
+    __tablename__ = "dose_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    action_id = Column(Text)
+    intervention_type = Column(Text)
+    dose_level = Column(Float, nullable=False)
+    dose_unit = Column(Text)
+    effect = Column(Float)
+    se = Column(Float)
+    N = Column(Integer)
+    dose_response_shape = Column(Text)
+    effective_dose_range = Column(Text)
+    maximum_tolerated_dose = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class SubgroupEvidence(Base):
+    """B14. Raw subgroup interaction data per study.
+
+    Written by AG05-EXT → consumed by modifier_compiler.
+    """
+    __tablename__ = "subgroup_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    edge_id = Column(Text)
+    modifier_variable = Column(Text, nullable=False)
+    modifier_value = Column(Text, nullable=False)
+    interaction_beta = Column(Float)
+    interaction_se = Column(Float)
+    interaction_p = Column(Float)
+    subgroup_effect = Column(Float)
+    subgroup_se = Column(Float)
+    subgroup_n = Column(Integer)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
 class ExtractionRun(Base):
     """Per-paper extraction run tracking."""
     __tablename__ = "extraction_runs"

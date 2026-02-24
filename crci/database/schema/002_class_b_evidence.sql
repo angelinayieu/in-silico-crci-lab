@@ -316,6 +316,153 @@ CREATE TABLE IF NOT EXISTS pathway_biomarkers_v1 (
     notes                           TEXT
 );
 
+-- ═══════════════════════════════════════════════════════════════
+-- B10-B14. NEW INTERMEDIATE EVIDENCE TABLES
+-- SYS_EXTRACTION_ADDENDUM Part 7: Raw extracted values BEFORE
+-- compilation. Compilers read from these and write to Class A.
+-- ═══════════════════════════════════════════════════════════════
+
+-- ───────────────────────────────────────────────────────────────
+-- B10. instrument_evidence_v1
+-- One row = one psychometric property for one instrument from
+-- one study. Written by AG11 → consumed by psychometric_compiler.
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS instrument_evidence_v1 (
+    id                          TEXT        PRIMARY KEY,
+    study_id                    TEXT        NOT NULL,
+    extraction_run_id           TEXT,
+    instrument_id               TEXT,
+    instrument_name             TEXT        NOT NULL,
+    instrument_subscale         TEXT,
+    population_descriptor       TEXT,
+    cancer_type                 TEXT,
+    treatment_phase             TEXT,
+    N                           INTEGER,
+    cronbachs_alpha             REAL,
+    se_alpha                    REAL,
+    factor_loading_mean         REAL,
+    factor_loading_per_subscale JSONB,
+    test_retest_reliability     REAL,
+    sem_value                   REAL,
+    convergent_validity         REAL,
+    discriminant_validity       REAL,
+    factor_structure            TEXT,
+    measurement_invariance      TEXT,
+    provenance_status           TEXT        DEFAULT 'CURATED_TRACED',
+    provenance_ref              TEXT,
+    created_at                  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes                       TEXT,
+    version                     INTEGER     DEFAULT 1
+);
+
+-- ───────────────────────────────────────────────────────────────
+-- B11. population_norms_v1
+-- One row = one population cognitive score for one domain from
+-- one study. Written by AG03-EXT → consumed by prior_compiler.
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS population_norms_v1 (
+    id                          TEXT        PRIMARY KEY,
+    study_id                    TEXT        NOT NULL,
+    extraction_run_id           TEXT,
+    cancer_type                 TEXT,
+    treatment_phase             TEXT,
+    node_id                     TEXT,
+    instrument_id               TEXT,
+    instrument_name             TEXT,
+    cognitive_domain            TEXT,
+    population_descriptor       TEXT,
+    mean_raw                    REAL,
+    sd_raw                      REAL,
+    mean_z                      REAL,
+    sd_z                        REAL,
+    N                           INTEGER,
+    percentile                  REAL,
+    provenance_status           TEXT        DEFAULT 'CURATED_TRACED',
+    provenance_ref              TEXT,
+    created_at                  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes                       TEXT,
+    version                     INTEGER     DEFAULT 1
+);
+
+-- ───────────────────────────────────────────────────────────────
+-- B12. temporal_evidence_v1
+-- One row = one timepoint × effect pair from one study.
+-- Written by AG08-EXT → consumed by temporal_compiler.
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS temporal_evidence_v1 (
+    id                          TEXT        PRIMARY KEY,
+    study_id                    TEXT        NOT NULL,
+    extraction_run_id           TEXT,
+    action_id                   TEXT,
+    intervention_type           TEXT,
+    timepoint_weeks             REAL        NOT NULL,
+    effect                      REAL,
+    se                          REAL,
+    is_recovery                 INTEGER     DEFAULT 0,
+    N                           INTEGER,
+    study_design                TEXT,
+    onset_observed              TEXT,
+    peak_observed               TEXT,
+    decay_observed              TEXT,
+    provenance_status           TEXT        DEFAULT 'CURATED_TRACED',
+    provenance_ref              TEXT,
+    created_at                  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes                       TEXT,
+    version                     INTEGER     DEFAULT 1
+);
+
+-- ───────────────────────────────────────────────────────────────
+-- B13. dose_evidence_v1
+-- One row = one dose × effect pair from one study.
+-- Written by AG06-EXT → consumed by dose_response_compiler.
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS dose_evidence_v1 (
+    id                          TEXT        PRIMARY KEY,
+    study_id                    TEXT        NOT NULL,
+    extraction_run_id           TEXT,
+    action_id                   TEXT,
+    intervention_type           TEXT,
+    dose_level                  REAL        NOT NULL,
+    dose_unit                   TEXT,
+    effect                      REAL,
+    se                          REAL,
+    N                           INTEGER,
+    dose_response_shape         TEXT,
+    effective_dose_range        TEXT,
+    maximum_tolerated_dose      TEXT,
+    provenance_status           TEXT        DEFAULT 'CURATED_TRACED',
+    provenance_ref              TEXT,
+    created_at                  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes                       TEXT,
+    version                     INTEGER     DEFAULT 1
+);
+
+-- ───────────────────────────────────────────────────────────────
+-- B14. subgroup_evidence_v1
+-- One row = one subgroup interaction from one study for one edge.
+-- Written by AG05-EXT → consumed by modifier_compiler.
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS subgroup_evidence_v1 (
+    id                          TEXT        PRIMARY KEY,
+    study_id                    TEXT        NOT NULL,
+    extraction_run_id           TEXT,
+    edge_id                     TEXT,
+    modifier_variable           TEXT        NOT NULL,
+    modifier_value              TEXT        NOT NULL,
+    interaction_beta            REAL,
+    interaction_se              REAL,
+    interaction_p               REAL,
+    subgroup_effect             REAL,
+    subgroup_se                 REAL,
+    subgroup_n                  INTEGER,
+    provenance_status           TEXT        DEFAULT 'CURATED_TRACED',
+    provenance_ref              TEXT,
+    created_at                  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    notes                       TEXT,
+    version                     INTEGER     DEFAULT 1
+);
+
+
 -- ───────────────────────────────────────────────────────────────
 -- E13. extraction_audit_v1  (evidence-related audit trail)
 -- One row = one extraction stage execution for one paper.
