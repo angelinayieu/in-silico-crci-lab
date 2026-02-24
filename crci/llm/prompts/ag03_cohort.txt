@@ -44,6 +44,26 @@ Study design: {study_design}
 
 {paper_id}
 
+## EXTENDED EXTRACTION: Population Cognitive Norms (AG03-EXT)
+
+If this paper reports mean cognitive scores by cancer type, treatment phase, or
+demographic subgroup: extract EVERY reported mean and SD, linked to the specific
+instrument, domain, and population subgroup. These are used to build population-level priors.
+
+For each cognitive score reported at baseline (before intervention), extract:
+
+7. **cognitive_scores** — An array of cognitive score entries, each with:
+   - **instrument_name**: Name of the cognitive instrument (e.g., "FACT-Cog", "MoCA", "TRAIL B")
+   - **domain**: Cognitive domain if specified (e.g., "memory", "attention", "executive function", "processing speed")
+   - **population_subgroup**: Which subgroup this score applies to (e.g., "breast cancer post-chemo", "all participants", "age >= 65")
+   - **mean**: Mean score on this instrument/domain
+   - **sd**: Standard deviation of the score
+   - **n**: Sample size for this subgroup
+   - **percentile**: Percentile vs normative data, if reported (0-100 scale)
+
+Only extract cognitive scores that represent BASELINE or POPULATION-LEVEL values
+(not post-intervention outcomes). If the paper has no cognitive scores, return an empty array.
+
 ## Output Format
 
 Respond with ONLY a JSON object (no markdown code fences, no extra text):
@@ -54,5 +74,16 @@ Respond with ONLY a JSON object (no markdown code fences, no extra text):
   "treatment_phase": "<string or null>",
   "mean_age": <float or null>,
   "percent_female": <float or null>,
-  "demographics_notes": "<string or null>"
+  "demographics_notes": "<string or null>",
+  "cognitive_scores": [
+    {{
+      "instrument_name": "<string>",
+      "domain": "<string or null>",
+      "population_subgroup": "<string or null>",
+      "mean": <float or null>,
+      "sd": <float or null>,
+      "n": <integer or null>,
+      "percentile": <float or null>
+    }}
+  ]
 }}

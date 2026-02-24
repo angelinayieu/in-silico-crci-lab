@@ -5,13 +5,14 @@
 # VERIFIED: no hardcoded formula parameters
 # VERIFIED: gates — none (STANDARD/DEEP only, mode gate enforced at orchestration level)
 """
-Component: SYS_EXTRACTION.EX-P1.AG06
+Component: SYS_EXTRACTION.EX-P1.AG06 + AG06-EXT
 Spec: SYS_EXTRACTION_COMPLETE.md lines 380-520 (AG06 ExposureAgent)
+      SYS_EXTRACTION_ADDENDUM Part 4 (AG06-EXT dose-response data)
 Formulas: None
 Reads: PaperMap.sections[Methods, Results] (from canonical_reader.py)
 Writes: AgentOutput with SpanLabel[] + Annotations for exposure/intervention
-        details, dosage, duration, adherence
-        (consumed by reconciliation.py, trust boundary)
+        details, dosage, duration, adherence, dose-response pairs
+        (consumed by reconciliation.py, trust boundary, dose_response_compiler)
 Gates: None (STANDARD/DEEP mode gate enforced at orchestration level)
 """
 from __future__ import annotations
@@ -27,7 +28,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
     BaseAgent,
 )
 from crci.llm.client import LLMClient
-from crci.llm.response_schemas import ExposureResponse
+from crci.llm.response_schemas import ExposureExtendedResponse, ExposureResponse
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -59,7 +60,7 @@ class ExposureAgent(BaseAgent):
 
     @property
     def response_schema(self) -> type[BaseModel]:
-        return ExposureResponse
+        return ExposureExtendedResponse
 
     @property
     def prompt_template_path(self) -> Path:
@@ -93,12 +94,13 @@ class ExposureAgent(BaseAgent):
     def _parse_response(
         self, response: BaseModel, paper_map: PaperMap
     ) -> AgentOutput:
-        """Convert ExposureResponse to AgentOutput.
+        """Convert ExposureExtendedResponse to AgentOutput.
 
         Creates SpanLabel entries for intervention type, dose, duration,
-        and annotations for adherence and detailed intervention metadata.
+        dose-response pairs (AG06-EXT), and annotations for adherence
+        and detailed intervention metadata.
         """
-        exposure_resp: ExposureResponse = response  # type: ignore[assignment]
+        exposure_resp: ExposureExtendedResponse = response  # type: ignore[assignment]
 
         span_labels: list[SpanLabel] = []
         annotations: list[RawAnnotationEmission] = []
@@ -294,6 +296,141 @@ class ExposureAgent(BaseAgent):
                 )
             )
 
+        # ─── AG06-EXT: Dose-response pairs ─────────────────────
+        for pair in exposure_resp.dose_effect_pairs:
+            grp_id = f"dose_{uuid.uuid4().hex[:8]}"
+
+            # SpanLabel for dose level
+            dose_text = pair.dose_level
+            dose_start = paper_map.full_text.find(dose_text)
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                    label_type="DOSE_LEVEL",
+                    value=dose_text,
+                    numeric_value=None,
+                    char_start=max(0, dose_start),
+                    char_end=(
+                        dose_start + len(dose_text) if dose_start >= 0 else 0
+                    ),
+                    confidence=0.85 if dose_start >= 0 else 0.65,
+                    source_section="results",
+                )
+            )
+
+            # SpanLabel for dose unit
+            if pair.dose_unit:
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                        label_type="DOSE_UNIT",
+                        value=pair.dose_unit,
+                        numeric_value=None,
+                        char_start=0,
+                        char_end=0,
+                        confidence=0.80,
+                        source_section="methods",
+                    )
+                )
+
+            # SpanLabel for effect at dose
+            if pair.effect is not None:
+                eff_str = str(pair.effect)
+                eff_start = paper_map.full_text.find(eff_str)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                        label_type="EFFECT_AT_DOSE",
+                        value=eff_str,
+                        numeric_value=pair.effect,
+                        char_start=max(0, eff_start),
+                        char_end=(
+                            eff_start + len(eff_str) if eff_start >= 0 else 0
+                        ),
+                        confidence=0.85 if eff_start >= 0 else 0.65,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for effect SE at dose
+            if pair.effect_se is not None:
+                se_str = str(pair.effect_se)
+                se_start = paper_map.full_text.find(se_str)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                        label_type="EFFECT_SE_AT_DOSE",
+                        value=se_str,
+                        numeric_value=pair.effect_se,
+                        char_start=max(0, se_start),
+                        char_end=(
+                            se_start + len(se_str) if se_start >= 0 else 0
+                        ),
+                        confidence=0.80 if se_start >= 0 else 0.60,
+                        source_section="results",
+                    )
+                )
+
+        # SpanLabel for dose-response shape
+        if exposure_resp.dose_response_shape:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                    label_type="DOSE_RESPONSE_SHAPE",
+                    value=exposure_resp.dose_response_shape,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        # SpanLabel for effective dose range
+        if exposure_resp.effective_dose_range:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                    label_type="EFFECTIVE_DOSE_RANGE",
+                    value=exposure_resp.effective_dose_range,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        # SpanLabel for maximum tolerated dose
+        if exposure_resp.maximum_tolerated_dose:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag06ext_{uuid.uuid4().hex[:12]}",
+                    label_type="MAXIMUM_TOLERATED_DOSE",
+                    value=exposure_resp.maximum_tolerated_dose,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        # Annotation for dose-response data
+        if exposure_resp.dose_effect_pairs:
+            annotations.append(
+                RawAnnotationEmission(
+                    annotation_id=f"ag06ext_ann_{uuid.uuid4().hex[:12]}",
+                    category="dose_response_evidence",
+                    content=(
+                        f"Dose-response data: {len(exposure_resp.dose_effect_pairs)} "
+                        f"dose levels; shape={exposure_resp.dose_response_shape or 'unknown'}"
+                    ),
+                    evidence_strength="moderate",
+                    extraction_snippet=None,
+                )
+            )
+
         metadata = {
             "intervention_type": exposure_resp.intervention_type,
             "dose": exposure_resp.dose,
@@ -301,6 +438,8 @@ class ExposureAgent(BaseAgent):
             "duration_weeks": exposure_resp.duration_weeks,
             "frequency": exposure_resp.frequency,
             "adherence_rate": exposure_resp.adherence_rate,
+            "n_dose_effect_pairs": len(exposure_resp.dose_effect_pairs),
+            "dose_response_shape": exposure_resp.dose_response_shape,
         }
 
         return AgentOutput(

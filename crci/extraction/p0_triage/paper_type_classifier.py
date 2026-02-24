@@ -38,7 +38,7 @@ def classify_paper_type(
     ingested_paper: dict[str, Any],
     llm_client: LLMClient | None = None,
 ) -> dict[str, Any]:
-    """Classify paper into one of 23 PaperSubtype values using Claude.
+    """Classify paper into one of 27 PaperSubtype values using Claude.
 
     P0-PTC: Paper Type Classifier.
     Uses the LLM to classify the paper based on its canonical text.
@@ -136,13 +136,15 @@ def _load_and_fill_prompt(paper_text: str) -> str:
         )
         # Inline fallback prompt (minimal)
         template = (
-            "Classify the following paper into one of the 23 CRCI paper subtypes. "
+            "Classify the following paper into one of the 27 CRCI paper subtypes. "
             "Valid subtypes: RCT_exercise, RCT_cognitive, RCT_pharmacological, "
             "RCT_multimodal, meta_analysis, systematic_review, longitudinal_cohort, "
             "cross_sectional, intensive_longitudinal, mechanistic_animal, "
             "mechanistic_human, imaging_structural, imaging_functional, "
             "biomarker_discovery, dose_response, safety_report, guideline, "
-            "case_report, editorial, review_narrative, protocol, qualitative, other.\n\n"
+            "case_report, editorial, review_narrative, protocol, qualitative, "
+            "psychometric_validation, normative_cohort, dose_response_study, "
+            "longitudinal_followup, other.\n\n"
             "Paper text:\n---\n{paper_text}\n---\n\n"
             "Respond with JSON: "
             '{{\"paper_subtype\": \"<subtype>\", \"confidence\": <float>, '

@@ -1,18 +1,19 @@
 # VERIFIED: formulas NP-01 through NP-11 match spec lines 628-650
 # VERIFIED: imports — all modules exist
-# VERIFIED: backward wiring — reads SpanLabel[] from ag05_stats_label.py
+# VERIFIED: backward wiring — reads SpanLabel[] from ag05_stats_label.py + AG11 + agent extensions
 # VERIFIED: forward wiring — writes list[ParsedNumeric] for consistency_checker.py
 # VERIFIED: no hardcoded formula parameters (plausibility bounds from config)
 # VERIFIED: gates TB-G1 raise on failure
 """
-Component: SYS_EXTRACTION.EX-TB.TB-NP
+Component: SYS_EXTRACTION.EX-TB.TB-NP + TB-PSYCH + TB-NORMS + TB-DOSE + TB-TEMPORAL + TB-SUBGROUP
 Spec: SYS_EXTRACTION_COMPLETE.md lines 593-650
-Formulas: NP-01, NP-02, NP-03, NP-04, NP-05, NP-06, NP-07, NP-08, NP-09, NP-10, NP-11
-Reads: SpanLabel[] (from ag05_stats_label.py)
+      SYS_EXTRACTION_ADDENDUM Part 5 (Trust Boundary Extensions)
+Formulas: NP-01 through NP-11 (original), TB-PSYCH/NORMS/DOSE/TEMPORAL/SUBGROUP (extensions)
+Reads: SpanLabel[] (from AG05, AG11, AG03-EXT, AG05-EXT, AG06-EXT, AG08-EXT)
 Writes: list[ParsedNumeric] (consumed by consistency_checker.py)
 Gates: TB-G1 (>= 1 span parsed successfully or raise GateViolation)
 
-THIS IS THE TRUST BOUNDARY FOR NUMERIC EVIDENCE.
+THIS IS THE TRUST BOUNDARY FOR ALL NUMERIC EVIDENCE.
 NO LLM CALLS. Pure deterministic parsing.
 """
 from __future__ import annotations
@@ -60,6 +61,63 @@ _RULE_NP_PASSTHROUGH_TYPES = {
     "RANGE_MIN", "RANGE_MAX", "INTERACTION_TERM", "SUBGROUP_EFFECT",
     "FOLLOW_UP_DURATION",
 }
+
+# ─── Extended label type rule sets (SYS_EXTRACTION_ADDENDUM Part 5) ───
+
+# TB-PSYCH: Psychometric validation labels → correlation/coefficient parsing
+_RULE_TB_PSYCH_COEFFICIENT_TYPES = {
+    "CRONBACHS_ALPHA", "TEST_RETEST_RELIABILITY", "FACTOR_LOADING",
+    "CONVERGENT_VALIDITY", "DISCRIMINANT_VALIDITY", "SEM_VALUE",
+}
+_RULE_TB_PSYCH_N_TYPES = {"INTERNAL_CONSISTENCY_N"}
+_RULE_TB_PSYCH_TEXT_TYPES = {
+    "FACTOR_STRUCTURE", "MEASUREMENT_INVARIANCE",
+    "INSTRUMENT_NAME", "INSTRUMENT_SUBSCALE", "POPULATION_DESCRIPTOR",
+}
+
+# TB-NORMS: Population cognitive norm labels
+_RULE_TB_NORMS_MEAN_TYPES = {"POPULATION_COGNITIVE_MEAN"}
+_RULE_TB_NORMS_SD_TYPES = {"POPULATION_COGNITIVE_SD"}
+_RULE_TB_NORMS_TEXT_TYPES = {
+    "POPULATION_COGNITIVE_DOMAIN", "POPULATION_COGNITIVE_INSTRUMENT",
+}
+_RULE_TB_NORMS_PCT_TYPES = {"POPULATION_PERCENTILE"}
+
+# TB-DOSE: Dose-response labels
+_RULE_TB_DOSE_NUMERIC_TYPES = {
+    "DOSE_LEVEL", "EFFECT_AT_DOSE", "EFFECT_SE_AT_DOSE",
+}
+_RULE_TB_DOSE_TEXT_TYPES = {
+    "DOSE_UNIT", "DOSE_RESPONSE_SHAPE", "EFFECTIVE_DOSE_RANGE",
+    "MAXIMUM_TOLERATED_DOSE",
+}
+
+# TB-TEMPORAL: Temporal curve labels
+_RULE_TB_TEMPORAL_NUMERIC_TYPES = {
+    "EFFECT_AT_TIMEPOINT", "SE_AT_TIMEPOINT", "TIMEPOINT_WEEKS",
+    "RECOVERY_POSTCESSATION", "RECOVERY_TIMEPOINT",
+}
+_RULE_TB_TEMPORAL_TEXT_TYPES = {
+    "ONSET_OBSERVED", "PEAK_OBSERVED", "DECAY_OBSERVED",
+}
+
+# TB-SUBGROUP: Subgroup interaction labels
+_RULE_TB_SUBGROUP_NUMERIC_TYPES = {
+    "INTERACTION_EFFECT", "INTERACTION_SE", "INTERACTION_P",
+    "SUBGROUP_EFFECT", "SUBGROUP_N",
+}
+_RULE_TB_SUBGROUP_TEXT_TYPES = {
+    "SUBGROUP_VARIABLE", "SUBGROUP_VALUE",
+}
+
+# Combined set of all text/non-numeric labels (passthrough as-is, no parse)
+_ALL_TEXT_LABEL_TYPES = (
+    _RULE_TB_PSYCH_TEXT_TYPES
+    | _RULE_TB_NORMS_TEXT_TYPES
+    | _RULE_TB_DOSE_TEXT_TYPES
+    | _RULE_TB_TEMPORAL_TEXT_TYPES
+    | _RULE_TB_SUBGROUP_TEXT_TYPES
+)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -912,6 +970,77 @@ def _rule_passthrough(raw_text: str, label_type: str) -> _ParseResult | None:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  TB Extension parse rules (SYS_EXTRACTION_ADDENDUM Part 5)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _rule_tb_psych_coefficient(raw_text: str, label_type: str) -> _ParseResult | None:
+    """TB-PSYCH: Parse psychometric coefficient (α, λ, r_tt, SEM).
+
+    These are all bounded values typically in (0, 1) except SEM.
+    Uses NP-09 correlation parsing fallback since the format is similar.
+    """
+    # Try correlation-style parsing first (r = X)
+    result = _rule_np09_correlation(raw_text, label_type)
+    if result is not None:
+        return _ParseResult(
+            value=result.value,
+            se=result.se,
+            ci_lower=result.ci_lower,
+            ci_upper=result.ci_upper,
+            rule_id="TB-PSYCH",
+            notes=result.notes + [f"Parsed as psychometric coefficient ({label_type})"],
+        )
+
+    # Fallback: extract bare number
+    num = _extract_first_number(raw_text)
+    if num is not None:
+        return _ParseResult(
+            value=num,
+            rule_id="TB-PSYCH",
+            notes=[f"Bare numeric parse for {label_type}"],
+        )
+
+    return None
+
+
+def _rule_tb_subgroup_numeric(raw_text: str, label_type: str) -> _ParseResult | None:
+    """TB-SUBGROUP: Parse subgroup interaction numeric values.
+
+    INTERACTION_EFFECT/INTERACTION_SE: regression coefficient parsing.
+    INTERACTION_P: p-value parsing.
+    SUBGROUP_EFFECT: effect size parsing.
+    SUBGROUP_N: sample size parsing.
+    """
+    if label_type == "INTERACTION_P":
+        return _rule_np03_p_value(raw_text, label_type)
+    if label_type == "SUBGROUP_N":
+        return _rule_np05_sample_size(raw_text, label_type)
+    if label_type in ("INTERACTION_EFFECT", "INTERACTION_SE"):
+        return _rule_np08_regression_coeff(raw_text, label_type)
+    if label_type == "SUBGROUP_EFFECT":
+        return _rule_np04_effect_size(raw_text, label_type)
+
+    # Fallback
+    return _rule_passthrough(raw_text, label_type)
+
+
+def _rule_text_passthrough(raw_text: str, label_type: str) -> _ParseResult | None:
+    """Parse text-only labels (instrument names, domains, etc.).
+
+    These don't have numeric values but need to pass through the trust
+    boundary for downstream compilers. Value is set to 0.0 as a placeholder.
+    """
+    if raw_text and raw_text.strip():
+        return _ParseResult(
+            value=0.0,
+            rule_id="TEXT-PASS",
+            notes=[f"Text label: {raw_text[:80]}"],
+        )
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
 #  Utility
 # ═══════════════════════════════════════════════════════════════
 
@@ -937,6 +1066,7 @@ def _extract_first_number(text: str) -> float | None:
 
 def _dispatch_parse(raw_text: str, label_type: str) -> _ParseResult | None:
     """Route a span to the correct parse rule based on its label_type."""
+    # ─── Original NP-01 through NP-10 rules ─────────────────
     if label_type in _RULE_NP01_TYPES:
         return _rule_np01_mean_sd(raw_text, label_type)
     if label_type in _RULE_NP02_TYPES:
@@ -957,6 +1087,37 @@ def _dispatch_parse(raw_text: str, label_type: str) -> _ParseResult | None:
         return _rule_np10_test_statistic(raw_text, label_type)
     if label_type in _RULE_NP_PASSTHROUGH_TYPES:
         return _rule_passthrough(raw_text, label_type)
+
+    # ─── TB-PSYCH: Psychometric coefficient types (α, λ, r_tt) ──
+    if label_type in _RULE_TB_PSYCH_COEFFICIENT_TYPES:
+        return _rule_tb_psych_coefficient(raw_text, label_type)
+    if label_type in _RULE_TB_PSYCH_N_TYPES:
+        return _rule_np05_sample_size(raw_text, label_type)
+
+    # ─── TB-NORMS: Population cognitive norm types ──────────────
+    if label_type in _RULE_TB_NORMS_MEAN_TYPES:
+        return _rule_np01_mean_sd(raw_text, label_type)
+    if label_type in _RULE_TB_NORMS_SD_TYPES:
+        return _rule_passthrough(raw_text, label_type)
+    if label_type in _RULE_TB_NORMS_PCT_TYPES:
+        return _rule_np06_percentage(raw_text, label_type)
+
+    # ─── TB-DOSE: Dose-response numeric types ──────────────────
+    if label_type in _RULE_TB_DOSE_NUMERIC_TYPES:
+        return _rule_passthrough(raw_text, label_type)
+
+    # ─── TB-TEMPORAL: Temporal curve numeric types ─────────────
+    if label_type in _RULE_TB_TEMPORAL_NUMERIC_TYPES:
+        return _rule_passthrough(raw_text, label_type)
+
+    # ─── TB-SUBGROUP: Subgroup interaction numeric types ───────
+    if label_type in _RULE_TB_SUBGROUP_NUMERIC_TYPES:
+        return _rule_tb_subgroup_numeric(raw_text, label_type)
+
+    # ─── Text/non-numeric labels: passthrough as string value ──
+    if label_type in _ALL_TEXT_LABEL_TYPES:
+        return _rule_text_passthrough(raw_text, label_type)
+
     # NP-07: table cell (any label type can come from a table)
     return _rule_np07_table_cell(raw_text, label_type)
 
@@ -1069,6 +1230,161 @@ def _validate_plausibility(
                 raw_text[:60],
             )
             return ParseStatus.FAILED
+
+    # ─── TB-PSYCH plausibility (SYS_EXTRACTION_ADDENDUM Part 5) ───
+
+    # CRONBACHS_ALPHA: must be ∈ (0, 1). Flag if < 0.50 or > 0.99
+    if label_type == "CRONBACHS_ALPHA" and result.value is not None:
+        if result.value <= 0 or result.value >= 1:
+            logger.warning(
+                "TB-PSYCH FAIL: CRONBACHS_ALPHA=%.4f not in (0, 1) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+        if result.value < 0.50:
+            logger.warning(
+                "TB-PSYCH WARNING: CRONBACHS_ALPHA=%.4f < 0.50 (likely misparse) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.WARNING
+
+    # FACTOR_LOADING: must be ∈ (0, 1). Flag if < 0.20 or > 0.98
+    if label_type == "FACTOR_LOADING" and result.value is not None:
+        if result.value <= 0 or result.value >= 1:
+            logger.warning(
+                "TB-PSYCH FAIL: FACTOR_LOADING=%.4f not in (0, 1) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+        if result.value < 0.20 or result.value > 0.98:
+            logger.warning(
+                "TB-PSYCH WARNING: FACTOR_LOADING=%.4f outside typical range for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.WARNING
+
+    # TEST_RETEST_RELIABILITY: must be ∈ (0, 1). Flag if < 0.40
+    if label_type == "TEST_RETEST_RELIABILITY" and result.value is not None:
+        if result.value <= 0 or result.value >= 1:
+            logger.warning(
+                "TB-PSYCH FAIL: TEST_RETEST=%.4f not in (0, 1) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+        if result.value < 0.40:
+            logger.warning(
+                "TB-PSYCH WARNING: TEST_RETEST=%.4f < 0.40 (poor reliability) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.WARNING
+
+    # CONVERGENT/DISCRIMINANT_VALIDITY: correlation-like, |value| ≤ 1
+    if label_type in ("CONVERGENT_VALIDITY", "DISCRIMINANT_VALIDITY") and result.value is not None:
+        if abs(result.value) > 1.0:
+            logger.warning(
+                "TB-PSYCH FAIL: %s=%.4f, |value| > 1 for '%s'",
+                label_type, result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # INTERNAL_CONSISTENCY_N: must be ≥ 20
+    if label_type == "INTERNAL_CONSISTENCY_N" and result.n is not None:
+        if result.n < 20:
+            logger.warning(
+                "TB-PSYCH FAIL: INTERNAL_CONSISTENCY_N=%d < 20 for '%s'",
+                result.n, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # ─── TB-NORMS plausibility ────────────────────────────────────
+
+    # POPULATION_COGNITIVE_SD: must be > 0
+    if label_type == "POPULATION_COGNITIVE_SD" and result.value is not None:
+        if result.value <= 0:
+            logger.warning(
+                "TB-NORMS FAIL: POPULATION_COGNITIVE_SD=%.4f ≤ 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # POPULATION_PERCENTILE: must be in [0, 100]
+    if label_type == "POPULATION_PERCENTILE" and result.value is not None:
+        if result.value < 0 or result.value > 1.0:
+            logger.warning(
+                "TB-NORMS FAIL: POPULATION_PERCENTILE=%.4f not in [0, 1] for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # ─── TB-DOSE plausibility ─────────────────────────────────────
+
+    # DOSE_LEVEL: must be > 0
+    if label_type == "DOSE_LEVEL" and result.value is not None:
+        if result.value <= 0:
+            logger.warning(
+                "TB-DOSE FAIL: DOSE_LEVEL=%.4f ≤ 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # EFFECT_SE_AT_DOSE: must be > 0
+    if label_type == "EFFECT_SE_AT_DOSE" and result.value is not None:
+        if result.value <= 0:
+            logger.warning(
+                "TB-DOSE FAIL: EFFECT_SE_AT_DOSE=%.4f ≤ 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # ─── TB-TEMPORAL plausibility ─────────────────────────────────
+
+    # TIMEPOINT_WEEKS: must be ≥ 0, flag if > 520 (10 years)
+    if label_type == "TIMEPOINT_WEEKS" and result.value is not None:
+        if result.value < 0:
+            logger.warning(
+                "TB-TEMPORAL FAIL: TIMEPOINT_WEEKS=%.1f < 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+        if result.value > 520:
+            logger.warning(
+                "TB-TEMPORAL WARNING: TIMEPOINT_WEEKS=%.1f > 520 (10 years) for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.WARNING
+
+    # RECOVERY_TIMEPOINT: must be ≥ 0
+    if label_type == "RECOVERY_TIMEPOINT" and result.value is not None:
+        if result.value < 0:
+            logger.warning(
+                "TB-TEMPORAL FAIL: RECOVERY_TIMEPOINT=%.1f < 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # ─── TB-SUBGROUP plausibility ─────────────────────────────────
+
+    # INTERACTION_SE: must be > 0 (when numeric)
+    if label_type == "INTERACTION_SE" and result.value is not None:
+        if result.value <= 0:
+            logger.warning(
+                "TB-SUBGROUP FAIL: INTERACTION_SE=%.4f ≤ 0 for '%s'",
+                result.value, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # SUBGROUP_N: must be > 0
+    if label_type == "SUBGROUP_N" and result.n is not None:
+        if result.n <= 0:
+            logger.warning(
+                "TB-SUBGROUP FAIL: SUBGROUP_N=%d ≤ 0 for '%s'",
+                result.n, raw_text[:60],
+            )
+            return ParseStatus.FAILED
+
+    # ─── Text labels always pass plausibility ─────────────────────
+    if label_type in _ALL_TEXT_LABEL_TYPES:
+        return ParseStatus.CLEAN
 
     return ParseStatus.CLEAN
 

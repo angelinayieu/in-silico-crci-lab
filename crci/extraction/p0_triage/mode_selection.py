@@ -47,6 +47,11 @@ _SUBTYPE_TO_MODE: dict[PaperSubtype, ExtractionMode] = {
     # DEEP: Meta-analyses (high evidence value, need thorough extraction)
     PaperSubtype.META_ANALYSIS: ExtractionMode.DEEP,
 
+    # DEEP: Dose-response and longitudinal follow-up
+    # (SYS_EXTRACTION_ADDENDUM Part 2: need thorough multi-dose/multi-timepoint extraction)
+    PaperSubtype.DOSE_RESPONSE_STUDY: ExtractionMode.DEEP,
+    PaperSubtype.LONGITUDINAL_FOLLOWUP: ExtractionMode.DEEP,
+
     # STANDARD: Systematic reviews and observational designs with cognitive outcomes
     PaperSubtype.SYSTEMATIC_REVIEW: ExtractionMode.STANDARD,
     PaperSubtype.LONGITUDINAL_COHORT: ExtractionMode.STANDARD,
@@ -56,6 +61,11 @@ _SUBTYPE_TO_MODE: dict[PaperSubtype, ExtractionMode] = {
     PaperSubtype.IMAGING_STRUCTURAL: ExtractionMode.STANDARD,
     PaperSubtype.IMAGING_FUNCTIONAL: ExtractionMode.STANDARD,
     PaperSubtype.DOSE_RESPONSE: ExtractionMode.STANDARD,
+
+    # STANDARD: Psychometric validation and normative cohorts
+    # (SYS_EXTRACTION_ADDENDUM Part 2: activate AG11 / AG03-EXT respectively)
+    PaperSubtype.PSYCHOMETRIC_VALIDATION: ExtractionMode.STANDARD,
+    PaperSubtype.NORMATIVE_COHORT: ExtractionMode.STANDARD,
 
     # SHALLOW: Lower evidence value or less extractable content
     PaperSubtype.MECHANISTIC_ANIMAL: ExtractionMode.SHALLOW,

@@ -168,6 +168,25 @@ Return a single JSON object with a "spans" array:
 }}
 ```
 
+## EXTENDED EXTRACTION: Subgroup Interactions (AG05-EXT)
+
+If this paper reports subgroup analyses or treatment x moderator interactions:
+extract the interaction effect, SE, and p-value for EACH subgroup comparison.
+Also extract the within-subgroup effect sizes if reported.
+
+For EACH subgroup analysis found, include these ADDITIONAL label types in the spans:
+- SUBGROUP_VARIABLE — What defines the subgroup (e.g., "age", "sex", "cancer_type")
+- SUBGROUP_VALUE — Specific subgroup (e.g., ">65", "female", "breast cancer")
+- INTERACTION_EFFECT — Interaction beta (subgroup x treatment)
+- INTERACTION_SE — SE of the interaction term
+- INTERACTION_P — p-value for interaction test
+- SUBGROUP_EFFECT — Effect size within this subgroup
+- SUBGROUP_N — Sample size for this subgroup
+
+Group all subgroup statistics for the SAME comparison with the SAME grouping_id.
+Example: "Age x treatment interaction: beta=0.15, SE=0.08, p=0.06; effect in older
+adults: d=0.52 (n=84)" produces 5 spans with one grouping_id.
+
 ## CRITICAL REMINDERS
 - Do NOT skip any numeric results — EVERY statistical claim matters
 - Character offsets MUST correspond to the exact positions in the provided text
@@ -175,5 +194,6 @@ Return a single JSON object with a "spans" array:
 - Group related statistics with the SAME grouping_id
 - The candidate spans listed above are HINTS — extract ALL statistics, not just the pre-identified ones
 - If you are unsure about a label_type, use context to pick the best match and lower your confidence
+- For subgroup analyses: extract BOTH the interaction term AND the within-subgroup effect if reported
 
 Return ONLY the JSON object, no additional text.

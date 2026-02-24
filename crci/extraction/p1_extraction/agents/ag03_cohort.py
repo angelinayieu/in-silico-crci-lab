@@ -5,12 +5,13 @@
 # VERIFIED: no hardcoded formula parameters
 # VERIFIED: gates — none (STANDARD/DEEP only, mode gate enforced at orchestration level)
 """
-Component: SYS_EXTRACTION.EX-P1.AG03
+Component: SYS_EXTRACTION.EX-P1.AG03 + AG03-EXT
 Spec: SYS_EXTRACTION_COMPLETE.md lines 380-520 (AG03 CohortAgent)
+      SYS_EXTRACTION_ADDENDUM Part 4 (AG03-EXT population cognitive norms)
 Formulas: None
 Reads: PaperMap.sections[Methods, Results] (from canonical_reader.py)
-Writes: AgentOutput with SpanLabel[] (N, age, demographics) + Annotations
-        (consumed by reconciliation.py, trust boundary)
+Writes: AgentOutput with SpanLabel[] (N, age, demographics + population cognitive scores)
+        + Annotations (consumed by reconciliation.py, trust boundary, prior_compiler)
 Gates: None (STANDARD/DEEP mode gate enforced at orchestration level)
 """
 from __future__ import annotations
@@ -26,7 +27,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
     BaseAgent,
 )
 from crci.llm.client import LLMClient
-from crci.llm.response_schemas import CohortResponse
+from crci.llm.response_schemas import CohortExtendedResponse, CohortResponse
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -58,7 +59,7 @@ class CohortAgent(BaseAgent):
 
     @property
     def response_schema(self) -> type[BaseModel]:
-        return CohortResponse
+        return CohortExtendedResponse
 
     @property
     def prompt_template_path(self) -> Path:
@@ -91,12 +92,13 @@ class CohortAgent(BaseAgent):
     def _parse_response(
         self, response: BaseModel, paper_map: PaperMap
     ) -> AgentOutput:
-        """Convert CohortResponse to AgentOutput.
+        """Convert CohortExtendedResponse to AgentOutput.
 
         Creates SpanLabel entries for sample size, age, demographics,
-        and annotations for cancer type and treatment phase.
+        population cognitive scores (AG03-EXT), and annotations for
+        cancer type and treatment phase.
         """
-        cohort_resp: CohortResponse = response  # type: ignore[assignment]
+        cohort_resp: CohortExtendedResponse = response  # type: ignore[assignment]
 
         span_labels: list[SpanLabel] = []
         annotations: list[RawAnnotationEmission] = []
@@ -251,6 +253,115 @@ class CohortAgent(BaseAgent):
                 )
             )
 
+        # ─── AG03-EXT: Population cognitive scores ─────────────
+        for cog in cohort_resp.cognitive_scores:
+            grp_id = f"cog_{uuid.uuid4().hex[:8]}"
+
+            # SpanLabel for instrument name
+            if cog.instrument_name:
+                inst_start = paper_map.full_text.find(cog.instrument_name)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag03ext_{uuid.uuid4().hex[:12]}",
+                        label_type="POPULATION_COGNITIVE_INSTRUMENT",
+                        value=cog.instrument_name,
+                        numeric_value=None,
+                        char_start=max(0, inst_start),
+                        char_end=(
+                            inst_start + len(cog.instrument_name)
+                            if inst_start >= 0
+                            else 0
+                        ),
+                        confidence=0.85 if inst_start >= 0 else 0.65,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for cognitive domain
+            if cog.domain:
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag03ext_{uuid.uuid4().hex[:12]}",
+                        label_type="POPULATION_COGNITIVE_DOMAIN",
+                        value=cog.domain,
+                        numeric_value=None,
+                        char_start=0,
+                        char_end=0,
+                        confidence=0.80,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for mean
+            if cog.mean is not None:
+                mean_str = str(cog.mean)
+                mean_start = paper_map.full_text.find(mean_str)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag03ext_{uuid.uuid4().hex[:12]}",
+                        label_type="POPULATION_COGNITIVE_MEAN",
+                        value=mean_str,
+                        numeric_value=cog.mean,
+                        char_start=max(0, mean_start),
+                        char_end=(
+                            mean_start + len(mean_str) if mean_start >= 0 else 0
+                        ),
+                        confidence=0.85 if mean_start >= 0 else 0.65,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for SD
+            if cog.sd is not None:
+                sd_str = str(cog.sd)
+                sd_start = paper_map.full_text.find(sd_str)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag03ext_{uuid.uuid4().hex[:12]}",
+                        label_type="POPULATION_COGNITIVE_SD",
+                        value=sd_str,
+                        numeric_value=cog.sd,
+                        char_start=max(0, sd_start),
+                        char_end=(
+                            sd_start + len(sd_str) if sd_start >= 0 else 0
+                        ),
+                        confidence=0.85 if sd_start >= 0 else 0.65,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for percentile
+            if cog.percentile is not None:
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag03ext_{uuid.uuid4().hex[:12]}",
+                        label_type="POPULATION_PERCENTILE",
+                        value=str(cog.percentile),
+                        numeric_value=cog.percentile,
+                        char_start=0,
+                        char_end=0,
+                        confidence=0.70,
+                        source_section="results",
+                    )
+                )
+
+            # Annotation for population cognitive data
+            pop_desc = cog.population_subgroup or cohort_resp.cancer_type or "all"
+            annotations.append(
+                RawAnnotationEmission(
+                    annotation_id=f"ag03ext_ann_{uuid.uuid4().hex[:12]}",
+                    category="population_specificity",
+                    content=(
+                        f"Cognitive score: {cog.instrument_name} "
+                        f"domain={cog.domain or 'overall'} "
+                        f"mean={cog.mean} SD={cog.sd} N={cog.n} "
+                        f"population={pop_desc}"
+                    ),
+                    evidence_strength="moderate",
+                    extraction_snippet=None,
+                )
+            )
+
         metadata = {
             "total_n": cohort_resp.total_n,
             "cancer_type": cohort_resp.cancer_type,
@@ -258,6 +369,7 @@ class CohortAgent(BaseAgent):
             "mean_age": cohort_resp.mean_age,
             "percent_female": cohort_resp.percent_female,
             "demographics_notes": cohort_resp.demographics_notes,
+            "n_cognitive_scores": len(cohort_resp.cognitive_scores),
         }
 
         return AgentOutput(

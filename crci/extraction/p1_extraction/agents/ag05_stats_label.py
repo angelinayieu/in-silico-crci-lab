@@ -91,6 +91,13 @@ SPAN_LABEL_TYPES: list[str] = [
     "SUBGROUP_EFFECT",      # 39. Subgroup-specific effect
     # Temporal
     "FOLLOW_UP_DURATION",   # 40. Follow-up duration (weeks, months)
+    # AG05-EXT: Subgroup interaction labels (SYS_EXTRACTION_ADDENDUM Part 4)
+    "SUBGROUP_VARIABLE",    # 41. What defines the subgroup
+    "SUBGROUP_VALUE",       # 42. Specific subgroup value
+    "INTERACTION_EFFECT",   # 43. Interaction beta (subgroup × treatment)
+    "INTERACTION_SE",       # 44. SE of interaction
+    "INTERACTION_P",        # 45. p-value for interaction test
+    "SUBGROUP_N",           # 46. Sample size for subgroup
 ]
 
 
@@ -337,6 +344,20 @@ class StatsLabelAgent(BaseAgent):
             "DF_RESIDUAL": "DF",
             "DEGREES_OF_FREEDOM": "DF",
             "N_PER_ARM": "SAMPLE_SIZE_ARM",
+            # AG05-EXT: Subgroup interaction normalization
+            "MODERATOR": "SUBGROUP_VARIABLE",
+            "MODERATOR_VARIABLE": "SUBGROUP_VARIABLE",
+            "SUBGROUP_MODERATOR": "SUBGROUP_VARIABLE",
+            "SUBGROUP_LEVEL": "SUBGROUP_VALUE",
+            "SUBGROUP_CATEGORY": "SUBGROUP_VALUE",
+            "INTERACTION_BETA": "INTERACTION_EFFECT",
+            "INTERACTION_B": "INTERACTION_EFFECT",
+            "INTERACTION_COEFF": "INTERACTION_EFFECT",
+            "INTERACTION_STANDARD_ERROR": "INTERACTION_SE",
+            "INTERACTION_PVALUE": "INTERACTION_P",
+            "INTERACTION_P_VALUE": "INTERACTION_P",
+            "N_SUBGROUP": "SUBGROUP_N",
+            "SUBGROUP_SAMPLE_SIZE": "SUBGROUP_N",
         }
         return normalization_map.get(raw_type, raw_type)
 

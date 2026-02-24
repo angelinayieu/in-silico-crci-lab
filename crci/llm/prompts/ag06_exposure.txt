@@ -46,6 +46,31 @@ Study arms: {arms}
 
 {paper_id}
 
+## EXTENDED EXTRACTION: Dose-Response Data (AG06-EXT)
+
+If this paper compares multiple doses of the same intervention: extract the effect
+size and SE at EACH dose level as separate entries. If the paper reports a dose-response
+curve or model parameters (EC50, Emax, Hill coefficient), extract those directly.
+
+For each dose level with a measured effect, extract:
+
+7. **dose_effect_pairs** — An array of dose-effect entries, each with:
+   - **dose_level**: Specific dose amount (e.g., "150", "300", "30")
+   - **dose_unit**: Unit for this dose (e.g., "min/week", "mg/day", "sessions/week")
+   - **effect**: Effect size at this dose level (float or null)
+   - **effect_se**: Standard error of the effect (float or null)
+   - **context**: Brief description (e.g., "exercise 150 min/week vs control on MoCA")
+
+8. **dose_response_shape** — Shape of the dose-response relationship if described:
+   "linear", "plateau", "U_shaped", "threshold", or null
+
+9. **effective_dose_range** — Reported therapeutic dose range (e.g., "150-300 min/week"), or null
+
+10. **maximum_tolerated_dose** — Safety ceiling dose if reported, or null
+
+Only extract dose-effect pairs when the paper explicitly compares multiple dose levels.
+If the paper has only one dose level, return an empty array for dose_effect_pairs.
+
 ## Output Format
 
 Respond with ONLY a JSON object (no markdown code fences, no extra text):
@@ -56,5 +81,17 @@ Respond with ONLY a JSON object (no markdown code fences, no extra text):
   "dose_unit": "<string or null>",
   "duration_weeks": <float or null>,
   "frequency": "<string or null>",
-  "adherence_rate": <float or null>
+  "adherence_rate": <float or null>,
+  "dose_effect_pairs": [
+    {{
+      "dose_level": "<string>",
+      "dose_unit": "<string or null>",
+      "effect": <float or null>,
+      "effect_se": <float or null>,
+      "context": "<string or null>"
+    }}
+  ],
+  "dose_response_shape": "<string or null>",
+  "effective_dose_range": "<string or null>",
+  "maximum_tolerated_dose": "<string or null>"
 }}

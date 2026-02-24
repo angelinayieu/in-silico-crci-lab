@@ -5,13 +5,15 @@
 # VERIFIED: no hardcoded formula parameters
 # VERIFIED: gates — none (STANDARD/DEEP only, mode gate enforced at orchestration level)
 """
-Component: SYS_EXTRACTION.EX-P1.AG08
+Component: SYS_EXTRACTION.EX-P1.AG08 + AG08-EXT
 Spec: SYS_EXTRACTION_COMPLETE.md lines 380-520 (AG08 TemporalAgent)
+      SYS_EXTRACTION_ADDENDUM Part 4 (AG08-EXT effect x timepoint data)
 Formulas: None
 Reads: PaperMap.sections[Methods, Results] (from canonical_reader.py)
 Writes: AgentOutput with SpanLabel[] + Annotations for measurement timepoints,
-        follow-up duration, temporal patterns
-        (consumed by reconciliation.py, trust boundary)
+        follow-up duration, temporal patterns, effect at each timepoint,
+        recovery curves (consumed by reconciliation.py, trust boundary,
+        temporal_compiler)
 Gates: None (STANDARD/DEEP mode gate enforced at orchestration level)
 """
 from __future__ import annotations
@@ -27,7 +29,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
     BaseAgent,
 )
 from crci.llm.client import LLMClient
-from crci.llm.response_schemas import TemporalResponse
+from crci.llm.response_schemas import TemporalExtendedResponse
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -39,6 +41,9 @@ logger = logging.getLogger(__name__)
 
 class TemporalAgent(BaseAgent):
     """AG08 -- Extract measurement timepoints, follow-up duration, temporal patterns.
+
+    AG08-EXT: Also extracts effect x timepoint structured data and
+    post-cessation recovery measurements.
 
     STANDARD/DEEP only (mode gate enforced at orchestration level).
 
@@ -59,7 +64,7 @@ class TemporalAgent(BaseAgent):
 
     @property
     def response_schema(self) -> type[BaseModel]:
-        return TemporalResponse
+        return TemporalExtendedResponse
 
     @property
     def prompt_template_path(self) -> Path:
@@ -91,12 +96,13 @@ class TemporalAgent(BaseAgent):
     def _parse_response(
         self, response: BaseModel, paper_map: PaperMap
     ) -> AgentOutput:
-        """Convert TemporalResponse to AgentOutput.
+        """Convert TemporalExtendedResponse to AgentOutput.
 
         Creates SpanLabel entries for each timepoint extracted,
-        and annotations for follow-up duration and temporal patterns.
+        effect at each timepoint (AG08-EXT), and annotations for
+        follow-up duration, temporal patterns, and onset/peak/decay.
         """
-        temporal_resp: TemporalResponse = response  # type: ignore[assignment]
+        temporal_resp: TemporalExtendedResponse = response  # type: ignore[assignment]
 
         span_labels: list[SpanLabel] = []
         annotations: list[RawAnnotationEmission] = []
@@ -211,6 +217,148 @@ class TemporalAgent(BaseAgent):
                 )
             )
 
+        # ─── AG08-EXT: Effect at each timepoint ────────────────
+        for etp in temporal_resp.effect_timepoints:
+            grp_id = f"etp_{uuid.uuid4().hex[:8]}"
+
+            # SpanLabel for timepoint in weeks
+            tp_str = str(etp.timepoint_weeks)
+            tp_start = paper_map.full_text.find(tp_str)
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                    label_type="TIMEPOINT_WEEKS",
+                    value=tp_str,
+                    numeric_value=etp.timepoint_weeks,
+                    char_start=max(0, tp_start),
+                    char_end=(
+                        tp_start + len(tp_str) if tp_start >= 0 else 0
+                    ),
+                    confidence=0.85 if tp_start >= 0 else 0.65,
+                    source_section="results",
+                )
+            )
+
+            # SpanLabel for effect at this timepoint
+            if etp.effect is not None:
+                eff_str = str(etp.effect)
+                eff_start = paper_map.full_text.find(eff_str)
+                label = (
+                    "RECOVERY_POSTCESSATION" if etp.is_recovery
+                    else "EFFECT_AT_TIMEPOINT"
+                )
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                        label_type=label,
+                        value=eff_str,
+                        numeric_value=etp.effect,
+                        char_start=max(0, eff_start),
+                        char_end=(
+                            eff_start + len(eff_str) if eff_start >= 0 else 0
+                        ),
+                        confidence=0.85 if eff_start >= 0 else 0.65,
+                        source_section="results",
+                    )
+                )
+
+            # SpanLabel for SE at this timepoint
+            if etp.se is not None:
+                se_str = str(etp.se)
+                se_start = paper_map.full_text.find(se_str)
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                        label_type="SE_AT_TIMEPOINT",
+                        value=se_str,
+                        numeric_value=etp.se,
+                        char_start=max(0, se_start),
+                        char_end=(
+                            se_start + len(se_str) if se_start >= 0 else 0
+                        ),
+                        confidence=0.80 if se_start >= 0 else 0.60,
+                        source_section="results",
+                    )
+                )
+
+            # Recovery timepoint label
+            if etp.is_recovery:
+                span_labels.append(
+                    SpanLabel(
+                        span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                        label_type="RECOVERY_TIMEPOINT",
+                        value=tp_str,
+                        numeric_value=etp.timepoint_weeks,
+                        char_start=0,
+                        char_end=0,
+                        confidence=0.80,
+                        source_section="results",
+                    )
+                )
+
+        # SpanLabels for onset/peak/decay observations
+        if temporal_resp.onset_observed:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                    label_type="ONSET_OBSERVED",
+                    value=temporal_resp.onset_observed,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        if temporal_resp.peak_observed:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                    label_type="PEAK_OBSERVED",
+                    value=temporal_resp.peak_observed,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        if temporal_resp.decay_observed:
+            span_labels.append(
+                SpanLabel(
+                    span_id=f"ag08ext_{uuid.uuid4().hex[:12]}",
+                    label_type="DECAY_OBSERVED",
+                    value=temporal_resp.decay_observed,
+                    numeric_value=None,
+                    char_start=0,
+                    char_end=0,
+                    confidence=0.75,
+                    source_section="results",
+                )
+            )
+
+        # Annotation for effect trajectory data
+        if temporal_resp.effect_timepoints:
+            n_recovery = sum(
+                1 for etp in temporal_resp.effect_timepoints if etp.is_recovery
+            )
+            annotations.append(
+                RawAnnotationEmission(
+                    annotation_id=f"ag08ext_ann_{uuid.uuid4().hex[:12]}",
+                    category="temporal_onset",
+                    content=(
+                        f"Effect trajectory: {len(temporal_resp.effect_timepoints)} "
+                        f"timepoints ({n_recovery} recovery); "
+                        f"onset={temporal_resp.onset_observed or 'not observed'}, "
+                        f"peak={temporal_resp.peak_observed or 'not observed'}"
+                    ),
+                    evidence_strength="moderate",
+                    extraction_snippet=None,
+                )
+            )
+
         metadata = {
             "n_timepoints": len(temporal_resp.timepoints),
             "follow_up_weeks": temporal_resp.follow_up_weeks,
@@ -223,6 +371,10 @@ class TemporalAgent(BaseAgent):
                 }
                 for tp in temporal_resp.timepoints
             ],
+            "n_effect_timepoints": len(temporal_resp.effect_timepoints),
+            "onset_observed": temporal_resp.onset_observed,
+            "peak_observed": temporal_resp.peak_observed,
+            "decay_observed": temporal_resp.decay_observed,
         }
 
         return AgentOutput(

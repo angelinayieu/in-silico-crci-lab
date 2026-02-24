@@ -44,6 +44,31 @@ For each measurement timepoint identified, extract:
 
 {paper_id}
 
+## EXTENDED EXTRACTION: Effect x Timepoint Data (AG08-EXT)
+
+If this paper reports effects at multiple timepoints: extract the effect size, SE,
+and timepoint (in weeks) for EACH measurement as separate entries. If the paper
+reports effects after the intervention ended (follow-up/recovery), extract those
+separately with is_recovery = true.
+
+For each timepoint with a measured effect, extract:
+
+6. **effect_timepoints** — An array of effect-at-timepoint entries, each with:
+   - **timepoint_weeks**: Weeks from baseline/intervention start (float)
+   - **effect**: Effect size at this timepoint (float or null)
+   - **se**: Standard error of the effect at this timepoint (float or null)
+   - **is_recovery**: true if this is a post-cessation/follow-up measurement, false otherwise
+   - **context**: Brief description (e.g., "SMD on FACT-Cog at week 12")
+
+7. **onset_observed** — First timepoint with significant effect (e.g., "week 4"), or null
+
+8. **peak_observed** — Timepoint with maximum effect (e.g., "week 12"), or null
+
+9. **decay_observed** — Timepoint where effect starts declining (e.g., "week 24"), or null
+
+Only extract effect_timepoints when the paper reports effect sizes at 2+ timepoints.
+If the paper reports only pre/post, return an empty array for effect_timepoints.
+
 ## Output Format
 
 Respond with ONLY a JSON object (no markdown code fences, no extra text):
@@ -57,5 +82,17 @@ Respond with ONLY a JSON object (no markdown code fences, no extra text):
     }}
   ],
   "follow_up_weeks": <float or null>,
-  "temporal_pattern": "<string or null>"
+  "temporal_pattern": "<string or null>",
+  "effect_timepoints": [
+    {{
+      "timepoint_weeks": <float>,
+      "effect": <float or null>,
+      "se": <float or null>,
+      "is_recovery": <boolean>,
+      "context": "<string or null>"
+    }}
+  ],
+  "onset_observed": "<string or null>",
+  "peak_observed": "<string or null>",
+  "decay_observed": "<string or null>"
 }}

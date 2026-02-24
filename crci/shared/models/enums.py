@@ -1228,7 +1228,10 @@ class IdentificationStatus(StrEnum):
 
 @unique
 class PaperSubtype(StrEnum):
-    """23 paper subtypes for extraction mode selection."""
+    """27 paper subtypes for extraction mode selection.
+
+    Original 23 subtypes + 4 from SYS_EXTRACTION_ADDENDUM Part 2.
+    """
     RCT_EXERCISE = "RCT_exercise"
     RCT_COGNITIVE = "RCT_cognitive"
     RCT_PHARMACOLOGICAL = "RCT_pharmacological"
@@ -1251,6 +1254,11 @@ class PaperSubtype(StrEnum):
     REVIEW_NARRATIVE = "review_narrative"
     PROTOCOL = "protocol"
     QUALITATIVE = "qualitative"
+    # ─── 4 new subtypes (SYS_EXTRACTION_ADDENDUM Part 2) ─────
+    PSYCHOMETRIC_VALIDATION = "psychometric_validation"
+    NORMATIVE_COHORT = "normative_cohort"
+    DOSE_RESPONSE_STUDY = "dose_response_study"
+    LONGITUDINAL_FOLLOWUP = "longitudinal_followup"
     OTHER = "other"
 
 
