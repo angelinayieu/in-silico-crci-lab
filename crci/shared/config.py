@@ -40,6 +40,7 @@ P_INCLUSION_MIN: float = 0.05
 FRESHNESS_DECAY_RATE: float = 0.015
 FRESHNESS_FLOOR: float = 0.70
 FRESHNESS_REFERENCE_YEAR: int = 2026
+FRESHNESS_DEFAULT_WEIGHT: float = 0.85  # No pub date → default w_fresh = 0.85 + WARN
 
 # ═══════════════════════════════════════════════════════════════
 #  TEMPORAL PARAMETERS
@@ -47,6 +48,7 @@ FRESHNESS_REFERENCE_YEAR: int = 2026
 
 TEMPORAL_DECAY_RATE: float = 0.05
 TEMPORAL_EXCLUSION_DAYS: int = 90
+TEMPORAL_WEIGHT_FLOOR: float = 0.01  # max(w_temporal, 0.01) floor in Formula P3-6
 
 # ═══════════════════════════════════════════════════════════════
 #  MONTE CARLO SAMPLING (§2.16)
@@ -75,16 +77,23 @@ SCOPE_FLOOR: float = 0.3
 # ═══════════════════════════════════════════════════════════════
 
 # Layer 1: Study design multipliers — Formula P3-1
+# Spec SYS_EX lines 765-790: 9 design categories + linear interpolation for small RCT
 DESIGN_MULTIPLIERS: dict[str, float] = {
-    "large_rct": 1.0,
-    "small_rct": 1.25,
-    "cohort": 1.75,
-    "cross_sectional": 3.0,
-    "animal": 4.5,
-    "expert": 6.0,
+    "large_rct": 1.0,                   # N > 200
+    "small_rct_default": 1.25,          # midpoint placeholder; actual via interpolation
+    "well_adjusted_cohort": 1.5,
+    "unadjusted_longitudinal": 2.0,
+    "cross_sectional_adjusted": 2.5,
+    "cross_sectional_unadjusted": 3.0,
+    "animal_in_vivo": 4.0,
+    "in_vitro_mechanistic": 5.0,
+    "expert_opinion": 6.0,
 }
+DESIGN_MULTIPLIER_DEFAULT: float = 3.0       # unclassified → 3.0× + WARN
+SMALL_RCT_N_THRESHOLD: int = 200             # N ≤ 200 triggers interpolation
+SMALL_RCT_PENALTY_SLOPE: float = 0.5         # m = 1.0 + 0.5×(200−N)/200
 
-# Layer 3: GRADE quality multipliers — Formula P3-3
+# Layer 5: GRADE quality multipliers — Formula P3-5
 GRADE_MULTIPLIERS: dict[str, float] = {
     "HIGH": 1.0,
     "MODERATE": 1.25,
@@ -134,6 +143,94 @@ CONFLICT_INFLATION_MAX_MULT: float = 2.0
 MISSINGNESS_INFLATION_VAR_ADD: float = 0.25
 
 # ═══════════════════════════════════════════════════════════════
+#  HARMONIZATION — EX-P2 (§2.5)
+# ═══════════════════════════════════════════════════════════════
+
+# S1 — Plausibility bounds (Gate P2-G1)
+PLAUSIBILITY_BETA_MAX: float = 5.0
+PLAUSIBILITY_CORRELATION_MAX: float = 1.0
+
+# S3 — Scale Harmonization: SD borrowing SE inflation tiers
+SD_BORROW_TIER1_INFLATION: float = 1.0    # same population
+SD_BORROW_TIER2_INFLATION: float = 1.15   # similar population
+SD_BORROW_TIER3_INFLATION: float = 1.30   # general population
+
+# S3 — Conversion formulas: mathematical constants
+# OR→SMD: d = ln(OR) × √3 / π
+CONVERSION_OR_TO_SMD_FACTOR: float = 0.5513288954217921  # √3/π
+
+# S4 — Orientation Alignment (Gate P2-G2)
+ORIENTATION_CONFIDENCE_THRESHOLD: float = 0.60
+
+# S5 — Identification Status attenuation factors
+IDENTIFICATION_FACTOR_IDENTIFIED: float = 1.00
+IDENTIFICATION_FACTOR_PARTIAL: float = 0.85
+IDENTIFICATION_FACTOR_PLAUSIBLE: float = 0.70
+IDENTIFICATION_FACTOR_UNIDENTIFIED: float = 0.50
+
+# S5 — Confounder coverage thresholds for identification upgrade/downgrade
+CONFOUNDER_COVERAGE_UPGRADE_THRESHOLD: float = 0.80   # >= 80% → upgrade
+CONFOUNDER_COVERAGE_DOWNGRADE_THRESHOLD: float = 0.30  # < 30% → downgrade
+
+# SE derivation constant: SE = (upper - lower) / (2 × 1.96)
+SE_FROM_CI_Z_MULTIPLIER: float = 1.96
+
+# ═══════════════════════════════════════════════════════════════
+#  RECONCILIATION CONFIDENCE (EX-P1-REC)
+# ═══════════════════════════════════════════════════════════════
+
+# Formula REC-d: conf = min(1.0, BASE + SUPPORT_N_WEIGHT×n + MEAN_CONF_WEIGHT×mean_confidence)
+REC_CONFIDENCE_BASE: float = 0.3
+REC_CONFIDENCE_SUPPORT_N_WEIGHT: float = 0.15
+REC_CONFIDENCE_MEAN_CONF_WEIGHT: float = 0.2
+REC_CONFIDENCE_CONFLICT_CAP: float = 0.50
+
+# REC-b: Jaccard similarity threshold for merge candidates
+REC_JACCARD_MERGE_THRESHOLD: float = 0.80
+
+# AT-06: Speculative evidence confidence ceiling
+ATB_SPECULATIVE_CONFIDENCE_CEILING: float = 0.50
+
+# ═══════════════════════════════════════════════════════════════
+#  TRUST BOUNDARY PLAUSIBILITY (EX-TB, §2.5)
+# ═══════════════════════════════════════════════════════════════
+
+# Gate TB-G2: Plausibility bounds for parsed numeric values
+TB_PLAUSIBILITY_BETA_MAX: float = 5.0        # |β| ≤ 5
+TB_PLAUSIBILITY_CORRELATION_MAX: float = 1.0  # |r| ≤ 1
+TB_PLAUSIBILITY_P_VALUE_MIN: float = 0.0      # p ≥ 0
+TB_PLAUSIBILITY_P_VALUE_MAX: float = 1.0      # p ≤ 1
+TB_PLAUSIBILITY_N_MIN: int = 1                # N > 0
+TB_PLAUSIBILITY_I_SQUARED_MAX: float = 100.0  # I² ≤ 100
+
+# Rule NP-11: SE derivation from CI
+# SE = (upper - lower) / (2 × 1.96)
+TB_CI_TO_SE_Z_MULTIPLIER: float = 1.96
+
+# Rule NP-02/NP-03: CI and p-value consistency thresholds
+TB_P_VALUE_SIGNIFICANCE_THRESHOLD: float = 0.05
+
+# ═══════════════════════════════════════════════════════════════
+#  EVIDENCE GROUPER — P4-EG (§2.12)
+# ═══════════════════════════════════════════════════════════════
+
+# Diminishing returns: w_base × 1 / (1 + DIMINISHING_DECAY × ln(k))
+EG_DIMINISHING_DECAY: float = 0.3
+
+# Precision caps (fraction of best RCT SE)
+EG_PRECISION_CAP_CROSS_SECTIONAL: float = 0.30  # cross-sect ≥ 30% best RCT
+EG_PRECISION_CAP_ANIMAL: float = 0.10            # animal ≥ 10%
+
+# ═══════════════════════════════════════════════════════════════
+#  DOUBLE-COUNTING RESOLVER — P4-DCR (§2.12)
+# ═══════════════════════════════════════════════════════════════
+
+# Threshold pairs for dual-metric overlap decision
+DCR_MINIMAL_OVERLAP_THRESHOLD: float = 0.10   # both < 0.10 → USE_MA_POOLED
+DCR_HIGH_OVERLAP_THRESHOLD: float = 0.70       # either > 0.70 → USE_PRIMARIES
+DCR_AMBIGUITY_THRESHOLD: float = 0.30          # disagree > 0.30 → AMBIGUOUS
+
+# ═══════════════════════════════════════════════════════════════
 #  META-ANALYSIS PARAMETERS (§2.12)
 # ═══════════════════════════════════════════════════════════════
 
@@ -143,6 +240,23 @@ MISSINGNESS_INFLATION_VAR_ADD: float = 0.25
 IVW_MIN_STUDIES: int = 2
 HETEROGENEITY_HIGH_THRESHOLD: float = 75.0  # I² > 75% = high
 HETEROGENEITY_MODERATE_THRESHOLD: float = 50.0  # I² 50-75% = moderate
+
+# Formula P4-3: P_incl = logistic(INTERCEPT + LN_K_COEFF·ln(k+1) + Z_COEFF·Z + RCT_COEFF·𝟙_RCT)
+P4_3_INTERCEPT: float = -0.5
+P4_3_LN_K_COEFF: float = 1.2
+P4_3_Z_COEFF: float = 0.4
+P4_3_RCT_COEFF: float = 0.6
+
+# Formula P4-3b / P4-MA-c: null_finding_context annotation adjustment
+P4_3B_NULL_FINDING_POWERED_ADJ: float = -0.3
+
+# P4-MA-c: σ²_structural annotation severity weights
+# severity_weight: moderate=0.05, high=0.10, critical=0.15
+ANNOTATION_SEVERITY_WEIGHTS: dict[str, float] = {
+    "moderate": 0.05,
+    "high": 0.10,
+    "critical": 0.15,
+}
 
 # ═══════════════════════════════════════════════════════════════
 #  PUBLICATION BIAS (§2.12.1)

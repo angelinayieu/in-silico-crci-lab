@@ -1055,6 +1055,57 @@ class ExtractionAudit(Base):
     notes = Column(Text)
 
 
+class StudyAnnotationsRaw(Base):
+    """B10. Every annotation emitted by every agent before reconciliation.
+
+    SYS_EX lines 2562-2583. 1 Row = one annotation emission from one agent.
+    Written by: EX-P1-REC | Read by: Reconciliation (dedup ref), Audit.
+    """
+    __tablename__ = "study_annotations_raw_v1"
+
+    raw_annotation_id = Column(Text, primary_key=True)
+    extraction_run_id = Column(Text, nullable=False)
+    study_id = Column(Text, nullable=False)
+    entered_by = Column(Text, nullable=False)
+    entered_at = Column(DateTime, nullable=False, server_default=func.now())
+    category = Column(Text, nullable=False)
+    target_entity_type = Column(Text)
+    target_entity_id = Column(Text)
+    content = Column(Text, nullable=False)
+    structured_data_json = Column(JSONB)
+    evidence_strength = Column(Text)
+    extraction_snippet = Column(Text)
+    source_span_id = Column(Text)
+
+
+class StudyAnnotations(Base):
+    """B11. Reconciled, deduplicated canonical annotations with maturity tracking.
+
+    SYS_EX lines 2585-2612. 1 Row = one reconciled canonical annotation.
+    Written by: EX-P1-ATB | Read by: EX-P4-MA, EX-ACQ-GAP, EX-PROM-THR.
+    """
+    __tablename__ = "study_annotations_v1"
+
+    annotation_id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    ler_id = Column(Text)
+    category = Column(Text, nullable=False)
+    consumer = Column(Text)
+    target_entity_type = Column(Text)
+    target_entity_id = Column(Text)
+    content = Column(Text, nullable=False)
+    structured_data_json = Column(JSONB)
+    evidence_strength = Column(Text)
+    extraction_snippet = Column(Text)
+    source_span_id = Column(Text)
+    cross_agent_support_n = Column(Integer, nullable=False, default=1)
+    adjudication_status = Column(Text, nullable=False, default="unreviewed")
+    duplicate_of_annotation_id = Column(Text)
+    reconciled_confidence = Column(Float)
+    maturity = Column(Text, nullable=False, default="raw")
+    promoted_to = Column(Text)
+
+
 # ═══════════════════════════════════════════════════════════════
 #  CLASS C: Compiled (Aggregated Parameters) — 7 tables
 # ═══════════════════════════════════════════════════════════════

@@ -1,0 +1,51 @@
+You are a precise scientific paper extraction agent specialized in mediators and biological pathways for the CRCI (Cancer-Related Cognitive Impairment) evidence extraction system.
+
+Your task is to extract mediators, biomarker pathways, and mechanistic claims from the paper. Focus on the biological and psychological mechanisms through which exposures affect cognitive outcomes.
+
+## What to Extract
+
+For each mediator or mechanism identified, extract:
+
+1. **mediator_name**: The name of the mediating variable or biomarker (e.g., "IL-6", "TNF-alpha", "BDNF", "cortisol", "hippocampal volume", "sleep quality", "physical fitness", "inflammation"). Use standard scientific nomenclature.
+
+2. **pathway**: The mechanistic pathway this mediator is part of (e.g., "neuroinflammation", "HPA_axis", "neurotrophic_signaling", "oxidative_stress", "vascular", "gut_brain_axis", "circadian_rhythm"). Use null if not clearly stated.
+
+3. **direction**: The proposed direction of the mediator's effect (e.g., "increase_associated_with_worse_cognition", "decrease_associated_with_better_cognition", "bidirectional", "U_shaped"). Use null if not clearly stated.
+
+4. **evidence_strength**: How strong is the evidence for this mechanistic claim? Use one of: "strong" (directly measured and statistically tested), "moderate" (measured but not formally tested as mediator), "weak" (discussed hypothetically or cited from other literature). Use null if unclear.
+
+## Extraction Rules
+
+- Extract mediators from ALL sections, but weight Discussion and Results more heavily than Introduction.
+- Include BOTH directly measured mediators (e.g., "IL-6 levels were measured and tested as a mediator") AND hypothesized pathways (e.g., "we hypothesize that inflammation may mediate this effect").
+- Distinguish between mediators that were TESTED in this study vs. merely DISCUSSED.
+- For hypothesized pathways without direct measurement, set evidence_strength to "weak".
+- Common CRCI pathways to look for: neuroinflammation (TNF-alpha, IL-1beta, IL-6, CRP), HPA axis (cortisol, ACTH), neurotrophic (BDNF, NGF), oxidative stress, blood-brain barrier, epigenetic, gut-brain axis, immune suppression.
+- Pay attention to mediation analysis results if present.
+
+## Paper Text (Introduction + Discussion + Results sections)
+
+{focused_text}
+
+## Tables
+
+{table_text}
+
+## Paper ID
+
+{paper_id}
+
+## Output Format
+
+Respond with ONLY a JSON object (no markdown code fences, no extra text):
+
+{{
+  "mediators": [
+    {{
+      "mediator_name": "<string>",
+      "pathway": "<string or null>",
+      "direction": "<string or null>",
+      "evidence_strength": "<strong|moderate|weak or null>"
+    }}
+  ]
+}}

@@ -967,6 +967,16 @@ class HarmonizationStatusInMem(StrEnum):
 
 
 @unique
+class DCRDecision(StrEnum):
+    """Double-counting resolution decision (SYS_EX lines 1102-1225)."""
+    USE_MA_POOLED = "USE_MA_POOLED"
+    USE_PRIMARIES = "USE_PRIMARIES"
+    USE_MA_EXCLUDE_OVERLAPPING = "USE_MA_EXCLUDE_OVERLAPPING"
+    AMBIGUOUS = "AMBIGUOUS"
+    N_A = "N_A"
+
+
+@unique
 class PriorSource(StrEnum):
     EMPIRICAL = "EMPIRICAL"
     LITERARY = "LITERARY"
