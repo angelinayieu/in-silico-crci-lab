@@ -189,13 +189,29 @@ class UnpaywallAdapter(SourceAdapter):
             )
             resp.raise_for_status()
 
-            # Verify we got a PDF (or at least some content)
+            # Verify we got a PDF — check BOTH Content-Type AND magic bytes
             content_type = resp.headers.get("Content-Type", "")
-            if "pdf" not in content_type.lower() and len(resp.content) < 1000:
+            is_pdf_content_type = "pdf" in content_type.lower()
+            is_pdf_magic = resp.content[:5] == b"%PDF-"
+
+            if not is_pdf_content_type and not is_pdf_magic:
                 logger.warning(
-                    "Unpaywall URL did not return PDF for %s (Content-Type: %s)",
+                    "Unpaywall URL did not return PDF for %s "
+                    "(Content-Type: %s, starts with: %r, size: %d bytes). "
+                    "This is likely an HTML landing page, not a PDF.",
                     identifier,
                     content_type,
+                    resp.content[:20],
+                    len(resp.content),
+                )
+                return None
+
+            if not is_pdf_magic:
+                logger.warning(
+                    "Content-Type says PDF but file magic bytes don't match for %s "
+                    "(starts with: %r). Rejecting as likely HTML/redirect page.",
+                    identifier,
+                    resp.content[:20],
                 )
                 return None
 

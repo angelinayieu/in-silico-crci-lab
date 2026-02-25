@@ -155,6 +155,17 @@ class FulltextRetriever:
                 content = adapter.retrieve_fulltext(identifier)
                 if content:
                     ext = "xml" if source_name == "europe_pmc" else "pdf"
+
+                    # Validate the content is actually the expected type
+                    if not self._validate_content(content, ext):
+                        logger.warning(
+                            "Content validation failed for %s via %s "
+                            "— skipping to next source",
+                            identifier,
+                            source_name,
+                        )
+                        continue
+
                     cache_path = self._save_to_cache(content, identifier, ext)
                     return RetrievalResult(
                         doi=doi,
@@ -185,18 +196,62 @@ class FulltextRetriever:
             source_used=None,
         )
 
+    def _validate_content(self, content: bytes, extension: str) -> bool:
+        """Validate downloaded content is actually the expected file type.
+
+        Checks file magic bytes to reject HTML pages saved as PDFs.
+        """
+        if extension == "pdf":
+            if not content[:5] == b"%PDF-":
+                logger.warning(
+                    "Downloaded content is not a valid PDF "
+                    "(starts with: %r, size: %d bytes). "
+                    "Likely an HTML landing page or CAPTCHA.",
+                    content[:20],
+                    len(content),
+                )
+                return False
+        elif extension == "xml":
+            # XML should start with <?xml or <article or similar
+            stripped = content.lstrip()
+            if not (stripped[:5] == b"<?xml" or stripped[:1] == b"<"):
+                logger.warning(
+                    "Downloaded content is not valid XML "
+                    "(starts with: %r, size: %d bytes).",
+                    content[:20],
+                    len(content),
+                )
+                return False
+        return True
+
     def _save_to_cache(
         self,
         content: bytes,
         identifier: str,
         extension: str,
     ) -> Path:
-        """Save downloaded content to the retrieval cache."""
+        """Save downloaded content to the retrieval cache.
+
+        Uses hash-based filename for dedup, plus a .manifest.json
+        with human-readable metadata for discoverability.
+        """
         # Use hash of identifier for filename
         id_hash = hashlib.md5(identifier.encode()).hexdigest()[:16]
         filename = f"{id_hash}.{extension}"
         path = self._cache_dir / filename
         path.write_bytes(content)
+
+        # Write a companion manifest for human readability
+        import json
+        manifest_path = path.with_suffix(".manifest.json")
+        manifest = {
+            "identifier": identifier,
+            "filename": filename,
+            "size_bytes": len(content),
+            "extension": extension,
+        }
+        manifest_path.write_text(json.dumps(manifest, indent=2))
+
         logger.debug("Cached %d bytes to %s", len(content), path)
         return path
 
@@ -205,9 +260,12 @@ class FulltextRetriever:
         scored: APSScoredCandidate,
         result: RetrievalResult,
     ) -> None:
-        """Write or update an acquisition_queue_v1 row."""
+        """Write or update an acquisition_queue_v1 row.
+
+        Deduplicates on candidate_doi — if a row with the same DOI
+        already exists, update status + APS instead of inserting.
+        """
         candidate = scored.candidate
-        queue_id = f"ACQ_{uuid.uuid4().hex[:16]}"
 
         status_map = {
             RetrievalStatus.RETRIEVED: "retrieved",
@@ -215,21 +273,54 @@ class FulltextRetriever:
             RetrievalStatus.FAILED: "failed",
         }
 
-        row = AcquisitionQueue(
-            queue_id=queue_id,
-            candidate_doi=candidate.doi,
-            candidate_pmid=candidate.pmid,
-            candidate_title=candidate.title,
-            target_edge_ids_json=(
-                [scored.target_entity_id] if scored.target_entity_id else None
-            ),
-            aps_score=scored.aps_score,
-            aps_components_json=scored.aps_components,
-            retrieval_tool=result.source_used,
-            status=status_map.get(result.status, "queued"),
-        )
+        new_status = status_map.get(result.status, "queued")
 
         try:
+            # Check for existing row with same DOI
+            from sqlalchemy import select
+            existing = self._session.query(AcquisitionQueue).filter(
+                AcquisitionQueue.candidate_doi == candidate.doi
+            ).first()
+
+            if existing:
+                # Update existing row if new APS is higher or status is better
+                status_priority = {"queued": 0, "failed": 1, "dispatched": 2, "retrieved": 3}
+                old_priority = status_priority.get(existing.status, 0)
+                new_priority = status_priority.get(new_status, 0)
+
+                if new_priority > old_priority or (scored.aps_score or 0) > (existing.aps_score or 0):
+                    existing.status = new_status
+                    existing.aps_score = max(scored.aps_score or 0, existing.aps_score or 0)
+                    existing.aps_components_json = scored.aps_components
+                    if result.source_used:
+                        existing.retrieval_tool = result.source_used
+                    self._session.commit()
+                    logger.debug(
+                        "Updated acquisition_queue row for DOI %s (status=%s, APS=%.3f)",
+                        candidate.doi, new_status, existing.aps_score or 0,
+                    )
+                else:
+                    logger.debug(
+                        "Skipping duplicate DOI %s (existing status=%s, APS=%.3f)",
+                        candidate.doi, existing.status, existing.aps_score or 0,
+                    )
+                return
+
+            # Insert new row
+            queue_id = f"ACQ_{uuid.uuid4().hex[:16]}"
+            row = AcquisitionQueue(
+                queue_id=queue_id,
+                candidate_doi=candidate.doi,
+                candidate_pmid=candidate.pmid,
+                candidate_title=candidate.title,
+                target_edge_ids_json=(
+                    [scored.target_entity_id] if scored.target_entity_id else None
+                ),
+                aps_score=scored.aps_score,
+                aps_components_json=scored.aps_components,
+                retrieval_tool=result.source_used,
+                status=new_status,
+            )
             self._session.add(row)
             self._session.commit()
         except Exception as exc:

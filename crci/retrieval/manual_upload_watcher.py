@@ -173,17 +173,165 @@ def import_structured_csv(
         csv_path.name,
         template_name,
     )
-    result.csvs_imported = len(rows)
 
-    # NOTE: Actual DB write would use the appropriate ORM model
-    # based on template_name. For now, log what would be imported.
-    logger.info(
-        "Would import %d rows into evidence table for template '%s'",
-        len(rows),
-        template_name,
-    )
+    if template_name == "edge_evidence_template":
+        imported = _write_edge_evidence_rows(session, rows, csv_path)
+        result.csvs_imported = imported
+    else:
+        # Other template types not yet implemented
+        result.warnings.append(
+            f"Template '{template_name}' import not yet implemented — "
+            f"only edge_evidence_template is supported. "
+            f"({len(rows)} rows skipped)"
+        )
+        logger.warning(
+            "Import for template '%s' not yet implemented, skipping %d rows",
+            template_name,
+            len(rows),
+        )
 
     return result
+
+
+# Study ID lookup: map DOI → study_id by checking study_registry_v1
+_DOI_STUDY_CACHE: dict[str, str] = {}
+
+
+def _resolve_study_id(session: Session, doi: str) -> str | None:
+    """Look up or generate a study_id for a DOI."""
+    if doi in _DOI_STUDY_CACHE:
+        return _DOI_STUDY_CACHE[doi]
+
+    from sqlalchemy import text
+    result = session.execute(
+        text("SELECT study_id FROM study_registry_v1 WHERE doi = :doi"),
+        {"doi": doi},
+    )
+    row = result.fetchone()
+    if row:
+        _DOI_STUDY_CACHE[doi] = row[0]
+        return row[0]
+
+    logger.warning(
+        "DOI %s not found in study_registry_v1. "
+        "Register the study first (scripts/load_evidence_into_db.py).",
+        doi,
+    )
+    return None
+
+
+def _write_edge_evidence_rows(
+    session: Session,
+    rows: list[dict],
+    csv_path: Path,
+) -> int:
+    """Write edge_evidence_template rows into edge_evidence_v1.
+
+    Maps CSV columns to DB columns:
+      CSV: doi, edge_id, beta_raw, se_raw, effect_type_original,
+           effect_size_type, sample_size, study_design, cancer_type,
+           treatment_phase, instrument_id, confidence_note
+      DB:  ler_id, edge_relation_id, study_id, edge_family, node_x, node_y,
+           effect_type_reported, effect_value_reported, se_reported,
+           N_effect, effect_size_type, notes
+    """
+    from datetime import datetime, timezone
+    from sqlalchemy import text as sa_text
+
+    # Load edge definitions for metadata lookup
+    edge_defs: dict[str, dict] = {}
+    result = session.execute(
+        sa_text("SELECT edge_relation_id, edge_family, node_x, node_y "
+                "FROM edge_relations_definitions_v1")
+    )
+    for r in result:
+        edge_defs[r[0]] = {"edge_family": r[1], "node_x": r[2], "node_y": r[3]}
+
+    insert_sql = sa_text("""
+        INSERT INTO edge_evidence_v1 (
+            ler_id, edge_relation_id, profile_id, study_id,
+            edge_family, node_x, node_y,
+            effect_type_reported, effect_value_reported, se_reported,
+            N_effect, effect_size_type,
+            notes, quality_rating, entered_by, entered_at, version, active
+        ) VALUES (
+            :ler_id, :edge_relation_id, :profile_id, :study_id,
+            :edge_family, :node_x, :node_y,
+            :effect_type_reported, :effect_value_reported, :se_reported,
+            :N_effect, :effect_size_type,
+            :notes, :quality_rating, :entered_by, :entered_at, :version, :active
+        )
+    """)
+
+    imported = 0
+    for row in rows:
+        edge_id = row.get("edge_id", "").strip()
+        doi = row.get("doi", "").strip()
+
+        if not edge_id or not doi:
+            logger.warning("Skipping row with empty edge_id or doi in %s", csv_path)
+            continue
+
+        study_id = _resolve_study_id(session, doi)
+        if not study_id:
+            continue
+
+        # Check for duplicates
+        existing = session.execute(
+            sa_text(
+                "SELECT ler_id FROM edge_evidence_v1 "
+                "WHERE study_id = :sid AND edge_relation_id = :eid"
+            ),
+            {"sid": study_id, "eid": edge_id},
+        ).fetchone()
+
+        if existing:
+            logger.info(
+                "Evidence for %s × %s already exists, skipping",
+                study_id, edge_id,
+            )
+            continue
+
+        edge_def = edge_defs.get(edge_id, {})
+        ler_id = f"LER_{study_id}_{edge_id}_{uuid.uuid4().hex[:8]}"
+
+        beta_raw = row.get("beta_raw", "").strip()
+        se_raw = row.get("se_raw", "").strip()
+        sample_size = row.get("sample_size", "").strip()
+
+        params = {
+            "ler_id": ler_id,
+            "edge_relation_id": edge_id,
+            "profile_id": "PROFILE_DEFAULT",
+            "study_id": study_id,
+            "edge_family": edge_def.get("edge_family", "unknown"),
+            "node_x": edge_def.get("node_x", "unknown"),
+            "node_y": edge_def.get("node_y", "unknown"),
+            "effect_type_reported": row.get("effect_type_original", "").strip(),
+            "effect_value_reported": float(beta_raw) if beta_raw else None,
+            "se_reported": float(se_raw) if se_raw else None,
+            "N_effect": int(sample_size) if sample_size else None,
+            "effect_size_type": row.get("effect_size_type", "").strip(),
+            "notes": row.get("confidence_note", "").strip(),
+            "quality_rating": "moderate",
+            "entered_by": "manual_csv_import",
+            "entered_at": datetime.now(timezone.utc).isoformat(),
+            "version": 1,
+            "active": 1,
+        }
+
+        session.execute(insert_sql, params)
+        logger.info(
+            "Inserted %s: %s × %s β=%.3f SE=%.3f n=%s",
+            ler_id, study_id, edge_id,
+            params["effect_value_reported"] or 0,
+            params["se_reported"] or 0,
+            params["N_effect"],
+        )
+        imported += 1
+
+    session.commit()
+    return imported
 
 
 def _get_required_columns(template_name: str) -> set[str]:

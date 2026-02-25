@@ -90,6 +90,7 @@ class LLMClient:
         response_schema: type[T],
         system_prompt: str | None = None,
         temperature: float = 0.0,
+        model_id: str | None = None,
     ) -> T:
         """Call Claude API and return validated response.
 
@@ -98,6 +99,8 @@ class LLMClient:
             response_schema: Pydantic model class to validate response against.
             system_prompt: Optional system prompt.
             temperature: Sampling temperature (default 0 for determinism).
+            model_id: Optional model override. If None, uses self.model_id.
+                     Use with model_router.route_task() for cost optimization.
 
         Returns:
             Validated instance of response_schema.
@@ -106,12 +109,13 @@ class LLMClient:
             LLMResponseValidationError: If response fails schema validation.
             LLMAPIError: If API call fails after all retries.
         """
+        effective_model = model_id if model_id is not None else self.model_id
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:16]
         start_time = time.monotonic()
 
         messages = [{"role": "user", "content": prompt}]
         kwargs: dict[str, Any] = {
-            "model": self.model_id,
+            "model": effective_model,
             "max_tokens": self.max_tokens,
             "messages": messages,
             "temperature": temperature,
@@ -138,7 +142,7 @@ class LLMClient:
         logger.info(
             "LLM call completed: model=%s prompt_hash=%s "
             "prompt_tokens=%d completion_tokens=%d latency_ms=%.0f",
-            self.model_id,
+            effective_model,
             prompt_hash,
             prompt_tokens,
             completion_tokens,
