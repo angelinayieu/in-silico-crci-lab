@@ -1147,6 +1147,33 @@ WORKSTREAM_PRIORITY: list[str] = [
 ]
 
 
+# ═══════════════════════════════════════════════════════════════
+#  PHASE 8: TRAJECTORY BUILDER (S2 — report assembly)
+# ═══════════════════════════════════════════════════════════════
+
+TRAJECTORY_DAYS_PER_MONTH: int = 30
+TRAJECTORY_P_LOWER: float = 0.10   # 10th percentile for prediction bands
+TRAJECTORY_P_UPPER: float = 0.90   # 90th percentile for prediction bands
+
+# ═══════════════════════════════════════════════════════════════
+#  PHASE 8: PATHWAY PROFILER (S3 — pathway activation z-scores)
+# ═══════════════════════════════════════════════════════════════
+
+# Thresholds relative to prior distribution (pre-intervention CRCI population)
+PATHWAY_DYSREGULATION_THRESHOLD: float = 1.5   # |z| ≥ 1.5 → red (top/bottom ~7%)
+PATHWAY_MILD_THRESHOLD: float = 0.5            # |z| ≥ 0.5 → yellow
+PATHWAY_SIGMA_FLOOR: float = 0.10              # minimum prior SD to prevent z-score explosion
+
+# ═══════════════════════════════════════════════════════════════
+#  PHASE 8: EVIDENCE GAP COMPILER (S5 — research prioritization)
+# ═══════════════════════════════════════════════════════════════
+
+EVSI_HYPOTHETICAL_N: int = 50           # hypothetical new study sample size
+EVSI_HIGH_HETEROGENEITY_I2: float = 0.75  # I² threshold for gap flagging
+EVSI_HETEROGENEITY_WEIGHT: float = 1.0    # heuristic upweight for high-I² edges (max 2× at I²=1.0)
+EVIDENCE_GAP_TOP_K: int = 10           # top acquisition targets
+
+
 @dataclass(frozen=True)
 class CRCIConfig:
     """Immutable configuration object aggregating all constants.

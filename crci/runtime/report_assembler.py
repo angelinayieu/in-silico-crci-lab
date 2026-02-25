@@ -23,6 +23,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+import numpy as np
+
 from crci.shared import config
 from crci.shared.models.output_contracts import (
     CompositeScore,
@@ -31,14 +33,23 @@ from crci.shared.models.output_contracts import (
     DomainScore,
     EvidenceGapItem,
     EvidenceGapReport,
+    NodeTrajectory,
     RecommendationReport,
     ScheduleAction,
     SchedulePlan,
+    TemporalTrajectory,
+    TrajectoryPoint,
     VarianceComponent,
     VarianceDecomposition,
 )
 from crci.shared.models.enums import ReportOutputMode, SeverityTier, StabilityClass
 
+from ..algorithm.chain_e_temporal.recovery_trajectory import RecoveryTrajectory
+from ..algorithm.chain_e_temporal.intervention_overlay import (
+    InterventionTrajectory,
+    OverlayResult,
+)
+from ..algorithm.chain_e_temporal.uncertainty_counterfactual import UncertaintyResult
 from ..algorithm.chain_f_analytics.composite_scorer import (
     CompositeState,
     SeverityTier as F1SeverityTier,
@@ -327,6 +338,8 @@ def _build_schedule_plan(sched: Schedule, run_id: str) -> SchedulePlan:
         stability_class=_map_stability_class(sched.stability_class),
         p_rank_1=sched.p_rank_1,
         warnings=sched.warnings,
+        cri_95_lower=sched.safe_b_cri_lower,
+        cri_95_upper=sched.safe_b_cri_upper,
     )
 
 
@@ -354,6 +367,182 @@ def _build_variance_decomposition(
         total_variance=variance.total_variance,
         dominant_source=dominant,
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-I: Trajectory Builder (S2 — Phase 8)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_node_trajectory_from_draws(
+    node_idx: int,
+    node_id: str,
+    node_label: str,
+    theta_natural: np.ndarray,
+    R_draws: np.ndarray,
+    R_mean: np.ndarray,
+    intervention_shift: np.ndarray | None,
+    var_theta_t: np.ndarray | None,
+) -> NodeTrajectory:
+    """Build one node's trajectory using empirical percentiles from MC draws.
+
+    Reconstructs per-draw theta values from R_draws and computes empirical
+    percentiles, preserving non-Gaussian distributional features (skewness,
+    multimodality) that parametric approximation would discard.
+
+    Args:
+        node_idx: Index of this node in theta_natural.
+        node_id: Node identifier string.
+        node_label: Human-readable node label.
+        theta_natural: Shape (n_nodes, T) — mean natural trajectory.
+        R_draws: Shape (n_draws, T) — MC draws of recovery fraction.
+        R_mean: Shape (T,) — mean recovery fraction.
+        intervention_shift: Shape (T,) — delta_C*K(t)+aging for interventions,
+                           or None for status_quo.
+        var_theta_t: Shape (T,) — E4 uncertainty growth (fallback for percentiles).
+
+    Returns:
+        NodeTrajectory with empirical percentile bands.
+    """
+    n_timepoints = theta_natural.shape[1]
+    theta_node = theta_natural[node_idx, :]  # (T,)
+
+    # Reconstruct linear mapping from R-space to theta-space:
+    # theta[i, t] = theta_nadir[i] + delta[i] * R(t)
+    # Solve for delta and nadir from theta_node and R_mean
+    r_spread = R_mean[-1] - R_mean[0] if n_timepoints > 1 else 0.0
+    epsilon = 1e-10
+    if abs(r_spread) > epsilon:
+        delta_i = (theta_node[-1] - theta_node[0]) / r_spread
+        nadir_i = theta_node[0] - delta_i * R_mean[0]
+    else:
+        # No recovery variation — flat trajectory
+        delta_i = 0.0
+        nadir_i = theta_node[0]
+
+    points: list[TrajectoryPoint] = []
+    p_lower = config.TRAJECTORY_P_LOWER * 100  # percentile (e.g. 10)
+    p_upper = config.TRAJECTORY_P_UPPER * 100  # percentile (e.g. 90)
+
+    for t in range(n_timepoints):
+        day = t * config.TRAJECTORY_DAYS_PER_MONTH
+
+        # Reconstruct per-draw theta at this node and time
+        # theta_draw[m] = nadir_i + delta_i * R_draws[m, t] (+ intervention_shift[t])
+        theta_draws_t = nadir_i + delta_i * R_draws[:, t]
+        if intervention_shift is not None:
+            theta_draws_t = theta_draws_t + intervention_shift[t]
+
+        z_mean = float(np.mean(theta_draws_t))
+        z_sd = float(np.std(theta_draws_t))
+        z_p10 = float(np.percentile(theta_draws_t, p_lower))
+        z_p90 = float(np.percentile(theta_draws_t, p_upper))
+
+        points.append(TrajectoryPoint(
+            day=day,
+            z_mean=z_mean,
+            z_sd=z_sd,
+            z_p10=z_p10,
+            z_p90=z_p90,
+        ))
+
+    final_delta = (
+        float(theta_node[-1] - theta_node[0])
+        if n_timepoints > 1 else None
+    )
+
+    return NodeTrajectory(
+        node_id=node_id,
+        node_label=node_label,
+        points=points,
+        final_delta_z=final_delta,
+    )
+
+
+def _build_trajectories(
+    recovery: RecoveryTrajectory,
+    overlay: OverlayResult | None,
+    uncertainty: UncertaintyResult | None,
+    node_labels: dict[str, str] | None = None,
+) -> list[TemporalTrajectory]:
+    """Convert E-chain results to output TemporalTrajectory list.
+
+    Uses empirical percentiles from R_draws (MC recovery fraction draws)
+    rather than Gaussian approximation, preserving non-Gaussian features.
+
+    Args:
+        recovery: E2 natural recovery trajectory.
+        overlay: E3 intervention overlay (None if no interventions).
+        uncertainty: E4 uncertainty results (used as fallback).
+        node_labels: Optional mapping node_idx→label.
+
+    Returns:
+        List of TemporalTrajectory (status_quo + per-intervention).
+    """
+    n_nodes, n_tp = recovery.theta_natural.shape
+    labels = node_labels or {}
+    var_theta_t = uncertainty.var_theta_t if uncertainty is not None else None
+
+    trajectories: list[TemporalTrajectory] = []
+
+    # 1. Status quo (natural recovery)
+    sq_nodes: list[NodeTrajectory] = []
+    for i in range(n_nodes):
+        nid = f"node_{i}"
+        nlabel = labels.get(nid, f"Node {i}")
+        sq_nodes.append(_build_node_trajectory_from_draws(
+            node_idx=i,
+            node_id=nid,
+            node_label=nlabel,
+            theta_natural=recovery.theta_natural,
+            R_draws=recovery.R_draws,
+            R_mean=recovery.R_mean,
+            intervention_shift=None,
+            var_theta_t=var_theta_t,
+        ))
+
+    horizon_days = (n_tp - 1) * config.TRAJECTORY_DAYS_PER_MONTH
+    trajectories.append(TemporalTrajectory(
+        scenario_id="status_quo",
+        scenario_label="Natural Recovery (No Intervention)",
+        horizon_days=horizon_days,
+        time_step_unit="day",
+        node_trajectories=sq_nodes,
+    ))
+
+    # 2. Intervention trajectories
+    if overlay is not None:
+        for aid, itraj in overlay.intervention_trajectories.items():
+            int_nodes: list[NodeTrajectory] = []
+            for i in range(n_nodes):
+                nid = f"node_{i}"
+                nlabel = labels.get(nid, f"Node {i}")
+                # Intervention shift = delta_C * K(t) + aging
+                shift = itraj.delta_C * itraj.K_a + itraj.delta_aging
+                int_nodes.append(_build_node_trajectory_from_draws(
+                    node_idx=i,
+                    node_id=nid,
+                    node_label=nlabel,
+                    theta_natural=recovery.theta_natural,
+                    R_draws=recovery.R_draws,
+                    R_mean=recovery.R_mean,
+                    intervention_shift=shift,
+                    var_theta_t=var_theta_t,
+                ))
+
+            trajectories.append(TemporalTrajectory(
+                scenario_id=aid,
+                scenario_label=f"Intervention: {aid}",
+                horizon_days=horizon_days,
+                time_step_unit="day",
+                node_trajectories=int_nodes,
+            ))
+
+    logger.info(
+        "Trajectory builder: %d scenarios, %d nodes, %d timepoints",
+        len(trajectories), n_nodes, n_tp,
+    )
+    return trajectories
 
 
 def _build_decision_trace(
@@ -405,6 +594,11 @@ def assemble_report(
     variance: VarianceState | None = None,
     questioning: QuestioningState | None = None,
     output_mode: ReportOutputMode = ReportOutputMode.CLINICAL,
+    # Phase 8: E-chain temporal results
+    recovery: RecoveryTrajectory | None = None,
+    overlay: OverlayResult | None = None,
+    uncertainty: UncertaintyResult | None = None,
+    node_labels: dict[str, str] | None = None,
 ) -> RecommendationReport:
     """RT-I4: Assemble complete RecommendationReport.
 
@@ -419,6 +613,10 @@ def assemble_report(
         variance: From ALG-F3.
         questioning: From RT-H.
         output_mode: Clinical or research output mode.
+        recovery: From ALG-E2 (natural recovery trajectory).
+        overlay: From ALG-E3 (intervention overlays).
+        uncertainty: From ALG-E4 (uncertainty/counterfactuals).
+        node_labels: Optional node_id→label map for trajectories.
 
     Returns:
         RecommendationReport.
@@ -466,6 +664,13 @@ def assemble_report(
     # Decision trace
     trace = _build_decision_trace(provenance, disclosure, session, run_id)
 
+    # Trajectories (Phase 8 S2)
+    traj_list = (
+        _build_trajectories(recovery, overlay, uncertainty, node_labels)
+        if recovery is not None
+        else []
+    )
+
     # Safety flags
     safety_flags: list[str] = []
     if disclosure.warning_text:
@@ -482,6 +687,7 @@ def assemble_report(
         composite_score=composite_score,
         primary_schedule=primary,
         alternative_schedules=alternatives,
+        trajectories=traj_list,
         variance_decomposition=var_decomp,
         decision_trace=trace,
         safety_flags=safety_flags,

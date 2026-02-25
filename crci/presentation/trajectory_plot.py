@@ -38,8 +38,8 @@ class TrajectoryLine:
     color: str
     timepoints_days: list[int]
     means: list[float]
-    lower_band: list[float]  # 95% CrI lower
-    upper_band: list[float]  # 95% CrI upper
+    lower_band: list[float]  # p10 lower bound (80% prediction interval)
+    upper_band: list[float]  # p90 upper bound (80% prediction interval)
     is_baseline: bool = False
 
 
@@ -61,6 +61,8 @@ class TrajectoryPlotView:
     horizon_days: int
     x_label: str
     y_label: str
+    band_coverage: str = "80%"
+    band_label: str = "80% prediction interval (p10\u2013p90)"
     mid_crossings: list[MIDCrossing] = field(default_factory=list)
     empty_state: bool = False
     empty_message: str = ""

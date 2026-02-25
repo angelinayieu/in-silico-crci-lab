@@ -91,6 +91,12 @@ class SchedulePlan(BaseModel):
     rationale: list[str] = Field(default_factory=list)
     constraints_applied: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # REVIEW: CrI values originate from Chain D MC draws. Interval calibration
+    # (actual coverage ≈ 95%) should be verified via simulation before clinical
+    # deployment. This passthrough is correct but the upstream intervals may need
+    # calibration tuning.
+    cri_95_lower: float | None = None
+    cri_95_upper: float | None = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -104,6 +110,7 @@ class PathwayContribution(BaseModel):
     pathway_id: str
     pathway_label: str
     contribution_fraction: float
+    activation_z: float = 0.0  # signed pathway z-score (direction matters)
     key_edges: list[str] = Field(default_factory=list)
     evidence_quality: str | None = None
 
