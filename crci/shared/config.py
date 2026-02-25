@@ -398,6 +398,50 @@ DEFAULT_TIME_STEP_UNIT: str = "day"
 MAX_SPECTRAL_RADIUS: float = 1.0  # ρ(B) must be < 1 for stability
 SPECTRAL_RADIUS_WARNING: float = 0.8  # warn if approaching instability
 
+# Condition number thresholds (A4)
+CONDITION_NUMBER_WARNING: float = 1e8   # κ(Λ) > 10⁸ → WARNING
+CONDITION_NUMBER_CRITICAL: float = 1e10  # κ(Λ) > 10¹⁰ → CRITICAL (force path enumeration)
+
+# ═══════════════════════════════════════════════════════════════
+#  GRAPH ASSEMBLY — ALG-A (§2.6, §2.11, §2.17)
+# ═══════════════════════════════════════════════════════════════
+
+# A1: Expected node count
+EXPECTED_NODE_COUNT: int = 63
+
+# A2: Edge functional forms
+EXPECTED_EDGE_COUNT_MIN: int = 100  # minimum edges for validation (actual registry may exceed 118)
+
+# A3: Residual variance floor (§2.6)
+# Formula A3-2: σ²_{ε,i} = max(1 − R²_i, RESIDUAL_VARIANCE_FLOOR)
+RESIDUAL_VARIANCE_FLOOR: float = 0.05
+
+# A3: Known residual correlation pairs (§2.17.2)
+# Format: (node_a, node_b, rho, block_name, source)
+RESIDUAL_CORRELATION_PAIRS: list[tuple[str, str, float, str, str]] = [
+    ("NODE_BIO_IL6", "NODE_BIO_TNF", 0.65, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_IL6", "NODE_BIO_CRP", 0.72, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_TNF", "NODE_BIO_CRP", 0.58, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_BDNF", "NODE_BIO_IL6", -0.35, "neuro_stress", "Ng et al., 2023"),
+    ("NODE_BIO_CORTISOL", "NODE_BIO_IL6", 0.28, "neuro_stress", "Adam et al., 2017"),
+    ("NODE_BIO_BDNF", "NODE_BIO_CORTISOL", -0.22, "neuro_stress", "Estimated"),
+    ("NODE_BIO_MDA", "NODE_BIO_IL6", 0.38, "inflammatory", "Zhao et al., 2025 [VERIFY]"),
+    ("NODE_BIO_NFL", "NODE_BIO_TNF", 0.31, "neuro_stress", "Schroyen et al., 2021"),
+]
+
+# A5b: Proxy validity SE multiplier tiers (§2.17)
+PROXY_SE_MULTIPLIER_HIGH: float = 1.0    # R² ≥ 0.5
+PROXY_SE_MULTIPLIER_MODERATE: float = 1.25  # R² 0.3–0.5
+PROXY_SE_MULTIPLIER_LOW: float = 1.5     # R² 0.2–0.3
+PROXY_SE_MULTIPLIER_VERY_LOW: float = 2.0  # R² < 0.2
+
+# A5c: Feedback loop stability thresholds
+FEEDBACK_GAIN_CRITICAL: float = 1.0   # gain ≥ 1 → CRITICAL: system unstable
+FEEDBACK_GAIN_WARNING: float = 0.5    # gain > 0.5 → WARNING: slow convergence
+
+# Node layer count (7 layers: 0-6)
+NODE_LAYER_COUNT: int = 7
+
 # ═══════════════════════════════════════════════════════════════
 #  DATABASE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
