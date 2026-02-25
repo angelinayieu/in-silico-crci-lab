@@ -442,6 +442,30 @@ FULLTEXT_SOURCE_PRIORITY: list[str] = [
 ACQUISITION_LOOP_HOURS: int = 6
 AUTHOR_GAP_BOOST_MULTIPLIER: float = 1.5
 
+# v2.0: Abstract screening (MS §9.2.1)
+ABSTRACT_SCREENING_MIN_KEYWORDS: int = 2
+ABSTRACT_SCREENING_CANCER_KEYWORDS: list[str] = [
+    "cancer", "tumor", "tumour", "oncology", "carcinoma", "malignancy",
+    "neoplasm", "chemotherapy", "radiation", "survivor",
+]
+ABSTRACT_SCREENING_COGNITIVE_KEYWORDS: list[str] = [
+    "cognit", "memory", "attention", "executive function", "processing speed",
+    "brain fog", "chemo brain", "chemobrain", "neuropsychol", "neurocognit",
+]
+
+# v2.0: Saturation detection (MS §9.7)
+SATURATION_NOVELTY_THRESHOLD: float = 0.10
+SATURATION_MIN_CYCLES: int = 3
+SATURATION_MAX_CYCLES: int = 20
+
+# v2.0: Content-driven hops (MS §9.4)
+HOP_MAX_DEPTH: int = 2
+HOP_CITATION_APS_BOOST: float = 0.15
+
+# v2.0: ID cross-resolution
+ID_RESOLVER_CROSSREF_TIMEOUT_S: int = 10
+ID_RESOLVER_PUBMED_TIMEOUT_S: int = 10
+
 # Workstream priority (higher = searched first)
 WORKSTREAM_PRIORITY: list[str] = [
     "instrument_psychometrics",
