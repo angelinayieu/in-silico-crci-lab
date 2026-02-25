@@ -1052,6 +1052,20 @@ class ProxyValidity(StrEnum):
     NONE = "NONE"
 
 
+@unique
+class ObservationTier(StrEnum):
+    """Observation priority tier (C2a).
+
+    TIER_0: Required — abort if missing (cancer_type, treatment, ≥1 cognitive).
+    TIER_1: Major gain (PSQI, PHQ-9, FACIT-F, age, IL-6/CRP, activity).
+    TIER_2: Pathway (BDNF, cortisol, GAD-7, glucose, APOE, ISI, NfL, etc.).
+    """
+
+    TIER_0 = "TIER_0"
+    TIER_1 = "TIER_1"
+    TIER_2 = "TIER_2"
+
+
 # ─── RUNTIME-G: Optimization ─────────────────────────────────
 
 
