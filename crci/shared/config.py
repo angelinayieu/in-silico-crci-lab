@@ -466,6 +466,30 @@ E3_ACC_COEFFICIENTS: dict[str, float] = {
 E3_ACC_DEFAULT: float = 1.5  # standard_chemo fallback
 
 # ═══════════════════════════════════════════════════════════════
+#  E4: UNCERTAINTY + COUNTERFACTUALS (spec lines 2872-2934)
+# ═══════════════════════════════════════════════════════════════
+
+# E4a: Uncertainty growth model (Formula E-6, spec line 2884)
+# Var(θ(t)) = Var(θ₀) + LINEAR·t + QUADRATIC·t²
+E4_VAR_LINEAR_COEFF: float = 0.01   # 0.1 SD/month — epistemic drift
+E4_VAR_QUADRATIC_COEFF: float = 0.005  # second-order uncertainty about uncertainty
+
+# E4a: Default kernel scale factor for conservative (unfitted) kernels
+E4_VAR_DEFAULT_KERNEL_SCALE: float = 1.5  # 1.5× coefficients for default kernels
+
+# E4c: Severity threshold for ARR/RRR/NNT (composite score threshold)
+# "Impaired" if composite cognitive score < this threshold (in SD units)
+E4_SEVERITY_THRESHOLD_SD: float = -0.5  # 0.5 SD below population mean
+
+# E4c: NNT classification thresholds (spec line 2929-2931)
+E4_NNT_STRONG_THRESHOLD: float = 3.0   # NNT < 3 → strong recommendation
+E4_NNT_MODERATE_THRESHOLD: float = 10.0  # NNT 3-10 → moderate; > 10 → weak
+
+# E4c: CrI quantiles for ITE and NNT (same as D4)
+E4_CRI_LOWER_QUANTILE: float = 0.025
+E4_CRI_UPPER_QUANTILE: float = 0.975
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 
