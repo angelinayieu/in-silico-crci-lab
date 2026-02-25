@@ -766,6 +766,10 @@ class StudyRegistry(Base):
     file_type = Column(Text)
     parse_quality = Column(Text)
 
+    # v2.0: Cohort lineage (CONVERSION_VALIDITY_AND_HARDENING.md Module 4.2)
+    cohort_lineage_id = Column(Text)   # FK to self-group
+    lineage_role = Column(Text)        # PRIMARY, SUPPLEMENTARY, FOLLOW_UP
+
 
 class StudyCohortProfile(Base):
     """B2. Cohort-level metadata per study."""
@@ -982,6 +986,20 @@ class EdgeEvidence(Base):
     meta_source_flag = Column(Text)
     heterogeneity_json = Column(Text)
     effect_size_type = Column(Text)
+
+    # v2.0: SE derivation cascade (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)
+    se_derivation_level = Column(Text)       # L1, L2a, ..., L6
+    se_inflation_applied = Column(Float)     # inflation factor (1.00-1.50)
+    se_quality_tag = Column(Text)            # DIRECT, DERIVED_EXACT, etc.
+
+    # v2.0: Conversion provenance (CONVERSION_VALIDITY_AND_HARDENING.md R4)
+    conversion_formula = Column(Text)        # formula ID (M1-SMD-d, M1-LOG-OR, etc.)
+    conversion_bias_risk = Column(Text)      # NONE, LOW, MODERATE, HIGH, VERY_HIGH, BLOCKED
+
+    # v2.0: Shared control & dependency (CONVERSION_VALIDITY_AND_HARDENING.md Module 4)
+    shared_control_flag = Column(Boolean, default=False)
+    shared_control_study_id = Column(Text)
+    endpoint_vs_change = Column(Text)        # ENDPOINT, CHANGE, UNCLEAR
 
     notes = Column(Text)
 

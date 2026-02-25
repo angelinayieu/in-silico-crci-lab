@@ -28,6 +28,7 @@ from .enums import (
     AnnotationMaturity,
     BiasRisk,
     BoundType,
+    ConversionBiasRisk,
     ConversionGateResult,
     EffectScale,
     ExtractionMode,
@@ -39,6 +40,8 @@ from .enums import (
     PriorSource,
     PriorTypePaper,
     ProxyValidity,
+    SEDerivationLevel,
+    SEQualityTag,
     SESource,
     SafeMode,
     StabilityClass,
@@ -243,7 +246,12 @@ class RoutedNumeric(BaseModel):
 
 
 class ScaledNumeric(BaseModel):
-    """After scale conversion with SE."""
+    """After scale conversion with SE.
+
+    v2.0: Includes SE derivation level tracking from the 6-level cascade
+    (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4) and conversion
+    provenance logging (Module 1 R4).
+    """
 
     span_id: str
     beta: float
@@ -251,6 +259,15 @@ class ScaledNumeric(BaseModel):
     se_source: SESource
     scale: EffectScale
     direction_aligned: bool = False
+    # v2.0: SE derivation cascade tracking
+    se_derivation_level: SEDerivationLevel | None = None
+    se_quality_tag: SEQualityTag | None = None
+    se_inflation_applied: float = 1.0
+    # v2.0: Conversion provenance (Module 1 R4)
+    conversion_formula: str | None = None
+    conversion_bias_risk: ConversionBiasRisk | None = None
+    fields_present: list[str] = Field(default_factory=list)
+    fields_missing: list[str] = Field(default_factory=list)
 
 
 class HarmonizedClaim(BaseModel):

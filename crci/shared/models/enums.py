@@ -958,6 +958,49 @@ class SESource(StrEnum):
 
 
 @unique
+class SEDerivationLevel(StrEnum):
+    """SE derivation cascade level (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4).
+
+    6 levels, tried in order L1→L6. First level where all required
+    fields are available is used. Each level has an associated inflation factor.
+    """
+    L1 = "L1"        # SE reported directly — inflation 1.00×
+    L2A = "L2a"      # 95% CI — inflation 1.00×
+    L2B = "L2b"      # 99% CI — inflation 1.00×
+    L2C = "L2c"      # 90% CI — inflation 1.00×
+    L3A = "L3a"      # Exact p-value + effect — inflation 1.05×
+    L3B = "L3b"      # Bounded p (e.g. p<0.05) — inflation 1.10×
+    L4A = "L4a"      # N per group + d — inflation 1.15×
+    L4B = "L4b"      # Total N only + d — inflation 1.20×
+    L5 = "L5"        # SD borrowed + N — inflation tier-dependent (1.15-1.50×)
+    L6 = "L6"        # Direction only, no numeric SE — qualitative
+
+
+@unique
+class SEQualityTag(StrEnum):
+    """Quality tag for SE derivation (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)."""
+    DIRECT = "DIRECT"
+    DERIVED_EXACT = "DERIVED_EXACT"
+    DERIVED_PVAL = "DERIVED_PVAL"
+    DERIVED_PBOUND = "DERIVED_PBOUND"
+    ESTIMATED_N = "ESTIMATED_N"
+    ESTIMATED_N_EQUAL_ASSUMED = "ESTIMATED_N_EQUAL_ASSUMED"
+    SD_BORROWED = "SD_BORROWED"
+    QUALITATIVE = "QUALITATIVE"
+
+
+@unique
+class ConversionBiasRisk(StrEnum):
+    """Bias risk level for effect-size conversion (CONVERSION_VALIDITY_AND_HARDENING.md Module 1)."""
+    NONE = "NONE"
+    LOW = "LOW"
+    MODERATE = "MODERATE"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+    BLOCKED = "BLOCKED"
+
+
+@unique
 class HarmonizationStatusInMem(StrEnum):
     FULL = "FULL"
     PARTIAL = "PARTIAL"

@@ -176,6 +176,45 @@ CONFOUNDER_COVERAGE_DOWNGRADE_THRESHOLD: float = 0.30  # < 30% → downgrade
 SE_FROM_CI_Z_MULTIPLIER: float = 1.96
 
 # ═══════════════════════════════════════════════════════════════
+#  SE DERIVATION CASCADE (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)
+# ═══════════════════════════════════════════════════════════════
+
+# Inflation factors per SE derivation level
+SE_CASCADE_INFLATION_L1: float = 1.00     # SE reported directly
+SE_CASCADE_INFLATION_L2A: float = 1.00    # 95% CI → SE
+SE_CASCADE_INFLATION_L2B: float = 1.00    # 99% CI → SE
+SE_CASCADE_INFLATION_L2C: float = 1.00    # 90% CI → SE
+SE_CASCADE_INFLATION_L3A: float = 1.05    # Exact p-value + effect → SE
+SE_CASCADE_INFLATION_L3B: float = 1.10    # Bounded p (e.g. p<0.05) → SE
+SE_CASCADE_INFLATION_L4A: float = 1.15    # N per group + d → SE
+SE_CASCADE_INFLATION_L4B: float = 1.20    # Total N only + d (assume n₁=n₂=N/2) → SE
+SE_CASCADE_INFLATION_L5_T1: float = 1.15  # SD borrowed, Tier 1 (same population)
+SE_CASCADE_INFLATION_L5_T2: float = 1.30  # SD borrowed, Tier 2 (similar population)
+SE_CASCADE_INFLATION_L5_T3: float = 1.50  # SD borrowed, Tier 3 (general population)
+
+# CI divisors for different confidence levels (z-multiplier × 2)
+SE_CI_DIVISOR_95: float = 3.92   # 2 × 1.96
+SE_CI_DIVISOR_99: float = 5.152  # 2 × 2.576
+SE_CI_DIVISOR_90: float = 3.290  # 2 × 1.645
+
+# ═══════════════════════════════════════════════════════════════
+#  CONVERSION VALIDITY MATRIX (CONVERSION_VALIDITY_AND_HARDENING.md Module 1)
+# ═══════════════════════════════════════════════════════════════
+
+# Hasselblad & Hedges OR→d conversion factor: √3/π ≈ 0.5513
+CONVERSION_OR_TO_D_FACTOR: float = 0.5513288954217921
+
+# SE inflation for missing fields (fallback paths)
+CONVERSION_SE_INFLATION_MISSING_GROUP_N: float = 1.10   # d from d, using total N/2
+CONVERSION_SE_INFLATION_MISSING_R_PREPOST: float = 1.30  # paired t with default r=0.5
+CONVERSION_SE_INFLATION_ETA_APPROX: float = 1.20         # η² total used as partial approx
+CONVERSION_SE_INFLATION_CHI2_APPROX: float = 1.20        # χ² without cell counts
+CONVERSION_SE_INFLATION_SPEARMAN: float = 1.06           # Spearman ρ treated as Pearson r
+
+# Default pre-post correlation for paired designs (when unknown)
+CONVERSION_DEFAULT_R_PREPOST: float = 0.50
+
+# ═══════════════════════════════════════════════════════════════
 #  RECONCILIATION CONFIDENCE (EX-P1-REC)
 # ═══════════════════════════════════════════════════════════════
 
