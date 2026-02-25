@@ -22,6 +22,7 @@ from crci.shared import config
 from crci.shared.models.intermediate_states import (
     GateViolation,
     ParsedNumeric,
+    TypedNumericValue,
     ValidatedNumeric,
 )
 
@@ -176,9 +177,17 @@ def _check_plausibility(
 
     plausibility_status = "PASS" if not notes else "WARNING"
 
+    # Construct TypedNumericValue from ParsedNumeric fields
+    typed_value = TypedNumericValue(
+        value=pv.parsed_value if pv.parsed_value is not None else 0.0,
+        original_text=pv.raw_text,
+        ci_lower=pv.parsed_lower,
+        ci_upper=pv.parsed_upper,
+    )
+
     return ValidatedNumeric(
         span_id=pv.span_id,
-        value=pv.parsed_value,
+        value=typed_value,
         plausibility_status=plausibility_status,
         plausibility_note="; ".join(notes) if notes else None,
     )

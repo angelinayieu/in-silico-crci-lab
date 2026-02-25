@@ -21,7 +21,7 @@ from sqlalchemy import (
     DateTime,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON as JSONB  # Alias: use JSON for SQLite compat, JSONB semantics on PostgreSQL
 from sqlalchemy.orm import DeclarativeBase
 
 

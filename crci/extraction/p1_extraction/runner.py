@@ -145,22 +145,28 @@ def run_p1_extraction(
     ]
 
     all_raw_annotations: list[Any] = []
+    all_span_labels: list[Any] = []
     for agent in agents:
         agent_name = agent.__class__.__name__
         logger.info("Running agent %s", agent_name)
         try:
             agent_output = agent.extract(paper_map)
             all_raw_annotations.extend(agent_output.annotations)
+            all_span_labels.extend(agent_output.span_labels)
             logger.info(
-                "Agent %s produced %d annotations",
-                agent_name, len(agent_output.annotations),
+                "Agent %s produced %d annotations, %d span_labels",
+                agent_name, len(agent_output.annotations), len(agent_output.span_labels),
             )
         except Exception as exc:
             logger.error("Agent %s failed: %s", agent_name, exc)
             # Continue with other agents — partial extraction is better than none
 
     context["raw_annotations"] = all_raw_annotations
-    logger.info("P1-AG complete: %d total raw annotations", len(all_raw_annotations))
+    context["all_span_labels"] = all_span_labels
+    logger.info(
+        "P1-AG complete: %d total raw annotations, %d total span_labels",
+        len(all_raw_annotations), len(all_span_labels),
+    )
 
     # ── P1-REC: Reconciliation ──
     logger.info("P1-REC: Reconciling cross-agent annotations")

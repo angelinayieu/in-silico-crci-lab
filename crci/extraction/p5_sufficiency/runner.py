@@ -99,11 +99,13 @@ def run_p5_sufficiency(
 
     coverage = build_coverage_matrix(compiled_edges)
     context["coverage_analysis"] = coverage
+    n_covered = coverage.n_strong + coverage.n_moderate + coverage.n_weak
+    n_expected = coverage.total_edges or 1
     logger.info(
         "P5-COV: coverage %.1f%% (%d/%d edges)",
         coverage.coverage_fraction * 100,
-        coverage.n_covered,
-        coverage.n_expected,
+        n_covered,
+        n_expected,
     )
 
     # ── P5-EV: E-value computation ──

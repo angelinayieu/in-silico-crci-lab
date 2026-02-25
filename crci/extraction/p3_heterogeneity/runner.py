@@ -57,6 +57,22 @@ def run_p3_heterogeneity(
         context["calibrated_records"] = []
         return context
 
+    # Debug: log what fields the harmonized records actually have
+    if harmonized_records:
+        sample = harmonized_records[0]
+        logger.info(
+            "P3: Record type=%s, fields=%s",
+            type(sample).__name__,
+            [f for f in dir(sample) if not f.startswith("_")],
+        )
+        # Log SE/beta availability across all records
+        has_se = sum(1 for r in harmonized_records if getattr(r, "se", None) is not None)
+        has_beta = sum(1 for r in harmonized_records if getattr(r, "beta", None) is not None)
+        logger.info(
+            "P3: Data availability: %d/%d have SE, %d/%d have beta",
+            has_se, len(harmonized_records), has_beta, len(harmonized_records),
+        )
+
     # ── P3-L1 through P3-L7: Apply all 7 layers ──
     from crci.extraction.p3_heterogeneity.layers import apply_all_layers
 

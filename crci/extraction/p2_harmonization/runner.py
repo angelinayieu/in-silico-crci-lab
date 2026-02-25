@@ -19,6 +19,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from crci.shared.models.enums import Orientation, PlausibilityStatus
 from crci.shared.models.tables import ExtractionRun
 
 logger = logging.getLogger(__name__)
@@ -48,21 +49,54 @@ def run_p2_harmonization(
         Updated context with harmonized evidence records.
     """
     paper_id = context.get("paper_id", "unknown")
-    claims = context.get("tb_result", {}).get("valid_claims", [])
 
-    if not claims:
-        claims = context.get("parsed_claims", {}).get("valid_claims", [])
+    # Get validated claims from TB result
+    # tb_result is a ConsistencyResult dataclass with .validated attribute
+    tb_result = context.get("tb_result")
+    if tb_result is not None and hasattr(tb_result, "validated"):
+        claims = tb_result.validated
+    else:
+        # Fallback: try parsed_claims from context
+        claims = context.get("parsed_claims", [])
+        if isinstance(claims, dict):
+            claims = claims.get("valid_claims", [])
 
     logger.info("P2: Harmonizing %d claims for %s", len(claims), paper_id)
+
+    # Resolve study_design from triage context for S5
+    classified_paper = context.get("classified_paper", {})
+    study_design_raw = classified_paper.get("study_design", "other")
+    if hasattr(study_design_raw, "value"):
+        study_design_str = study_design_raw.value
+    else:
+        study_design_str = str(study_design_raw) if study_design_raw else "other"
 
     # ── P2-S1: Plausibility ──
     logger.info("P2-S1: Running plausibility checks")
     from crci.extraction.p2_harmonization.plausibility_checker import check_plausibility
 
-    plausibility_results = check_plausibility(claims, session=session)
-    context["p2_plausibility"] = plausibility_results
+    passed_claims: list[Any] = []
+    failed_plausibility: list[Any] = []
+    for claim in claims:
+        try:
+            result = check_plausibility(
+                span_id=claim.span_id,
+                value=claim.value,
+            )
+            if result.plausibility_status != PlausibilityStatus.FAIL:
+                passed_claims.append(result)
+            else:
+                failed_plausibility.append(result)
+        except Exception as exc:
+            logger.debug("P2-S1: plausibility check failed for span %s: %s",
+                         getattr(claim, "span_id", "?"), exc)
+            # On error, pass claim through (fail-open for debugging)
+            passed_claims.append(claim)
 
-    passed_claims = plausibility_results.get("passed", claims)
+    context["p2_plausibility"] = {
+        "passed": passed_claims,
+        "failed": failed_plausibility,
+    }
     logger.info(
         "P2-S1 complete: %d/%d passed plausibility",
         len(passed_claims), len(claims),
@@ -72,69 +106,104 @@ def run_p2_harmonization(
     logger.info("P2-S2: Converting effect sizes")
     from crci.extraction.p2_harmonization.conversion_router import route_conversion
 
-    converted_list = []
-    failed_conversions = []
+    converted_list: list[Any] = []
+    failed_conversions: list[Any] = []
     for claim in passed_claims:
         try:
-            effect_type = getattr(claim, "effect_type_reported", "UNKNOWN")
-            has_orient = getattr(claim, "has_orientation_metadata", True)
-            routed = route_conversion(claim, effect_type, has_orientation_metadata=has_orient)
+            routed = route_conversion(
+                validated=claim,
+                effect_type_reported="group_diff",  # Default; TB claims lack this metadata
+            )
             converted_list.append(routed)
         except Exception as exc:
-            logger.debug("P2-S2: conversion failed for claim: %s", exc)
+            logger.debug("P2-S2: conversion failed for span %s: %s",
+                         getattr(claim, "span_id", "?"), exc)
             failed_conversions.append(claim)
 
-    converted = {"converted": converted_list, "failed": failed_conversions}
-    context["p2_converted"] = converted
-    logger.info("P2-S2 complete: %d converted", len(converted_list))
+    context["p2_converted"] = {
+        "converted": converted_list,
+        "failed": failed_conversions,
+    }
+    logger.info("P2-S2 complete: %d converted, %d failed",
+                len(converted_list), len(failed_conversions))
 
     # ── P2-S3: Scale Harmonization ──
     logger.info("P2-S3: Harmonizing scales")
     from crci.extraction.p2_harmonization.scale_harmonizer import harmonize_scale
 
-    harmonized_list = []
+    harmonized_list: list[Any] = []
     for routed_item in converted_list:
         try:
-            effect_type = getattr(routed_item, "effect_type_reported", "UNKNOWN")
-            scaled = harmonize_scale(routed_item, effect_type)
+            scaled = harmonize_scale(
+                routed=routed_item,
+                effect_type_reported="group_diff",
+            )
             harmonized_list.append(scaled)
         except Exception as exc:
-            logger.debug("P2-S3: harmonization failed: %s", exc)
+            logger.debug("P2-S3: scale harmonization failed for span %s: %s",
+                         getattr(routed_item, "span_id", "?"), exc)
 
-    harmonized = {"harmonized": harmonized_list}
-    context["p2_harmonized"] = harmonized
+    context["p2_harmonized"] = harmonized_list
     logger.info("P2-S3 complete: %d harmonized", len(harmonized_list))
 
     # ── P2-S4: Orientation Alignment ──
     logger.info("P2-S4: Aligning orientation")
     from crci.extraction.p2_harmonization.orientation_aligner import align_orientation
 
-    oriented = align_orientation(harmonized.get("harmonized", []), session=session)
-    context["p2_oriented"] = oriented
-    logger.info("P2-S4 complete: %d aligned", len(oriented.get("aligned", [])))
+    aligned_list: list[Any] = []
+    for scaled_item in harmonized_list:
+        try:
+            aligned = align_orientation(
+                scaled=scaled_item,
+                dag_orientation=Orientation.HIGHER_WORSE,  # Default; lookup from DAG later
+                reported_direction_positive=True,  # Default assumption
+                orientation_confidence=0.7,  # Moderate default
+            )
+            aligned_list.append(aligned)
+        except Exception as exc:
+            logger.debug("P2-S4: orientation alignment failed for span %s: %s",
+                         getattr(scaled_item, "span_id", "?"), exc)
+            # Pass through unaligned
+            aligned_list.append(scaled_item)
+
+    context["p2_oriented"] = aligned_list
+    logger.info("P2-S4 complete: %d aligned", len(aligned_list))
 
     # ── P2-S5: Identification Scoring ──
     logger.info("P2-S5: Scoring identification status")
     from crci.extraction.p2_harmonization.identification_scorer import score_identification
 
-    identified = score_identification(oriented.get("aligned", []), session=session)
-    context["p2_identified"] = identified
-    logger.info("P2-S5 complete: %d scored", len(identified.get("scored", [])))
+    scored_list: list[Any] = []
+    for aligned_item in aligned_list:
+        try:
+            id_result = score_identification(
+                scaled=aligned_item,
+                study_design=study_design_str,
+            )
+            scored_list.append(id_result)
+        except Exception as exc:
+            logger.debug("P2-S5: identification scoring failed for span %s: %s",
+                         getattr(aligned_item, "span_id", "?"), exc)
+
+    context["p2_identified"] = scored_list
+    logger.info("P2-S5 complete: %d scored", len(scored_list))
 
     # ── P2-FA: Parameter Family Assignment (Module 5.1) ──
+    # Use aligned_list (ScaledNumeric objects) as the primary records
+    # because downstream P3 needs .beta and .se fields.
+    # IdentificationResult objects are kept separately in p2_identified.
     logger.info("P2-FA: Assigning parameter families")
     from crci.extraction.p2_harmonization.parameter_family_assigner import (
         assign_parameter_family,
     )
 
-    scored_records = identified.get("scored", [])
-    paper_subtype = context.get("classified_paper", {}).get("paper_subtype")
+    paper_subtype = classified_paper.get("paper_subtype")
     subtype_str = (
         paper_subtype.value if hasattr(paper_subtype, "value") else paper_subtype
     )
 
     family_counts: dict[str, int] = {}
-    for record in scored_records:
+    for record in aligned_list:
         edge_family = getattr(record, "edge_family", None)
         extraction_ctx = getattr(record, "extraction_context", None)
         meta_source = getattr(record, "meta_source_flag", None)
@@ -154,11 +223,13 @@ def run_p2_harmonization(
 
         family_counts[family.value] = family_counts.get(family.value, 0) + 1
 
-    context["harmonized_records"] = scored_records
+    # Pass ScaledNumeric objects (aligned_list) as harmonized_records.
+    # These have .beta, .se, .se_source, .scale that P3 needs.
+    context["harmonized_records"] = aligned_list
     context["parameter_family_counts"] = family_counts
     logger.info(
         "P2-FA complete: %d records assigned families: %s",
-        len(scored_records),
+        len(aligned_list),
         family_counts,
     )
 

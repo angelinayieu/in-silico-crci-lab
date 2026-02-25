@@ -48,27 +48,24 @@ def run_tb_trust_boundary(
     logger.info("TB-S1: Parsing numeric claims for %s", paper_id)
     from crci.extraction.tb_trust_boundary.numeric_parser import parse_spans
 
-    # Extract SpanLabel objects from raw annotations produced by P1 agents
-    raw_annotations = context.get("raw_annotations", [])
-    span_labels = []
-    for ann in raw_annotations:
-        if hasattr(ann, "span_labels"):
-            span_labels.extend(ann.span_labels)
-        elif hasattr(ann, "spans"):
-            span_labels.extend(ann.spans)
+    # Extract SpanLabel objects from P1 agent outputs (passed via context)
+    span_labels = context.get("all_span_labels", [])
+
+    # Also check PaperMap candidate_spans as fallback
+    paper_map = context.get("paper_map")
+    if not span_labels and paper_map and hasattr(paper_map, "candidate_spans"):
+        span_labels = paper_map.candidate_spans
 
     parsed_numerics = parse_spans(span_labels)
 
     # Separate valid (parsed successfully) from failed
-    valid_claims = [p for p in parsed_numerics if p.status.value == "PARSED"]
-    failed_claims = [p for p in parsed_numerics if p.status.value != "PARSED"]
+    # ParseStatus enum: CLEAN = successfully parsed, AMBIGUOUS = partial, FAILED = rejected
+    valid_claims = [p for p in parsed_numerics if p.parse_status.value == "CLEAN"]
+    failed_claims = [p for p in parsed_numerics if p.parse_status.value != "CLEAN"]
 
-    parsed = {
-        "valid_claims": valid_claims,
-        "failed_claims": failed_claims,
-        "total_spans": len(span_labels),
-    }
-    context["parsed_claims"] = parsed
+    context["parsed_claims"] = valid_claims
+    context["failed_claims"] = failed_claims
+    context["total_spans"] = len(span_labels)
 
     logger.info(
         "TB-S1 complete: %d claims parsed from %d span labels",
@@ -81,17 +78,16 @@ def run_tb_trust_boundary(
     from crci.extraction.tb_trust_boundary.consistency_checker import check_consistency
 
     consistency_result = check_consistency(
-        parsed_claims=parsed,
+        parsed_values=valid_claims,
         paper_id=paper_id,
-        session=session,
     )
     context["tb_result"] = consistency_result
 
     logger.info(
-        "TB-S2 complete: %d passed, %d flagged, %d blocked",
-        consistency_result.get("passed", 0),
-        consistency_result.get("flagged", 0),
-        consistency_result.get("blocked", 0),
+        "TB-S2 complete: %d validated, %d warnings, %d rejected",
+        len(consistency_result.validated),
+        len(consistency_result.warnings),
+        len(consistency_result.rejected),
     )
 
     return context

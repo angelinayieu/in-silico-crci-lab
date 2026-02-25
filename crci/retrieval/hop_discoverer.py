@@ -68,6 +68,7 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
                 StudyRegistry.study_subtype.in_([
                     "pairwise_ma", "nma", "ipdma",
                     "dose_response_ma", "mega_analysis",
+                    "systematic_review",  # SRs also have included study lists
                 ]),
             )
         )
