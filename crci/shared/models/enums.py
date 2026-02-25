@@ -1448,3 +1448,94 @@ class ExtractionModeStr(StrEnum):
     COMPUTED_FROM_CONTEXT = "computed_from_context"
 
 
+# ═══════════════════════════════════════════════════════════════
+#  PART 9: CONVERSION VALIDITY & HARDENING ENUMS
+#  CONVERSION_VALIDITY_AND_HARDENING.md Modules 2-5
+# ═══════════════════════════════════════════════════════════════
+
+
+@unique
+class ParameterFamily(StrEnum):
+    """Parameter family for freshness decay policies (Module 5).
+
+    Each family has its own decay rate and floor.
+    """
+    PSYCHOMETRICS = "psychometrics"               # α, b_k — 0.0%/yr, floor 1.00
+    NORMATIVE_DATA = "normative_data"             # Population norms — 0.5%/yr, floor 0.90
+    BIOLOGICAL_CORRELATIONS = "biological_correlations"  # Molecular — 0.5%/yr, floor 0.90
+    EDGE_INTERVENTION = "edge_intervention"       # Intervention→outcome — 1.5%/yr, floor 0.70
+    EDGE_MECHANISM = "edge_mechanism"             # Mechanism→mechanism — 1.0%/yr, floor 0.80
+    INTERVENTION_KERNELS = "intervention_kernels" # Temporal data — 2.0%/yr, floor 0.70
+    CONTEXT_PRIORS = "context_priors"             # Baseline levels — 1.0%/yr, floor 0.80
+    META_ANALYSIS_POOLED = "meta_analysis_pooled" # MA estimates — 1.5%/yr, floor 0.70
+    RECOVERY_CURVES = "recovery_curves"           # Recovery trajectories — 1.0%/yr, floor 0.80
+
+
+@unique
+class EndpointVsChange(StrEnum):
+    """Whether a study reports endpoint or change-from-baseline scores (Module 4.3)."""
+    ENDPOINT = "ENDPOINT"
+    CHANGE = "CHANGE"
+    UNCLEAR = "UNCLEAR"
+
+
+@unique
+class LineageRole(StrEnum):
+    """Role within a cohort lineage group (Module 4.2)."""
+    PRIMARY = "PRIMARY"
+    SUPPLEMENTARY = "SUPPLEMENTARY"
+    FOLLOW_UP = "FOLLOW_UP"
+
+
+@unique
+class VerificationTier(StrEnum):
+    """Verification intensity tier (Module 2)."""
+    TIER_1 = "TIER_1"  # 100% human verification
+    TIER_2 = "TIER_2"  # 25-30% spot-check
+    TIER_3 = "TIER_3"  # 10-15% sample verification
+
+
+@unique
+class EscalationRule(StrEnum):
+    """Which escalation rule triggered Tier 1 verification (Module 2.1)."""
+    E1_MAJORITY_WEIGHT = "E1"       # w_i > 0.50
+    E2_LOW_K = "E2"                 # k < 3
+    E3_SIGN_FLIP = "E3"             # removing record flips β̂ sign
+    E4_SOLE_CANCER_MATCH = "E4"     # only cancer-matched study + k ≤ 5
+    E5_SOFT_SE_HIGH_WEIGHT = "E5"   # se_derivation_level ≥ L4 + w_i > 0.30
+    E6_FOREST_PLOT = "E6"           # meta_source_flag = FOREST_PLOT_ENTRY
+
+
+@unique
+class VerificationStatus(StrEnum):
+    """Verification lifecycle status for evidence records (Module 2.2)."""
+    UNVERIFIED = "UNVERIFIED"
+    ESCALATED_TO_TIER1 = "ESCALATED_TO_TIER1"
+    PENDING_VERIFICATION = "PENDING_VERIFICATION"
+    VERIFIED = "VERIFIED"
+    VERIFIED_WITH_CORRECTIONS = "VERIFIED_WITH_CORRECTIONS"
+
+
+@unique
+class MissingnessCode(StrEnum):
+    """Why a component is missing from extraction (Module 3.2)."""
+    PRESENT = "PRESENT"
+    ABSENT_IN_PAPER = "ABSENT_IN_PAPER"
+    PARSE_FAILURE = "PARSE_FAILURE"
+    AGENT_MISS = "AGENT_MISS"
+    GUARDED_REJECTION = "GUARDED_REJECTION"
+    TB_REJECTION = "TB_REJECTION"
+    PARTIAL = "PARTIAL"
+
+
+@unique
+class CorrectiveAction(StrEnum):
+    """Corrective action for missing components (Module 3.3)."""
+    SEARCH = "search"
+    REPARSE = "reparse"
+    RERUN_AGENT = "rerun_agent"
+    MANUAL = "manual"
+    ACCEPT = "accept"
+    REVIEW_RULE = "review_rule"
+
+

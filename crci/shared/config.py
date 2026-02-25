@@ -214,6 +214,52 @@ CONVERSION_SE_INFLATION_SPEARMAN: float = 1.06           # Spearman ρ treated a
 # Default pre-post correlation for paired designs (when unknown)
 CONVERSION_DEFAULT_R_PREPOST: float = 0.50
 
+# Change score ↔ endpoint conversion SE inflation (when ρ unknown, Module 4.3)
+CS_UNKNOWN_RHO_SE_INFLATION: float = 1.20
+CS_DEFAULT_RHO: float = 0.50
+CS_MAJORITY_FRACTION: float = 2.0 / 3.0  # ≥2/3 for majority rule
+
+# ═══════════════════════════════════════════════════════════════
+#  FAMILY-SPECIFIC FRESHNESS (CONVERSION_VALIDITY_AND_HARDENING.md Module 5)
+# ═══════════════════════════════════════════════════════════════
+
+# {family: (decay_per_year, floor)}
+FRESHNESS_FAMILY_POLICIES: dict[str, tuple[float, float]] = {
+    "psychometrics": (0.000, 1.00),
+    "normative_data": (0.005, 0.90),
+    "biological_correlations": (0.005, 0.90),
+    "edge_intervention": (0.015, 0.70),
+    "edge_mechanism": (0.010, 0.80),
+    "intervention_kernels": (0.020, 0.70),
+    "context_priors": (0.010, 0.80),
+    "meta_analysis_pooled": (0.015, 0.70),
+    "recovery_curves": (0.010, 0.80),
+}
+
+# Supersession penalty for psychometrics/MAs when newer better-matched record exists
+FRESHNESS_SUPERSESSION_PENALTY: float = 0.70
+FRESHNESS_SUPERSESSION_MIN_N_RATIO: float = 0.50  # newer N ≥ older N × 0.50
+
+# ═══════════════════════════════════════════════════════════════
+#  VERIFICATION ESCALATION (CONVERSION_VALIDITY_AND_HARDENING.md Module 2)
+# ═══════════════════════════════════════════════════════════════
+
+# E1: Majority IVW weight threshold
+ESCALATION_E1_WEIGHT_THRESHOLD: float = 0.50
+
+# E2: Minimum studies for pooling protection
+ESCALATION_E2_MIN_K: int = 3
+
+# E4: Maximum k for sole-cancer-match escalation
+ESCALATION_E4_MAX_K: int = 5
+
+# E5: SE derivation level threshold (L4a and above → soft SE)
+ESCALATION_E5_SE_LEVEL_THRESHOLD: str = "L4a"
+ESCALATION_E5_WEIGHT_THRESHOLD: float = 0.30
+
+# Unverified inflation applied to escalated records until verified
+ESCALATION_UNVERIFIED_SE_INFLATION: float = 1.20
+
 # ═══════════════════════════════════════════════════════════════
 #  RECONCILIATION CONFIDENCE (EX-P1-REC)
 # ═══════════════════════════════════════════════════════════════

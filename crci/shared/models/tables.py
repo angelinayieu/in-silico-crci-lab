@@ -770,6 +770,11 @@ class StudyRegistry(Base):
     cohort_lineage_id = Column(Text)   # FK to self-group
     lineage_role = Column(Text)        # PRIMARY, SUPPLEMENTARY, FOLLOW_UP
 
+    # v2.0: Multi-arm trial metadata (CONVERSION_VALIDITY_AND_HARDENING.md Module 4.1)
+    multi_arm = Column(Boolean, default=False)
+    n_arms = Column(Integer)
+    trial_registry_id = Column(Text)
+
 
 class StudyCohortProfile(Base):
     """B2. Cohort-level metadata per study."""
@@ -1000,6 +1005,18 @@ class EdgeEvidence(Base):
     shared_control_flag = Column(Boolean, default=False)
     shared_control_study_id = Column(Text)
     endpoint_vs_change = Column(Text)        # ENDPOINT, CHANGE, UNCLEAR
+    comparison_arm_label = Column(Text)      # Module 4.1 SC-1
+
+    # v2.0: Verification escalation (CONVERSION_VALIDITY_AND_HARDENING.md Module 2)
+    verification_tier = Column(Text, default="TIER_3")
+    verification_status = Column(Text, default="UNVERIFIED")
+    escalation_rules_json = Column(Text)     # JSON array of escalation rule IDs
+    escalation_se_inflation = Column(Float, default=1.0)
+
+    # v2.0: Freshness provenance (CONVERSION_VALIDITY_AND_HARDENING.md Module 5)
+    parameter_family = Column(Text)          # psychometrics, edge_intervention, etc.
+    freshness_w = Column(Float)              # computed w_fresh
+    freshness_superseded = Column(Boolean, default=False)
 
     notes = Column(Text)
 
@@ -1921,6 +1938,31 @@ class ExtractionRun(Base):
     stages_completed_json = Column(JSONB, default="[]")
     error_message = Column(Text)
     notes = Column(Text)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  EXTRACTION COMPLETENESS (CONVERSION_VALIDITY_AND_HARDENING.md Module 3)
+# ═══════════════════════════════════════════════════════════════
+
+
+class ExtractionCompleteness(Base):
+    """Missingness provenance for extraction components.
+
+    Module 3: Each component per paper gets a code explaining
+    WHY it is missing (or PRESENT). Used by P5 gap analysis
+    and acquisition loop to route corrective actions.
+    """
+    __tablename__ = "extraction_completeness_v1"
+
+    completeness_id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    component_id = Column(Text, nullable=False)
+    component_label = Column(Text)
+    missingness_code = Column(Text, nullable=False)
+    missingness_detail = Column(Text)
+    agent_id = Column(Text)
+    corrective_action = Column(Text)
+    created_at = Column(Text)
 
 
 # ═══════════════════════════════════════════════════════════════
