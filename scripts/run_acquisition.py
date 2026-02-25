@@ -6,21 +6,22 @@ Usage:
     python scripts/run_acquisition.py --workstream all --max-papers 50
     python scripts/run_acquisition.py --workstream instruments --max-papers 10 --dry-run
     python scripts/run_acquisition.py --manual
-    python scripts/run_acquisition.py --cycle --max-papers 20
+    python scripts/run_acquisition.py --continuous --max-papers 20
 
 Options:
     --workstream: {edge|instruments|norms|priors|recovery|kernels|correlations|all}
     --max-papers: Maximum papers to retrieve per cycle (default: 50)
     --dry-run: Show queries and candidates without fetching
     --manual: Process manual_uploads/ instead of automated search
-    --cycle: Run full cycle (search + retrieve + extract + compile)
     --continuous: Run in continuous mode (loop every N hours)
+    --max-cycles: Max number of cycles in continuous mode
     --verbose: Enable debug-level logging
 """
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,18 @@ from pathlib import Path
 _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+
+# Load .env if present
+_env_path = _project_root / ".env"
+if _env_path.exists():
+    with open(_env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
+
+from crci.shared.db import get_session, init_db
 
 
 _WORKSTREAM_MAP = {
@@ -118,23 +131,30 @@ def main() -> int:
     args = parser.parse_args()
 
     _setup_logging(args.verbose)
+    init_db()
 
     # Determine workstreams
     workstream = _WORKSTREAM_MAP.get(args.workstream)
     workstreams = [workstream] if workstream else None
 
     if args.manual:
-        # Manual import mode
-        from crci.retrieval.manual_upload_watcher import run_manual_import
+        from crci.retrieval.manual_upload_watcher import (
+            scan_pdfs,
+            import_structured_csv,
+            process_search_overrides,
+        )
 
         logger = logging.getLogger(__name__)
-        logger.info("Running manual import...")
+        logger.info("Running manual import via acquisition script...")
 
-        # For manual import, we need a DB session
-        # NOTE: In production, this would use the actual DB engine
-        print("Manual import mode: scanning data/manual_uploads/")
-        print("NOTE: Database session required for actual import.")
-        print("Use run_manual_import.py for full manual import functionality.")
+        with get_session() as session:
+            pdfs = scan_pdfs(session)
+            logger.info("Scanned %d PDFs for import", len(pdfs))
+            csvs = import_structured_csv(session)
+            logger.info("Imported %d structured CSVs", len(csvs))
+            overrides = process_search_overrides(session)
+            logger.info("Processed %d search overrides", len(overrides))
+
         return 0
 
     # Automated acquisition mode
@@ -145,8 +165,26 @@ def main() -> int:
 
     print(f"Starting acquisition: workstream={args.workstream}, "
           f"max_papers={args.max_papers}, dry_run={args.dry_run}")
-    print("NOTE: Database session required. Configure DB connection first.")
-    print("Acquisition scheduler ready for integration with database engine.")
+
+    with get_session() as session:
+        if args.continuous:
+            reports = run_continuous(
+                session,
+                workstreams=workstreams,
+                max_papers_per_cycle=args.max_papers,
+                max_cycles=args.max_cycles,
+            )
+            for i, report in enumerate(reports, 1):
+                print(f"\n--- Cycle {i} ---")
+                _print_report(report)
+        else:
+            report = run_acquisition_cycle(
+                session,
+                workstreams=workstreams,
+                max_papers=args.max_papers,
+                dry_run=args.dry_run,
+            )
+            _print_report(report)
 
     return 0
 

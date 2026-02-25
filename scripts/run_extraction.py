@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,17 @@ _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+# Load .env if present
+_env_path = _project_root / ".env"
+if _env_path.exists():
+    with open(_env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
+
+from crci.shared.db import init_db
 from crci.extraction.pipeline import run_extraction_pipeline
 
 
@@ -79,6 +91,7 @@ def main() -> int:
     args = parser.parse_args()
 
     _setup_logging(args.verbose)
+    init_db()
 
     pdf_path = Path(args.pdf_path)
     if not pdf_path.exists():
