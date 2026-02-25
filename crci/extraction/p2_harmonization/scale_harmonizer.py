@@ -89,7 +89,7 @@ class SDAnchor:
 
 
 def _derive_se_from_ci(ci_lower: float, ci_upper: float) -> float:
-    """Derive SE from a 95% confidence interval.
+    """Derive SE from a 95% confidence interval (linear scale).
 
     Formula S3-SE-CI: SE = (upper - lower) / (2 * 1.96)
     """
@@ -97,7 +97,37 @@ def _derive_se_from_ci(ci_lower: float, ci_upper: float) -> float:
     return (ci_upper - ci_lower) / (2 * SE_FROM_CI_Z_MULTIPLIER)
 
 
-def _resolve_se(routed: RoutedNumeric) -> tuple[float | None, SESource]:
+def _derive_se_from_ci_log_scale(ci_lower: float, ci_upper: float) -> float:
+    """Derive SE on the log scale from a 95% CI on the original ratio scale.
+
+    For ratio measures (OR, HR, RR), CIs are reported on the original scale
+    but SE is needed on the log scale.
+
+    Formula: SE_log = (ln(CI_u) - ln(CI_l)) / (2 * 1.96)
+    """
+    # Formula S3-SE-CI-LOG: SE = (ln(CI_u) - ln(CI_l)) / (2 * Z_0.975)
+    return (math.log(ci_upper) - math.log(ci_lower)) / (2 * SE_FROM_CI_Z_MULTIPLIER)
+
+
+def _is_ratio_measure(effect_type_reported: str) -> bool:
+    """Check if the reported effect type is a ratio measure (OR, HR, RR).
+
+    These require log-scale SE derivation when CI is on the original scale.
+    """
+    # Import here to avoid circular import at module level
+    from crci.shared.models.enums import EffectTypeReported
+
+    return effect_type_reported in {
+        EffectTypeReported.OR,
+        EffectTypeReported.HR,
+        EffectTypeReported.RR,
+    }
+
+
+def _resolve_se(
+    routed: RoutedNumeric,
+    effect_type_reported: str | None = None,
+) -> tuple[float | None, SESource]:
     """Resolve the best available SE for a record.
 
     Priority:
@@ -118,14 +148,26 @@ def _resolve_se(routed: RoutedNumeric) -> tuple[float | None, SESource]:
 
     # Priority 2: Derive from CI
     if value.ci_lower is not None and value.ci_upper is not None:
-        se = _derive_se_from_ci(value.ci_lower, value.ci_upper)
+        # For ratio measures (OR, HR, RR), CIs are on the original scale
+        # and SE must be derived on the log scale: (ln(CI_u)-ln(CI_l))/(2*Z)
+        use_log = (
+            effect_type_reported is not None
+            and _is_ratio_measure(effect_type_reported)
+            and value.ci_lower > 0
+            and value.ci_upper > 0
+        )
+        if use_log:
+            se = _derive_se_from_ci_log_scale(value.ci_lower, value.ci_upper)
+        else:
+            se = _derive_se_from_ci(value.ci_lower, value.ci_upper)
         if se > 0:
             logger.info(
-                "span_id=%s: SE derived from CI [%.4f, %.4f] = %.4f",
+                "span_id=%s: SE derived from CI [%.4f, %.4f] = %.4f%s",
                 routed.span_id,
                 value.ci_lower,
                 value.ci_upper,
                 se,
+                " (log-scale)" if use_log else "",
             )
             return se, SESource.SE_FROM_CI
 
@@ -258,7 +300,7 @@ def harmonize_scale(
             "span_id=%s: BLOCKED — passing through without conversion",
             routed.span_id,
         )
-        se, se_source = _resolve_se(routed)
+        se, se_source = _resolve_se(routed, effect_type_reported)
         return ScaledNumeric(
             span_id=routed.span_id,
             beta=routed.value.value,
@@ -268,8 +310,8 @@ def harmonize_scale(
             direction_aligned=False,
         )
 
-    # Resolve SE first
-    se, se_source = _resolve_se(routed)
+    # Resolve SE first (pass effect type so ratio measures get log-scale SE)
+    se, se_source = _resolve_se(routed, effect_type_reported)
 
     # Determine the SD to use for standardization
     used_sd: float | None = study_sd

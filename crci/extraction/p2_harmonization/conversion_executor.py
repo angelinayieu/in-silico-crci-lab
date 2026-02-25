@@ -514,8 +514,8 @@ def convert_r_to_d(
 
     se_d: float | None = None
     if n is not None and n > 3:
-        # Formula M1-SMD-r-SE: SE_d = 4/(N(1-r²))
-        se_d = 4.0 / (n * (1.0 - r_sq))
+        # Formula M1-SMD-r-SE: SE_d = √(4/(N(1-r²)))
+        se_d = math.sqrt(4.0 / (n * (1.0 - r_sq)))
 
     return ConversionResult(
         d=d, se_d=se_d,
