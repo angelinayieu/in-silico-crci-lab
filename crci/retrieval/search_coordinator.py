@@ -15,7 +15,6 @@ Writes: CandidateMetadata[] (deduplicated) for aps_scorer
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from sqlalchemy.orm import Session
 

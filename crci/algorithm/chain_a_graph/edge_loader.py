@@ -197,15 +197,15 @@ def _parse_hill_params_from_registry(
                 continue
 
             e_max = float(row["hill_e_max"]) if row.get("hill_e_max") else config.P7_EMAX_E0_DEFAULT
-            ec50 = float(row["hill_ec50"]) if row.get("hill_ec50") else 1.0
+            ec50 = float(row["hill_ec50"]) if row.get("hill_ec50") else config.EDGE_DEFAULT_HILL_EC50
             h = float(row["hill_coefficient"]) if row.get("hill_coefficient") else config.P7_HILL_COEFFICIENT_DEFAULT
 
             if ec50 <= 0:
                 logger.warning(
-                    "Edge '%s': hill_ec50=%.4f <= 0, using default 1.0",
-                    edge_id, ec50,
+                    "Edge '%s': hill_ec50=%.4f <= 0, using default %.1f",
+                    edge_id, ec50, config.EDGE_DEFAULT_HILL_EC50,
                 )
-                ec50 = 1.0
+                ec50 = config.EDGE_DEFAULT_HILL_EC50
 
             hill_params[edge_id] = HillParams(e_max=e_max, ec50=ec50, h=h)
             logger.info(

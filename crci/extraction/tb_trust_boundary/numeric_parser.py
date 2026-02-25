@@ -1241,10 +1241,10 @@ def _validate_plausibility(
                 result.value, raw_text[:60],
             )
             return ParseStatus.FAILED
-        if result.value < 0.50:
+        if result.value < config.TB_CRONBACH_ALPHA_MIN:
             logger.warning(
-                "TB-PSYCH WARNING: CRONBACHS_ALPHA=%.4f < 0.50 (likely misparse) for '%s'",
-                result.value, raw_text[:60],
+                "TB-PSYCH WARNING: CRONBACHS_ALPHA=%.4f < %.2f (likely misparse) for '%s'",
+                result.value, config.TB_CRONBACH_ALPHA_MIN, raw_text[:60],
             )
             return ParseStatus.WARNING
 
@@ -1256,10 +1256,10 @@ def _validate_plausibility(
                 result.value, raw_text[:60],
             )
             return ParseStatus.FAILED
-        if result.value < 0.20 or result.value > 0.98:
+        if result.value < config.TB_FACTOR_LOADING_MIN or result.value > config.TB_FACTOR_LOADING_MAX:
             logger.warning(
-                "TB-PSYCH WARNING: FACTOR_LOADING=%.4f outside typical range for '%s'",
-                result.value, raw_text[:60],
+                "TB-PSYCH WARNING: FACTOR_LOADING=%.4f outside typical range [%.2f, %.2f] for '%s'",
+                result.value, config.TB_FACTOR_LOADING_MIN, config.TB_FACTOR_LOADING_MAX, raw_text[:60],
             )
             return ParseStatus.WARNING
 
@@ -1271,10 +1271,10 @@ def _validate_plausibility(
                 result.value, raw_text[:60],
             )
             return ParseStatus.FAILED
-        if result.value < 0.40:
+        if result.value < config.TB_TEST_RETEST_MIN:
             logger.warning(
-                "TB-PSYCH WARNING: TEST_RETEST=%.4f < 0.40 (poor reliability) for '%s'",
-                result.value, raw_text[:60],
+                "TB-PSYCH WARNING: TEST_RETEST=%.4f < %.2f (poor reliability) for '%s'",
+                result.value, config.TB_TEST_RETEST_MIN, raw_text[:60],
             )
             return ParseStatus.WARNING
 
@@ -1287,12 +1287,12 @@ def _validate_plausibility(
             )
             return ParseStatus.FAILED
 
-    # INTERNAL_CONSISTENCY_N: must be ≥ 20
+    # INTERNAL_CONSISTENCY_N: must be ≥ TB_INTERNAL_CONSISTENCY_N_MIN
     if label_type == "INTERNAL_CONSISTENCY_N" and result.n is not None:
-        if result.n < 20:
+        if result.n < config.TB_INTERNAL_CONSISTENCY_N_MIN:
             logger.warning(
-                "TB-PSYCH FAIL: INTERNAL_CONSISTENCY_N=%d < 20 for '%s'",
-                result.n, raw_text[:60],
+                "TB-PSYCH FAIL: INTERNAL_CONSISTENCY_N=%d < %d for '%s'",
+                result.n, config.TB_INTERNAL_CONSISTENCY_N_MIN, raw_text[:60],
             )
             return ParseStatus.FAILED
 
@@ -1346,10 +1346,10 @@ def _validate_plausibility(
                 result.value, raw_text[:60],
             )
             return ParseStatus.FAILED
-        if result.value > 520:
+        if result.value > config.TB_TIMEPOINT_WEEKS_MAX:
             logger.warning(
-                "TB-TEMPORAL WARNING: TIMEPOINT_WEEKS=%.1f > 520 (10 years) for '%s'",
-                result.value, raw_text[:60],
+                "TB-TEMPORAL WARNING: TIMEPOINT_WEEKS=%.1f > %.0f (10 years) for '%s'",
+                result.value, config.TB_TIMEPOINT_WEEKS_MAX, raw_text[:60],
             )
             return ParseStatus.WARNING
 

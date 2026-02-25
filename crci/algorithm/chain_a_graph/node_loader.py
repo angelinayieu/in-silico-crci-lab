@@ -85,11 +85,11 @@ def _parse_proxy_r_squared(val: str) -> float | None:
     val = val.strip()
     if not val or val.startswith("N/A") or val.lower() in ("none", ""):
         return None
-    # Map qualitative values to numeric estimates
+    # Map qualitative values to numeric estimates (from config)
     qualitative_map = {
-        "high": 0.60,
-        "moderate": 0.40,
-        "low": 0.20,
+        "high": config.PROXY_R_SQ_QUALITATIVE_HIGH,
+        "moderate": config.PROXY_R_SQ_QUALITATIVE_MODERATE,
+        "low": config.PROXY_R_SQ_QUALITATIVE_LOW,
     }
     if val.lower() in qualitative_map:
         return qualitative_map[val.lower()]

@@ -283,7 +283,7 @@ def build_proxy_table(node_map: NodeMap) -> list[ProxyDef]:
             se_mult = config.PROXY_SE_MULTIPLIER_VERY_LOW
             validity = "VERY_LOW"
 
-        if r_sq is not None and r_sq < 0.3:
+        if r_sq is not None and r_sq < config.PROXY_R_SQ_MODERATE_THRESHOLD:
             logger.warning(
                 "Node %s has LOW_PROXY_VALIDITY (R²=%.2f)",
                 node.node_id,
@@ -380,7 +380,7 @@ def verify_feedback_loops(
         # Compute gain using placeholder weights
         # At skeleton stage, use conservative estimate: gain = 0.5^n_edges
         n_loop_edges = len(all_edge_ids)
-        placeholder_beta = 0.4  # conservative per-edge placeholder
+        placeholder_beta = config.A5C_FEEDBACK_LOOP_PLACEHOLDER_BETA
         gain = placeholder_beta ** n_loop_edges
 
         is_stable = gain < config.FEEDBACK_GAIN_CRITICAL

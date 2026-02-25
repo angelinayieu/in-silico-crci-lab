@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats as scipy_stats
@@ -35,9 +34,6 @@ from crci.shared.models.intermediate_states import (
     GateViolation,
     PooledEstimate,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

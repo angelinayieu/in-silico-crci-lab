@@ -114,6 +114,13 @@ SCALE_MULTIPLIERS: dict[str, float] = {
 }
 
 # ═══════════════════════════════════════════════════════════════
+#  P0 RELEVANCE SCREENING THRESHOLDS (SYS_EX lines 233-254)
+# ═══════════════════════════════════════════════════════════════
+
+P0_RELEVANCE_ACCEPT_THRESHOLD: float = 0.8  # Score >= 0.8 → ACCEPT
+P0_RELEVANCE_REVIEW_THRESHOLD: float = 0.5  # Score >= 0.5 → REVIEW; < 0.5 → REJECT
+
+# ═══════════════════════════════════════════════════════════════
 #  AGGREGATION PRIORITY SCORE (APS) — §2.5
 # ═══════════════════════════════════════════════════════════════
 
@@ -294,6 +301,7 @@ COHERENCE_SE_INFLATION_ALARM: float = 2.0
 # Default Emax parameters
 EMAX_DEFAULT_K: float = 150.0  # half-max dose
 EMAX_DEFAULT_MAX: float = 1.0
+EDGE_DEFAULT_HILL_EC50: float = 1.0  # fallback EC50 when missing from registry
 
 # ═══════════════════════════════════════════════════════════════
 #  SYNERGY (§2.16.1)
@@ -361,6 +369,32 @@ P6_SE_MAX_PLAUSIBLE: float = 10.0
 
 # G12: High heterogeneity threshold for I²
 P6_I_SQUARED_HIGH: float = 75.0
+
+# G10: Minimum edge coverage fraction
+P6_MINIMUM_EDGE_COVERAGE: float = 0.5  # >= 50% of expected edges covered
+
+# G15: Maximum acceptable coherence SE inflation before warning
+P6_SE_INFLATION_COHERENCE_MAX: float = 2.0
+
+# G16: Maximum acceptable pub bias SE inflation before warning
+P6_SE_INFLATION_PUB_BIAS_MAX: float = 1.5
+
+# ═══════════════════════════════════════════════════════════════
+#  TRUST BOUNDARY VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# Sample size discrepancy threshold (|N_max - N_min| / N_max)
+TB_SAMPLE_SIZE_DISCREPANCY: float = 0.20
+
+# Psychometric plausibility bounds
+TB_CRONBACH_ALPHA_MIN: float = 0.50
+TB_FACTOR_LOADING_MIN: float = 0.20
+TB_FACTOR_LOADING_MAX: float = 0.98
+TB_TEST_RETEST_MIN: float = 0.40
+TB_INTERNAL_CONSISTENCY_N_MIN: int = 20
+
+# Temporal plausibility
+TB_TIMEPOINT_WEEKS_MAX: float = 520.0  # 10 years
 
 # ═══════════════════════════════════════════════════════════════
 #  P4 PRIOR SELECTION — FALLBACK SE MULTIPLIERS (SYS_ALG line 3876)
@@ -457,6 +491,21 @@ EXPECTED_EDGE_COUNT_MIN: int = 100  # minimum edges for validation (actual regis
 # Formula A3-2: σ²_{ε,i} = max(1 − R²_i, RESIDUAL_VARIANCE_FLOOR)
 RESIDUAL_VARIANCE_FLOOR: float = 0.05
 
+# A3: Placeholder R² per parent edge (skeleton stage before parameterization)
+A3_R_SQUARED_PER_PARENT_PLACEHOLDER: float = 0.10
+A3_R_SQUARED_CEILING: float = 0.95
+
+# A4: Edge scaling factor for B_scaled (skeleton stage)
+A4_EDGE_SCALING_FACTOR: float = 0.3
+
+# A5c: Placeholder beta for feedback loop gain estimation (skeleton stage)
+A5C_FEEDBACK_LOOP_PLACEHOLDER_BETA: float = 0.4
+
+# Qualitative proxy R² mapping (NODE_REGISTRY.csv text → numeric)
+PROXY_R_SQ_QUALITATIVE_HIGH: float = 0.60
+PROXY_R_SQ_QUALITATIVE_MODERATE: float = 0.40
+PROXY_R_SQ_QUALITATIVE_LOW: float = 0.20
+
 # A3: Known residual correlation pairs (§2.17.2)
 # Format: (node_a, node_b, rho, block_name, source)
 RESIDUAL_CORRELATION_PAIRS: list[tuple[str, str, float, str, str]] = [
@@ -481,6 +530,13 @@ PROXY_SE_MULTIPLIER_VERY_LOW: float = 2.0  # R² < 0.2
 
 # A2b: Secondary instrument loading factor
 INSTRUMENT_SECONDARY_LOADING_FACTOR: float = 0.5
+
+# Instrument CSV default fallback values
+INSTRUMENT_DEFAULT_LOADING_B_K: float = 1.0
+INSTRUMENT_DEFAULT_INTERCEPT_A_K: float = 0.0
+INSTRUMENT_DEFAULT_RELIABILITY_ALPHA: float = 0.80
+INSTRUMENT_DEFAULT_SE_MULTIPLIER: float = 1.0
+INSTRUMENT_RELIABILITY_ALPHA_FLOOR: float = 0.01  # prevent division by zero
 
 # S3: Conversion edge cases
 PERFECT_CORRELATION_CLAMP_D: float = 10.0  # |d| cap when |r| ≥ 1.0
@@ -524,6 +580,11 @@ B3_MECHANISTIC_SYNTH_A0: float = 0.05
 
 # B3: Structural Placeholder variance: N(0, σ²) — wide to express ignorance
 B3_STRUCTURAL_PLACEHOLDER_VAR: float = 100.0  # σ² = 10²
+
+# B3: Decision tree thresholds — spec SYS_EX lines 1268-1272
+P4_K_THRESHOLD_ROBUST_MAP: int = 5      # k >= 5 → RobustMAP
+P4_K_THRESHOLD_POWER: int = 1            # k == 1 → Power Prior
+P4_MIN_RCTS_FOR_ROBUST_MAP: int = 2      # >= 2 RCTs required for RobustMAP
 
 # B3: Commensurate prior (Hobbs et al., 2011) — k ∈ [2,4]
 B3_COMMENSURATE_MIN_K: int = 2

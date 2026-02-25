@@ -124,11 +124,23 @@ def load_instruments(registry_path: str | Path) -> list[InstrumentDef]:
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            # Parse numeric fields with safe defaults
-            loading = _safe_float(row.get("loading_b_k", "1.0"), 1.0)
-            intercept = _safe_float(row.get("intercept_a_k", "0.0"), 0.0)
-            alpha = _safe_float(row.get("reliability_alpha", "0.80"), 0.80)
-            se_mult = _safe_float(row.get("se_multiplier", "1.0"), 1.0)
+            # Parse numeric fields with safe defaults from config
+            loading = _safe_float(
+                row.get("loading_b_k", str(config.INSTRUMENT_DEFAULT_LOADING_B_K)),
+                config.INSTRUMENT_DEFAULT_LOADING_B_K,
+            )
+            intercept = _safe_float(
+                row.get("intercept_a_k", str(config.INSTRUMENT_DEFAULT_INTERCEPT_A_K)),
+                config.INSTRUMENT_DEFAULT_INTERCEPT_A_K,
+            )
+            alpha = _safe_float(
+                row.get("reliability_alpha", str(config.INSTRUMENT_DEFAULT_RELIABILITY_ALPHA)),
+                config.INSTRUMENT_DEFAULT_RELIABILITY_ALPHA,
+            )
+            se_mult = _safe_float(
+                row.get("se_multiplier", str(config.INSTRUMENT_DEFAULT_SE_MULTIPLIER)),
+                config.INSTRUMENT_DEFAULT_SE_MULTIPLIER,
+            )
             time_window = _safe_int(row.get("time_window_days", ""), None)
 
             inst = InstrumentDef(
@@ -243,7 +255,7 @@ def assemble_instrument_map(
 
         # Compute observation noise variance
         # σ²_{y,k} = (1 - α) / α * se_mult²
-        alpha = max(inst.reliability_alpha, 0.01)  # prevent division by zero
+        alpha = max(inst.reliability_alpha, config.INSTRUMENT_RELIABILITY_ALPHA_FLOOR)
         noise_var = ((1.0 - alpha) / alpha) * (inst.se_multiplier ** 2)
         observation_noise_var[inst.instrument_id] = noise_var
 

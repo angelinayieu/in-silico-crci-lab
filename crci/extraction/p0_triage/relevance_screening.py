@@ -18,6 +18,7 @@ import logging
 import re
 from typing import Any
 
+from crci.shared.config import P0_RELEVANCE_ACCEPT_THRESHOLD, P0_RELEVANCE_REVIEW_THRESHOLD
 from crci.shared.models.enums import TriageDecision
 from crci.shared.models.intermediate_states import GateViolation
 
@@ -116,8 +117,8 @@ _SAMPLE_SIZE_PATTERN = re.compile(
 # Score >= ACCEPT_THRESHOLD -> ACCEPT
 # REVIEW_THRESHOLD <= Score < ACCEPT_THRESHOLD -> REVIEW
 # Score < REVIEW_THRESHOLD -> REJECT
-ACCEPT_THRESHOLD: float = 0.8
-REVIEW_THRESHOLD: float = 0.5
+ACCEPT_THRESHOLD: float = P0_RELEVANCE_ACCEPT_THRESHOLD
+REVIEW_THRESHOLD: float = P0_RELEVANCE_REVIEW_THRESHOLD
 
 
 def screen_relevance(

@@ -122,9 +122,11 @@ def build_d_matrix(
         parent_weights = B[:, i]
         n_parents = np.count_nonzero(parent_weights)
         if n_parents > 0:
-            # Use placeholder: each parent contributes 0.1 to R²
-            # This ensures R² stays below 1 with up to 9 parents
-            r_squared[i] = min(n_parents * 0.10, 0.95)
+            # Use placeholder: each parent contributes config amount to R²
+            r_squared[i] = min(
+                n_parents * config.A3_R_SQUARED_PER_PARENT_PLACEHOLDER,
+                config.A3_R_SQUARED_CEILING,
+            )
 
     # Formula A3-2: σ²_{ε,i} = max(1 − R²_i, RESIDUAL_VARIANCE_FLOOR)
     residual_var = np.maximum(
@@ -336,7 +338,7 @@ def build_lambda_structure(
         outgoing = np.count_nonzero(B[i, :])
         if outgoing > 0:
             # Scale so total outgoing influence stays bounded
-            scale = 0.3 / max(outgoing, 1)
+            scale = config.A4_EDGE_SCALING_FACTOR / max(outgoing, 1)
             B_scaled[i, :] = B[i, :] * scale
 
     # Formula A4-3: ρ(B) = max|eigenvalue(B)|
