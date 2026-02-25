@@ -4,52 +4,46 @@ You are building the CRCI Bayesian Causal Model system: a scientifically
 rigorous evidence-to-recommendation pipeline. Every formula must be exact.
 Every gate must be enforced. Every module must connect to the next.
 
-<<<<<<< HEAD
-## 📚 START HERE: Your Documentation Hub
+## Task Routing — Read This First
 
-**Adding a new paper?** → Read **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** first.
+**What are you being asked to do?** Match the task below, then follow its bootstrap.
 
-**New to this project? Read these in order:**
+---
 
-1. **[docs/00_navigation/IMPLEMENTATION_GUIDE.md](docs/00_navigation/IMPLEMENTATION_GUIDE.md)** ← **START HERE**
-   - Complete roadmap with all context organized
-   - What you're building, how to build it, quality gates
-   - ~900 lines, but it's your single source of truth
-   
-2. **[docs/00_navigation/QUICK_REFERENCE.md](docs/00_navigation/QUICK_REFERENCE.md)**
-   - One-page cheat sheet for common tasks
-   - Fast lookup for formulas, rules, files, commands
-   
-3. **[docs/00_navigation/VISUAL_ROADMAP.md](docs/00_navigation/VISUAL_ROADMAP.md)**
-   - Flowcharts and diagrams
-   - See the system structure visually
-   - Progress tracking template
+### → "Extract / add a paper"
+1. Read **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** — full procedure (Steps 0–9)
+2. Read **[EXTRACTION_LOG.md](EXTRACTION_LOG.md)** — what's already extracted, avoid duplication
+3. Read **[registries/EDGE_REGISTRY.csv](registries/EDGE_REGISTRY.csv)** header + last 10 rows — know existing edges
+4. Read **[registries/NODE_REGISTRY.csv](registries/NODE_REGISTRY.csv)** — valid node IDs
+5. Read **[registries/INSTRUMENT_REGISTRY.csv](registries/INSTRUMENT_REGISTRY.csv)** — valid instrument IDs
+6. List `data/manual_uploads/structured/` — see which papers already have folders
+7. Check `data/manual_uploads/pdfs/` — see which PDFs + meta.json exist
+8. If the paper is a **systematic review or meta-analysis**: also read `crci/retrieval/hop_discoverer.py` docstring (it auto-queues constituent studies)
 
-**Then execute:** [docs/04_implementation/PROMPT_SEQUENCE.md](docs/04_implementation/PROMPT_SEQUENCE.md) — 42 prompts in order
-=======
-## Auto-Continue Protocol
+**Minimum context for ANY paper extraction:** steps 1-5 above. Without them, you risk wrong IDs, duplicate edges, or inconsistent column names.
 
-**When the user says "continue", "next slice", or this is a new session:**
+---
 
-1. **Read `PROGRESS.md`** FIRST — it tracks exactly where you are
-2. Identify the **next slice** from the progress table
-3. Follow the **Slice Implementation Protocol** in PROGRESS.md (context → plan → implement → test → verify → commit)
-4. **Update PROGRESS.md** after committing (mark done, advance next)
-5. **Auto-continue to the next slice** without waiting — keep going until:
-   - The user says "stop" or "pause"
-   - You hit a spec ambiguity requiring user input
-   - You complete an entire chain (report summary, then continue)
-   - The session is running low on context
+### → "Continue building / next slice"
+1. Read **`PROGRESS.md`** — tracks exactly where you are
+2. Read the **FILE_CONTEXT_MANIFEST** entry for the next file
+3. Read the exact spec lines it references
+4. Read upstream file(s) that produce your input types
+5. Read `shared/config.py` for constants
+6. Follow the Slice Implementation Protocol in PROGRESS.md
 
-**Context refreshing:** At the START of every slice, always re-read:
-- The FILE_CONTEXT_MANIFEST entry for the file you're building
-- The exact spec lines it references
-- The upstream file(s) that produce your input types
-- `config.py` for existing constants
-- The downstream consumer manifest entries
+---
 
-This prevents drift from compaction and ensures type/naming consistency.
->>>>>>> fbf772927bca154896eddc1b8cd909d635a8f01d
+### → "General question about the system"
+1. Read **[docs/00_navigation/QUICK_REFERENCE.md](docs/00_navigation/QUICK_REFERENCE.md)** — one-page cheat sheet
+2. If deeper: **[docs/00_navigation/IMPLEMENTATION_GUIDE.md](docs/00_navigation/IMPLEMENTATION_GUIDE.md)** — full roadmap
+3. If about formulas/algorithm: **[docs/02_system_specs/SYS_ALGORITHM_COMPLETE.md](docs/02_system_specs/SYS_ALGORITHM_COMPLETE.md)**
+
+---
+
+### → "Build order / prompt sequence"
+1. **[docs/04_implementation/PROMPT_SEQUENCE.md](docs/04_implementation/PROMPT_SEQUENCE.md)** — 42 prompts in dependency order
+2. **[docs/00_navigation/VISUAL_ROADMAP.md](docs/00_navigation/VISUAL_ROADMAP.md)** — flowcharts
 
 ## Repository Documentation
 
