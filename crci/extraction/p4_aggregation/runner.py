@@ -108,9 +108,10 @@ def run_p4_aggregation(
     logger.info("P4-GRP: %d evidence groups formed", len(groups))
 
     # ── P4-DCR: Double counting resolution ──
-    from crci.extraction.p4_aggregation.double_counting import resolve_double_counting
+    from crci.extraction.p4_aggregation.double_counting import resolve_all
 
-    resolved_groups = resolve_double_counting(groups, session=session)
+    resolved_groups = resolve_all(groups, session=session)
+    context["resolved_groups"] = resolved_groups
     logger.info(
         "P4-DCR: %d groups after double-counting resolution",
         len(resolved_groups),
