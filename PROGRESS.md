@@ -3,10 +3,10 @@
 ## Current Position
 - **Phase:** 5 (Algorithm Chains)
 - **Prompt:** 5.4 (ALG-D: Monte Carlo Simulation)
-- **Last completed slice:** D2 (effect_propagation.py)
-- **Next slice:** D3 (safety_checker.py — Contraindication & Safety Evaluation)
+- **Last completed slice:** D3-synergy (synergy_bundle.py)
+- **Next slice:** D4-D6 (ranker.py — SAFE Scoring, Ranking, Dose Optimization)
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Latest commit:** `0c434ce` — feat: Implement ALG-D2 effect_propagation.py
+- **Latest commit:** TBD — feat: Implement ALG-D3-synergy synergy_bundle.py
 
 ## Completed Slices (this phase)
 
@@ -25,8 +25,9 @@
 | D0 | `chain_d_simulation/intervention_loader.py` | `e5a09a4` | DONE |
 | D1 | `chain_d_simulation/mc_sampler.py` | `f74ee6a` | DONE |
 | D2 | `chain_d_simulation/effect_propagation.py` | `0c434ce` | DONE |
-| D3 | `chain_d_simulation/safety_checker.py` | — | **NEXT** |
-| D4-D6 | `chain_d_simulation/ranker.py` | — | PENDING |
+| D3 | `chain_d_simulation/safety_checker.py` | `610c101` | DONE |
+| D3-syn | `chain_d_simulation/synergy_bundle.py` | TBD | DONE |
+| D4-D6 | `chain_d_simulation/ranker.py` | — | **NEXT** |
 
 ### ALG-E (Chain E: Temporal Prediction) — NOT STARTED
 | Slice | File | Commit | Status |

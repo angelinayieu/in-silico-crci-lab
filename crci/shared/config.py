@@ -346,6 +346,21 @@ EDGE_DEFAULT_HILL_EC50: float = 1.0  # fallback EC50 when missing from registry
 
 SYNERGY_GAMMA_CAP_DEFAULT: float = 0.40
 
+# D3c: Synergy γ prior — γ ~ Beta(α, β) × γ_cap (spec line 2367)
+# mode ≈ α-1/(α+β-2) × 0.40 ≈ 0.25/4 × 0.40 ≈ 0.10
+D3_GAMMA_BETA_ALPHA: float = 2.0
+D3_GAMMA_BETA_BETA: float = 4.0
+
+# D3c: JPO overlap penalty factor (spec line 2363)
+# ΔC_bundle = Σ_a ΔC_a · Π_{b≠a}(1 − JPO(a,b)·FACTOR)
+D3_JPO_OVERLAP_PENALTY_FACTOR: float = 0.5
+
+# D3c: Maximum bundle size (spec line 2368)
+D3_MAX_BUNDLE_SIZE: int = 4
+
+# D3c: Exhaustive search threshold — Thompson sampling for larger sets (spec line 2369-2370)
+D3_EXHAUSTIVE_SEARCH_MAX_CANDIDATES: int = 8
+
 # ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
