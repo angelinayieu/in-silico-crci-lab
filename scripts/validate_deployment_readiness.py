@@ -24,6 +24,8 @@ import os
 import sys
 from pathlib import Path
 
+from sqlalchemy import text
+
 # Ensure the project root is on sys.path
 _project_root = Path(__file__).resolve().parent.parent
 if str(_project_root) not in sys.path:
@@ -73,8 +75,6 @@ def _check_g0_1(session) -> tuple[bool, str]:
         AND instrument_id IN (SELECT DISTINCT instrument_id FROM question_bank_v1)
         MUST = 0
     """
-    from sqlalchemy import text
-
     try:
         result = session.execute(text("""
             SELECT COUNT(*) FROM instrument_definitions_v1 i
@@ -104,8 +104,6 @@ def _check_g0_2(session) -> tuple[bool, str]:
         SELECT COUNT(*) FROM edges_v1 WHERE beta_mean IS NOT NULL
         MUST ≥ 30
     """
-    from sqlalchemy import text
-
     try:
         # Try edge_relations_definitions_v1 first (the actual Class A table)
         result = session.execute(text(
@@ -141,8 +139,6 @@ def _check_g0_3(session) -> tuple[bool, str]:
         WHERE provenance_status = 'CURATED_TRACED'
         MUST ≥ 3
     """
-    from sqlalchemy import text
-
     try:
         result = session.execute(text(
             "SELECT COUNT(DISTINCT context_key) "
@@ -208,8 +204,6 @@ def _check_g0_5(session, patient_context: str | None) -> tuple[bool, str]:
     """
     if patient_context is None:
         return True, "No patient context specified — skipping critical path check."
-
-    from sqlalchemy import text
 
     # Check context prior exists and is curated
     try:

@@ -3,15 +3,15 @@
 ## Current Position
 - **Phase:** 7 (Integration + CLI Scripts) — COMPLETE
 - **Prompt:** 7.2 completed (End-to-End Test)
-- **Last completed slice:** E2E test (test_full_pipeline.py)
-- **Next:** Review round 3 (final V-FINAL audit)
+- **Last completed slice:** V-FINAL review round 3
+- **Next:** CODE COMPLETE — all spec phases implemented and reviewed
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Latest commit:** `ca6545a` — feat: Phase 7 CLI scripts + E2E test
 - **Total tests:** 720 passing
 
 ## Review Summary
 - **Round 1:** Fixed SchedulePlan missing `warnings` field, fixed freshness decay test ref year mismatch (3 pre-existing failures fixed)
 - **Round 2:** Migrated 7 hardcoded constants to config.py (dose multipliers, safety thresholds, report assembly defaults). Import coherence verified clean.
+- **Round 3 (V-FINAL):** Import coherence audit (all valid), hardcode scan (clean), wiring audit (fixed 3 config constant name mismatches in CLI scripts: `SPECTRAL_RADIUS_THRESHOLD`→`MAX_SPECTRAL_RADIUS`, `CONDITION_NUMBER_WARN`→`CONDITION_NUMBER_WARNING`, `spectral_radius`→`spectral_radius_B`). Consolidated duplicate sqlalchemy imports in validate_deployment_readiness.py.
 
 ## Completed Slices (this phase)
 
