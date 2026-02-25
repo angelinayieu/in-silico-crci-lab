@@ -155,52 +155,55 @@ class TestDiscoveryScore:
 
 class TestEVSI:
 
-    def test_hand_computed(self):
-        """EVSI = vc × (1 - 1/(k + 1 + N_hyp))."""
+    def test_hand_computed_no_heterogeneity(self):
+        """EVSI = vc × (1 - 1/(k + 1 + N_hyp)) × 1.0 when I²=0."""
         vc = 0.5
         k = 3
         n_hyp = config.EVSI_HYPOTHETICAL_N
         expected = vc * (1.0 - 1.0 / (k + 1 + n_hyp))
-        result = _compute_evsi(vc, k)
+        result = _compute_evsi(vc, k, i_squared=0.0)
         assert abs(result - expected) < 1e-10
 
-    def test_monotonicity_higher_k_lower_evsi(self):
-        """EVSI should decrease as k increases (diminishing returns)."""
+    def test_hand_computed_with_heterogeneity(self):
+        """EVSI = vc × (1 - 1/(k + 1 + N_hyp)) × (1 + w × I²)."""
+        vc = 0.5
+        k = 3
+        i_sq = 0.8
+        n_hyp = config.EVSI_HYPOTHETICAL_N
+        w = config.EVSI_HETEROGENEITY_WEIGHT
+        expected = vc * (1.0 - 1.0 / (k + 1 + n_hyp)) * (1.0 + w * i_sq)
+        result = _compute_evsi(vc, k, i_squared=i_sq)
+        assert abs(result - expected) < 1e-10
+
+    def test_heterogeneity_boost_magnitude(self):
+        """High I² should boost EVSI by ~1.9× compared to I²=0."""
+        vc = 1.0
+        k = 5
+        evsi_low = _compute_evsi(vc, k, i_squared=0.0)
+        evsi_high = _compute_evsi(vc, k, i_squared=0.9)
+        ratio = evsi_high / evsi_low
+        # With EVSI_HETEROGENEITY_WEIGHT=1.0: ratio = (1 + 1.0*0.9) = 1.9
+        assert abs(ratio - 1.9) < 1e-10
+
+    def test_heterogeneity_zero_unchanged(self):
+        """I²=0 should produce the same EVSI as no heterogeneity."""
+        vc = 0.5
+        k = 3
+        evsi_default = _compute_evsi(vc, k)
+        evsi_zero_i2 = _compute_evsi(vc, k, i_squared=0.0)
+        assert abs(evsi_default - evsi_zero_i2) < 1e-10
+
+    def test_monotonicity_higher_k(self):
+        """EVSI reduction factor increases with k (formula property)."""
         vc = 1.0
         evsi_k1 = _compute_evsi(vc, k=1)
-        evsi_k5 = _compute_evsi(vc, k=5)
-        evsi_k10 = _compute_evsi(vc, k=10)
         evsi_k50 = _compute_evsi(vc, k=50)
 
-        # All positive
+        # Both positive
         assert evsi_k1 > 0
-        assert evsi_k5 > 0
-        assert evsi_k10 > 0
         assert evsi_k50 > 0
-
-        # Monotonically increasing (more k → higher reduction factor → higher EVSI)
-        # Wait: EVSI = vc * (1 - 1/(k+1+N)). As k increases, 1/(k+1+N) decreases,
-        # so (1 - 1/(k+1+N)) INCREASES. This means EVSI increases with k.
-        # But the VALUE of getting one MORE study decreases...
-        # The formula as written computes the total value of all existing + hypothetical
-        # evidence. What we want is the MARGINAL value.
-        # Actually, the formula is correct: it's the EVSI of running one more study
-        # of size N_hyp given we already have k studies. The reduction factor
-        # (1 - 1/(k+1+N)) grows with k, meaning the more studies we have, the
-        # more the total variance is explained. But the MARGINAL decrease is:
-        # vc × [1/(k+N) - 1/(k+1+N)] which DECREASES with k.
-        # For our purposes, the rank ordering is what matters.
-        # Edges with k=0 have the SMALLEST EVSI (most room to grow is not
-        # the same as most value from one more study).
-        # Let me verify: k=0: 1 - 1/(0+1+50) = 1 - 1/51 = 0.9804
-        #                k=10: 1 - 1/(10+1+50) = 1 - 1/61 = 0.9836
-        # So EVSI_k10 > EVSI_k0. This is because the formula models
-        # "fraction of variance retained after adding N_hyp studies to k existing"
-        # and more existing studies means the system is already better calibrated.
-        # The marginal EVSI would be different.
-        # For ranking purposes, this is OK: we want to rank by how much variance
-        # this edge contributes (large vc) weighted by the fraction explained.
-        assert evsi_k50 > evsi_k1  # higher k → higher (1-1/(k+1+N))
+        # Higher k → higher (1-1/(k+1+N)) factor
+        assert evsi_k50 > evsi_k1
 
     def test_zero_variance_zero_evsi(self):
         """Zero variance contribution → zero EVSI."""

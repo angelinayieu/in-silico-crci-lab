@@ -90,10 +90,10 @@ def compile_evidence_gaps(
         vc = variance_contrib.get(eid, 0.0) if variance_contrib else 0.0
         disc_score = _compute_discovery_score(eid, vc, elasticity)
 
-        # Formula S5-3: EVSI
+        # Formula S5-3: EVSI (with heterogeneity boost)
         # REVIEW: assumes independent study contributions; does not discount
         # for shared-control overlap
-        evsi = _compute_evsi(vc, k)
+        evsi = _compute_evsi(vc, k, i_sq)
 
         gap_items.append(EvidenceGapItem(
             edge_param_id=eid,
@@ -244,17 +244,25 @@ def _compute_discovery_score(
 def _compute_evsi(
     variance_contrib: float,
     k: int,
+    i_squared: float = 0.0,
 ) -> float:
-    """Formula S5-3: Simplified EVSI.
+    """Formula S5-3: Simplified EVSI with heterogeneity boost.
 
-    EVSI_e = variance_contrib × (1 - 1/(k + 1 + EVSI_HYPOTHETICAL_N))
+    EVSI_e = variance_contrib × (1 - 1/(k + 1 + N_hyp)) × (1 + w_het × I²)
 
     Approximates diminishing returns: as k increases, the marginal
-    value of one more study decreases.
+    value of one more study decreases. High heterogeneity (I²) boosts
+    EVSI because existing studies disagree — a well-designed new study
+    could resolve the disagreement and disproportionately reduce variance.
+
+    # REVIEW: heterogeneity boost is a heuristic (not formally derived EVSI).
+    # The (1 + I²) multiplier upweights high-heterogeneity edges by up to 2×,
+    # reflecting that contested evidence benefits most from new data.
 
     Args:
         variance_contrib: This edge's variance contribution.
         k: Current study count for this edge.
+        i_squared: Between-study heterogeneity (0–1 scale).
 
     Returns:
         Expected value of sample information.
@@ -265,4 +273,6 @@ def _compute_evsi(
     n_hyp = config.EVSI_HYPOTHETICAL_N
     # Diminishing returns factor: approaches 1 as k→∞, near 1 for large n_hyp
     reduction_factor = 1.0 - 1.0 / (k + 1 + n_hyp)
-    return variance_contrib * reduction_factor
+    # Heterogeneity boost: high I² → existing studies disagree → new study more valuable
+    heterogeneity_boost = 1.0 + config.EVSI_HETEROGENEITY_WEIGHT * i_squared
+    return variance_contrib * reduction_factor * heterogeneity_boost

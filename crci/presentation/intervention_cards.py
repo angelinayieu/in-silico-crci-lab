@@ -70,9 +70,10 @@ def _render_card(plan: SchedulePlan) -> InterventionCardView:
     dose_text = f"{actions[0].dose_value} {actions[0].dose_unit}" if actions else "N/A"
     dur_text = f"{actions[0].duration_days} days" if actions else "N/A"
 
-    cri_text = ""
     if plan.cri_95_lower is not None and plan.cri_95_upper is not None:
         cri_text = f"95% CrI [{plan.cri_95_lower:.2f}, {plan.cri_95_upper:.2f}]"
+    else:
+        cri_text = "(CrI unavailable)"
 
     return InterventionCardView(
         rank=plan.plan_rank,

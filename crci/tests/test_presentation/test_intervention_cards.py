@@ -231,8 +231,8 @@ class TestInterventionCards:
         view = render_intervention_cards(report)
         assert view.cards[0].cri_text == "95% CrI [0.10, 0.90]"
 
-    def test_cri_text_empty_when_no_bounds(self):
-        """CrI text should be empty when SchedulePlan has no CrI bounds (backward compatibility)."""
+    def test_cri_text_unavailable_when_no_bounds(self):
+        """CrI text should show '(CrI unavailable)' when SchedulePlan has no CrI bounds."""
         report = _make_report(n_alternatives=0)
         view = render_intervention_cards(report)
-        assert view.cards[0].cri_text == ""
+        assert view.cards[0].cri_text == "(CrI unavailable)"

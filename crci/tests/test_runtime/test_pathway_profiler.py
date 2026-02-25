@@ -202,3 +202,26 @@ class TestPathwayProfiler:
         pws, theta_hat, prior_mean, sigma, ni, vc = _three_pathway_setup()
         profile = compute_pathway_profile(pws, theta_hat, prior_mean, sigma, ni, vc)
         assert 0.0 < profile.coverage_fraction <= 1.0
+
+    def test_sigma_floor_prevents_extreme_z(self):
+        """Tiny sigma_prior should be clamped to PATHWAY_SIGMA_FLOOR, preventing z-score explosion."""
+        pws = [
+            PathwayInput(
+                pathway_id="pw_test",
+                pathway_label="Test",
+                component_node_ids=["n0"],
+                edge_ids=["e0"],
+            ),
+        ]
+        theta_hat = np.array([1.0])
+        prior_mean = np.zeros(1)
+        # Tiny sigma: without floor, z = 1.0 / 0.001 = 1000
+        sigma = np.array([0.001])
+        ni = {"n0": 0}
+
+        profile = compute_pathway_profile(pws, theta_hat, prior_mean, sigma, ni, None)
+        pw = profile.pathway_contributions[0]
+        # With floor of 0.10, z = 1.0 / 0.10 = 10.0 (still large, but bounded)
+        assert pw.activation_z == pytest.approx(1.0 / config.PATHWAY_SIGMA_FLOOR, abs=1e-6)
+        # Without the floor, z would be 1000.0
+        assert abs(pw.activation_z) < 100.0  # sanity: bounded by floor

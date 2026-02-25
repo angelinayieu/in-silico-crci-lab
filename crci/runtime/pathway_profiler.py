@@ -125,6 +125,13 @@ def compute_pathway_profile(
                     "Pathway %s node %s: sigma_prior <= 0, using default %f",
                     pw.pathway_id, nid, sigma,
                 )
+            elif sigma < config.PATHWAY_SIGMA_FLOOR:
+                logger.warning(
+                    "Pathway %s node %s: sigma_prior=%.4f below floor, "
+                    "clamping to %.2f for numerical stability",
+                    pw.pathway_id, nid, sigma, config.PATHWAY_SIGMA_FLOOR,
+                )
+                sigma = config.PATHWAY_SIGMA_FLOOR
 
             # Formula S3-1: signed z-score
             z_i = (float(theta_hat[idx]) - float(theta_prior_mean[idx])) / sigma
