@@ -70,6 +70,25 @@ D1_BASELINE_CLIP_SD: float = 4.0
 # D1a: Maximum sign-preservation rejection attempts (truncated normal)
 D1_SIGN_PRESERVATION_MAX_RETRIES: int = 50
 
+# D2d: Physiological ceiling bounds (spec lines 2291-2301)
+# Single intervention: ±1.0 SD per node
+D2_CEILING_SINGLE_SD: float = 1.0
+# Bundle (multi-intervention): ±1.5 SD per node
+D2_CEILING_BUNDLE_SD: float = 1.5
+# WARNING threshold: if > 20% of draw×node entries are clipped
+D2_CEILING_CLIP_WARNING_FRACTION: float = 0.20
+
+# D2e: Composite scoring — severity weights (spec lines 2311-2314)
+# |z_d| < 1.0 SD → w = 1.0 (mild); 1.0 ≤ |z_d| < 2.0 → w = 1.5 (moderate); |z_d| ≥ 2.0 → w = 2.0 (severe)
+D2_SEVERITY_WEIGHT_MILD: float = 1.0       # |z| < 1.0
+D2_SEVERITY_WEIGHT_MODERATE: float = 1.5   # 1.0 ≤ |z| < 2.0
+D2_SEVERITY_WEIGHT_SEVERE: float = 2.0     # |z| ≥ 2.0
+D2_SEVERITY_Z_MODERATE: float = 1.0        # boundary between mild/moderate
+D2_SEVERITY_Z_SEVERE: float = 2.0          # boundary between moderate/severe
+
+# D2e: Cognitive domain identifier (NODE_REGISTRY clinical_domain value)
+D2_COGNITIVE_DOMAIN: str = "cognitive_performance"
+
 # ═══════════════════════════════════════════════════════════════
 #  SCOPE MATCHING (§2.9) — Formula P3-2: w_scope
 # ═══════════════════════════════════════════════════════════════
