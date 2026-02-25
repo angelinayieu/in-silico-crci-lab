@@ -119,6 +119,8 @@ SCALE_MULTIPLIERS: dict[str, float] = {
 
 P0_RELEVANCE_ACCEPT_THRESHOLD: float = 0.8  # Score >= 0.8 → ACCEPT
 P0_RELEVANCE_REVIEW_THRESHOLD: float = 0.5  # Score >= 0.5 → REVIEW; < 0.5 → REJECT
+# Mode selection: reject editorial/protocol subtypes below this score
+P0_MODE_SELECTION_REJECT_THRESHOLD: float = 0.8
 
 # ═══════════════════════════════════════════════════════════════
 #  AGGREGATION PRIORITY SCORE (APS) — §2.5
@@ -280,6 +282,10 @@ PUB_BIAS_SE_INFLATION_LOW: float = 1.0
 PUB_BIAS_SE_INFLATION_MODERATE: float = 1.15
 PUB_BIAS_SE_INFLATION_HIGH: float = 1.30
 
+# Trim & Fill shift severity classification (Formula P4B-2)
+PUB_BIAS_SHIFT_SEVERE_THRESHOLD: float = 0.3   # shift > 0.3 SD → SEVERE
+PUB_BIAS_SHIFT_MODERATE_THRESHOLD: float = 0.1  # shift > 0.1 SD → MODERATE
+
 # ═══════════════════════════════════════════════════════════════
 #  CHAIN-VS-DIRECT VALIDATION (§2.13)
 # ═══════════════════════════════════════════════════════════════
@@ -324,6 +330,12 @@ P7_UNINFORMATIVE_SE_INFLATION: float = 2.0
 
 # Compiler 3 (temporal): minimum timepoints for curve fitting
 P7_MIN_TIMEPOINTS_CURVE: int = 3
+# Temporal onset z-score threshold (weighted effect > z * SE → onset detected)
+P7_TEMPORAL_ONSET_Z_THRESHOLD: float = 1.96  # matches SE_FROM_CI_Z_MULTIPLIER (95% CI)
+# Temporal plateau detection: decline fraction of peak to end plateau
+P7_TEMPORAL_PLATEAU_DECAY_FRACTION: float = 0.8
+# Weeks to months conversion factor (365.25 / 12 / 7 ≈ 4.345)
+P7_WEEKS_TO_MONTHS: float = 4.345
 
 # Gate P7-G3: Recovery parameter constraints
 P7_RECOVERY_R_INF_MIN: float = 0.0
