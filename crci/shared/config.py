@@ -363,6 +363,37 @@ P7_SYNERGY_GAMMA_MAX: float = 1.0
 P7_SYNERGY_GAMMA_CLASSIFY_THRESHOLD: float = 0.05  # |γ| > 0.05 → non-additive
 
 # ═══════════════════════════════════════════════════════════════
+#  ALG-C4: MODIFIER APPLICATION (SYS_ALG lines 1896-1912)
+# ═══════════════════════════════════════════════════════════════
+
+# C4b: Individual modifier clamp bounds (same as P7 compiler)
+C4_MODIFIER_INDIVIDUAL_LOW: float = 0.7
+C4_MODIFIER_INDIVIDUAL_HIGH: float = 1.5
+
+# C4b: Cumulative product clamp bounds
+C4_MODIFIER_CUMULATIVE_LOW: float = 0.5
+C4_MODIFIER_CUMULATIVE_HIGH: float = 2.0
+
+# C4b: Cognitive reserve modifier bounds (Stern 2009)
+# >16yr education → 0.7; <12yr education → 1.3
+C4_COGNITIVE_RESERVE_LOW: float = 0.7
+C4_COGNITIVE_RESERVE_HIGH: float = 1.3
+
+# C4c: Modifier evidence grade → SE inflation
+# Grade A/B/C/D (distinct from GRADE_MULTIPLIERS used in extraction)
+C4_GRADE_SE_MULTIPLIERS: dict[str, float] = {
+    "A": 1.00,
+    "B": 1.15,
+    "C": 1.30,
+    "D": 1.50,
+}
+
+# C4d: Pathway activation threshold (spec lines 1912)
+# A(P) = mean(|θ̂[nodes_in_P]|); active if A(P) > τ_P
+C4_PATHWAY_ACTIVATION_THRESHOLD_DEFAULT: float = 0.5  # SD
+C4_PATHWAY_ACTIVATION_THRESHOLD_SENSITIVE: float = 0.3  # SD
+
+# ═══════════════════════════════════════════════════════════════
 #  P5 CHAIN VALIDATION THRESHOLDS
 # ═══════════════════════════════════════════════════════════════
 
