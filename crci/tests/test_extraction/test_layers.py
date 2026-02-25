@@ -14,7 +14,7 @@ import math
 import pytest
 
 from crci.shared import config
-from crci.extraction.heterogeneity.layers import (
+from crci.extraction.p3_heterogeneity.layers import (
     HeterogeneityResult,
     layer_1_study_design,
     layer_2_scope_match,
@@ -433,5 +433,5 @@ class TestLayer7FreshnessDecay:
         """Freshness constants come from config."""
         assert config.FRESHNESS_DECAY_RATE == 0.015
         assert config.FRESHNESS_FLOOR == 0.70
-        assert config.FRESHNESS_REFERENCE_YEAR == 2026
+        assert config.FRESHNESS_REFERENCE_YEAR == 2025
         assert config.FRESHNESS_DEFAULT_WEIGHT == 0.85

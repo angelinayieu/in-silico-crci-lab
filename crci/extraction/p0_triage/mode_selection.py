@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from crci.shared.config import P0_MODE_SELECTION_REJECT_THRESHOLD
 from crci.shared.models.enums import (
     ExtractionMode,
     PaperSubtype,
@@ -134,11 +135,11 @@ def select_extraction_mode(
 
     # ─── REJECT candidate check ──────────────────────────────
     # Editorials and protocols with low relevance should be rejected
-    if paper_subtype in _REJECT_CANDIDATES and relevance_score < 0.8:
+    if paper_subtype in _REJECT_CANDIDATES and relevance_score < P0_MODE_SELECTION_REJECT_THRESHOLD:
         decision = TriageDecision.REJECT
         rejection_reason = (
             f"Paper subtype '{paper_subtype.value}' has minimal extractable "
-            f"evidence and relevance score {relevance_score:.3f} < 0.8"
+            f"evidence and relevance score {relevance_score:.3f} < {P0_MODE_SELECTION_REJECT_THRESHOLD}"
         )
         extraction_mode = None
         logger.info(

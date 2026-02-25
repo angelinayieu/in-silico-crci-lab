@@ -485,15 +485,23 @@ class PosteriorState(BaseModel):
 
 
 class PreparedObservation(BaseModel):
-    """Observation prepared for simulation.
+    """Observation prepared for Bayesian update (one per instrument).
 
-    SYS_ALG lines 1630-1680.
+    SYS_ALG lines 1665-1720 (PreparedObservation state after C2).
+    Produced by: observation_mapper.py (C2)
+    Consumed by: bayesian_update.py (C3)
     """
 
-    node_id: str
-    z_value: float
-    noise_sd: float
-    source: str
+    instrument_id: str
+    node_i: int = Field(ge=0, le=62, description="Target latent node index")
+    y_k: float = Field(description="Observed measurement value")
+    a_k: float = Field(description="Instrument intercept (offset)")
+    b_k: float = Field(description="Instrument loading (slope)")
+    sigma_sq_y_k: float = Field(gt=0, description="Total observation noise variance")
+    cancer_SE_mult: float = Field(ge=1.0, le=1.5, description="Cancer validation SE mult")
+    w_temporal: float = Field(gt=0, le=1.0, description="Temporal decay weight")
+    t_days: float = Field(ge=0, description="Days since assessment")
+    tier: str = Field(description="Observation priority tier (TIER_0, TIER_1, TIER_2)")
 
 
 class ModifiedEdge(BaseModel):

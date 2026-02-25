@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats as scipy_stats
@@ -29,15 +28,14 @@ from crci.shared.config import (
     PUB_BIAS_SE_INFLATION_HIGH,
     PUB_BIAS_SE_INFLATION_LOW,
     PUB_BIAS_SE_INFLATION_MODERATE,
+    PUB_BIAS_SHIFT_MODERATE_THRESHOLD,
+    PUB_BIAS_SHIFT_SEVERE_THRESHOLD,
 )
 from crci.shared.models.enums import BiasRisk
 from crci.shared.models.intermediate_states import (
     GateViolation,
     PooledEstimate,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -317,9 +315,9 @@ def run_trim_and_fill(
     shift_sd_units = shift / se_pooled if se_pooled > 0 else 0.0
 
     # Formula P4B-2: severity classification
-    if shift_sd_units > 0.3:
+    if shift_sd_units > PUB_BIAS_SHIFT_SEVERE_THRESHOLD:
         severity = "SEVERE"
-    elif shift_sd_units > 0.1:
+    elif shift_sd_units > PUB_BIAS_SHIFT_MODERATE_THRESHOLD:
         severity = "MODERATE"
     else:
         severity = "NONE"

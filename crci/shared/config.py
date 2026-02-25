@@ -36,10 +36,11 @@ P_INCLUSION_MIN: float = 0.05
 #  EVIDENCE FRESHNESS (§2.9, Layer 7)
 # ═══════════════════════════════════════════════════════════════
 
-# Formula P3-8: w_freshness = max(FLOOR, exp(-DECAY × age_years))
+# Formula P3-7/B2-L7: w_fresh = max(FLOOR, 1 − DECAY × (REF_YEAR − pub_year))
+# Calibration: Poynard et al. (2002) — 45-year half-life → ln(2)/45 ≈ 1.54%/yr
 FRESHNESS_DECAY_RATE: float = 0.015
 FRESHNESS_FLOOR: float = 0.70
-FRESHNESS_REFERENCE_YEAR: int = 2026
+FRESHNESS_REFERENCE_YEAR: int = 2025  # Spec lines 1091, 1307 all use 2025
 FRESHNESS_DEFAULT_WEIGHT: float = 0.85  # No pub date → default w_fresh = 0.85 + WARN
 
 # ═══════════════════════════════════════════════════════════════
@@ -56,6 +57,37 @@ TEMPORAL_WEIGHT_FLOOR: float = 0.01  # max(w_temporal, 0.01) floor in Formula P3
 
 MC_DRAWS: int = 10_000
 MC_DEFAULT_SEED: int = 42
+
+# D1b: Structural inclusion sampling thresholds (spec lines 2214-2216)
+# Edges with P >= threshold treated as always-present (optimization)
+D1_INCLUSION_ALWAYS_PRESENT: float = 0.99
+# Edges with P <= threshold treated as always-absent (optimization)
+D1_INCLUSION_ALWAYS_ABSENT: float = 0.05
+
+# D1c: Patient baseline sampling — clip θ₀^(m) to ±N SD (spec line 2228)
+D1_BASELINE_CLIP_SD: float = 4.0
+
+# D1a: Maximum sign-preservation rejection attempts (truncated normal)
+D1_SIGN_PRESERVATION_MAX_RETRIES: int = 50
+
+# D2d: Physiological ceiling bounds (spec lines 2291-2301)
+# Single intervention: ±1.0 SD per node
+D2_CEILING_SINGLE_SD: float = 1.0
+# Bundle (multi-intervention): ±1.5 SD per node
+D2_CEILING_BUNDLE_SD: float = 1.5
+# WARNING threshold: if > 20% of draw×node entries are clipped
+D2_CEILING_CLIP_WARNING_FRACTION: float = 0.20
+
+# D2e: Composite scoring — severity weights (spec lines 2311-2314)
+# |z_d| < 1.0 SD → w = 1.0 (mild); 1.0 ≤ |z_d| < 2.0 → w = 1.5 (moderate); |z_d| ≥ 2.0 → w = 2.0 (severe)
+D2_SEVERITY_WEIGHT_MILD: float = 1.0       # |z| < 1.0
+D2_SEVERITY_WEIGHT_MODERATE: float = 1.5   # 1.0 ≤ |z| < 2.0
+D2_SEVERITY_WEIGHT_SEVERE: float = 2.0     # |z| ≥ 2.0
+D2_SEVERITY_Z_MODERATE: float = 1.0        # boundary between mild/moderate
+D2_SEVERITY_Z_SEVERE: float = 2.0          # boundary between moderate/severe
+
+# D2e: Cognitive domain identifier (NODE_REGISTRY clinical_domain value)
+D2_COGNITIVE_DOMAIN: str = "cognitive_performance"
 
 # ═══════════════════════════════════════════════════════════════
 #  SCOPE MATCHING (§2.9) — Formula P3-2: w_scope
@@ -93,7 +125,10 @@ DESIGN_MULTIPLIER_DEFAULT: float = 3.0       # unclassified → 3.0× + WARN
 SMALL_RCT_N_THRESHOLD: int = 200             # N ≤ 200 triggers interpolation
 SMALL_RCT_PENALTY_SLOPE: float = 0.5         # m = 1.0 + 0.5×(200−N)/200
 
-# Layer 5: GRADE quality multipliers — Formula P3-5
+# Layer 5: GRADE quality multipliers — Formula P3-5 / ALG-B2 L5
+# REVIEW: SPEC AMBIGUITY — ALG-B chain card line 1305 says MODERATE=1.15, LOW=1.3.
+#   SYS_EXTRACTION line 1089 and ALG-B worked example line 3857 say MODERATE=1.25, LOW=1.50.
+#   Using 1.25/1.50 (majority across specs + worked example agreement).
 GRADE_MULTIPLIERS: dict[str, float] = {
     "HIGH": 1.0,
     "MODERATE": 1.25,
@@ -108,6 +143,15 @@ SCALE_MULTIPLIERS: dict[str, float] = {
     "general_population": 1.30,
     "known_somatic_confound": 1.50,
 }
+
+# ═══════════════════════════════════════════════════════════════
+#  P0 RELEVANCE SCREENING THRESHOLDS (SYS_EX lines 233-254)
+# ═══════════════════════════════════════════════════════════════
+
+P0_RELEVANCE_ACCEPT_THRESHOLD: float = 0.8  # Score >= 0.8 → ACCEPT
+P0_RELEVANCE_REVIEW_THRESHOLD: float = 0.5  # Score >= 0.5 → REVIEW; < 0.5 → REJECT
+# Mode selection: reject editorial/protocol subtypes below this score
+P0_MODE_SELECTION_REJECT_THRESHOLD: float = 0.8
 
 # ═══════════════════════════════════════════════════════════════
 #  AGGREGATION PRIORITY SCORE (APS) — §2.5
@@ -241,7 +285,8 @@ IVW_MIN_STUDIES: int = 2
 HETEROGENEITY_HIGH_THRESHOLD: float = 75.0  # I² > 75% = high
 HETEROGENEITY_MODERATE_THRESHOLD: float = 50.0  # I² 50-75% = moderate
 
-# Formula P4-3: P_incl = logistic(INTERCEPT + LN_K_COEFF·ln(k+1) + Z_COEFF·Z + RCT_COEFF·𝟙_RCT)
+# Formula B4-1 / P4-3: P_incl = logistic(INTERCEPT + LN_K_COEFF·ln(k+1) + Z_COEFF·Z + RCT_COEFF·𝟙_RCT)
+# Used by ALG-B4 (structural inclusion probability)
 P4_3_INTERCEPT: float = -0.5
 P4_3_LN_K_COEFF: float = 1.2
 P4_3_Z_COEFF: float = 0.4
@@ -268,6 +313,10 @@ PUB_BIAS_SE_INFLATION_LOW: float = 1.0
 PUB_BIAS_SE_INFLATION_MODERATE: float = 1.15
 PUB_BIAS_SE_INFLATION_HIGH: float = 1.30
 
+# Trim & Fill shift severity classification (Formula P4B-2)
+PUB_BIAS_SHIFT_SEVERE_THRESHOLD: float = 0.3   # shift > 0.3 SD → SEVERE
+PUB_BIAS_SHIFT_MODERATE_THRESHOLD: float = 0.1  # shift > 0.1 SD → MODERATE
+
 # ═══════════════════════════════════════════════════════════════
 #  CHAIN-VS-DIRECT VALIDATION (§2.13)
 # ═══════════════════════════════════════════════════════════════
@@ -289,12 +338,28 @@ COHERENCE_SE_INFLATION_ALARM: float = 2.0
 # Default Emax parameters
 EMAX_DEFAULT_K: float = 150.0  # half-max dose
 EMAX_DEFAULT_MAX: float = 1.0
+EDGE_DEFAULT_HILL_EC50: float = 1.0  # fallback EC50 when missing from registry
 
 # ═══════════════════════════════════════════════════════════════
 #  SYNERGY (§2.16.1)
 # ═══════════════════════════════════════════════════════════════
 
 SYNERGY_GAMMA_CAP_DEFAULT: float = 0.40
+
+# D3c: Synergy γ prior — γ ~ Beta(α, β) × γ_cap (spec line 2367)
+# mode ≈ α-1/(α+β-2) × 0.40 ≈ 0.25/4 × 0.40 ≈ 0.10
+D3_GAMMA_BETA_ALPHA: float = 2.0
+D3_GAMMA_BETA_BETA: float = 4.0
+
+# D3c: JPO overlap penalty factor (spec line 2363)
+# ΔC_bundle = Σ_a ΔC_a · Π_{b≠a}(1 − JPO(a,b)·FACTOR)
+D3_JPO_OVERLAP_PENALTY_FACTOR: float = 0.5
+
+# D3c: Maximum bundle size (spec line 2368)
+D3_MAX_BUNDLE_SIZE: int = 4
+
+# D3c: Exhaustive search threshold — Thompson sampling for larger sets (spec line 2369-2370)
+D3_EXHAUSTIVE_SEARCH_MAX_CANDIDATES: int = 8
 
 # ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
@@ -311,6 +376,12 @@ P7_UNINFORMATIVE_SE_INFLATION: float = 2.0
 
 # Compiler 3 (temporal): minimum timepoints for curve fitting
 P7_MIN_TIMEPOINTS_CURVE: int = 3
+# Temporal onset z-score threshold (weighted effect > z * SE → onset detected)
+P7_TEMPORAL_ONSET_Z_THRESHOLD: float = 1.96  # matches SE_FROM_CI_Z_MULTIPLIER (95% CI)
+# Temporal plateau detection: decline fraction of peak to end plateau
+P7_TEMPORAL_PLATEAU_DECAY_FRACTION: float = 0.8
+# Weeks to months conversion factor (365.25 / 12 / 7 ≈ 4.345)
+P7_WEEKS_TO_MONTHS: float = 4.345
 
 # Gate P7-G3: Recovery parameter constraints
 P7_RECOVERY_R_INF_MIN: float = 0.0
@@ -333,6 +404,99 @@ P7_MODIFIER_CLAMP_HIGH: float = 1.5
 # Gate P7-G6: Synergy γ bounds
 P7_SYNERGY_GAMMA_MIN: float = -1.0
 P7_SYNERGY_GAMMA_MAX: float = 1.0
+
+# Compiler 6 (synergy): γ classification thresholds
+P7_SYNERGY_GAMMA_CLASSIFY_THRESHOLD: float = 0.05  # |γ| > 0.05 → non-additive
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-C4: MODIFIER APPLICATION (SYS_ALG lines 1896-1912)
+# ═══════════════════════════════════════════════════════════════
+
+# C4b: Individual modifier clamp bounds (same as P7 compiler)
+C4_MODIFIER_INDIVIDUAL_LOW: float = 0.7
+C4_MODIFIER_INDIVIDUAL_HIGH: float = 1.5
+
+# C4b: Cumulative product clamp bounds
+C4_MODIFIER_CUMULATIVE_LOW: float = 0.5
+C4_MODIFIER_CUMULATIVE_HIGH: float = 2.0
+
+# C4b: Cognitive reserve modifier bounds (Stern 2009)
+# >16yr education → 0.7; <12yr education → 1.3
+C4_COGNITIVE_RESERVE_LOW: float = 0.7
+C4_COGNITIVE_RESERVE_HIGH: float = 1.3
+
+# C4c: Modifier evidence grade → SE inflation
+# Grade A/B/C/D (distinct from GRADE_MULTIPLIERS used in extraction)
+C4_GRADE_SE_MULTIPLIERS: dict[str, float] = {
+    "A": 1.00,
+    "B": 1.15,
+    "C": 1.30,
+    "D": 1.50,
+}
+
+# C4d: Pathway activation threshold (spec lines 1912)
+# A(P) = mean(|θ̂[nodes_in_P]|); active if A(P) > τ_P
+C4_PATHWAY_ACTIVATION_THRESHOLD_DEFAULT: float = 0.5  # SD
+C4_PATHWAY_ACTIVATION_THRESHOLD_SENSITIVE: float = 0.3  # SD
+
+# ═══════════════════════════════════════════════════════════════
+#  P5 CHAIN VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# FM5 nonlinearity ratio: chain_product > ratio × |direct_beta| → FM5
+P5_FM5_NONLINEARITY_RATIO: float = 3.0
+
+# ═══════════════════════════════════════════════════════════════
+#  P6 DEPLOYMENT VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# G4: Plausible beta range
+P6_BETA_MAX_PLAUSIBLE: float = 5.0
+
+# G5: Maximum plausible SE
+P6_SE_MAX_PLAUSIBLE: float = 10.0
+
+# G12: High heterogeneity threshold for I²
+P6_I_SQUARED_HIGH: float = 75.0
+
+# G10: Minimum edge coverage fraction
+P6_MINIMUM_EDGE_COVERAGE: float = 0.5  # >= 50% of expected edges covered
+
+# G15: Maximum acceptable coherence SE inflation before warning
+P6_SE_INFLATION_COHERENCE_MAX: float = 2.0
+
+# G16: Maximum acceptable pub bias SE inflation before warning
+P6_SE_INFLATION_PUB_BIAS_MAX: float = 1.5
+
+# ═══════════════════════════════════════════════════════════════
+#  TRUST BOUNDARY VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# Sample size discrepancy threshold (|N_max - N_min| / N_max)
+TB_SAMPLE_SIZE_DISCREPANCY: float = 0.20
+
+# Psychometric plausibility bounds
+TB_CRONBACH_ALPHA_MIN: float = 0.50
+TB_FACTOR_LOADING_MIN: float = 0.20
+TB_FACTOR_LOADING_MAX: float = 0.98
+TB_TEST_RETEST_MIN: float = 0.40
+TB_INTERNAL_CONSISTENCY_N_MIN: int = 20
+
+# Temporal plausibility
+TB_TIMEPOINT_WEEKS_MAX: float = 520.0  # 10 years
+
+# ═══════════════════════════════════════════════════════════════
+#  P4 PRIOR SELECTION — FALLBACK SE MULTIPLIERS (SYS_ALG line 3876)
+# ═══════════════════════════════════════════════════════════════
+
+# 4-level fallback SE multipliers
+P4_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
+P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
+P4_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
+P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
+
+# Mechanistic synthesis discount a₀ (95% discount)
+P4_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
 
 # ═══════════════════════════════════════════════════════════════
 #  OPTIMIZATION (§2.16.3) — SAFE score
@@ -398,6 +562,156 @@ DEFAULT_TIME_STEP_UNIT: str = "day"
 MAX_SPECTRAL_RADIUS: float = 1.0  # ρ(B) must be < 1 for stability
 SPECTRAL_RADIUS_WARNING: float = 0.8  # warn if approaching instability
 
+# Condition number thresholds (A4)
+CONDITION_NUMBER_WARNING: float = 1e8   # κ(Λ) > 10⁸ → WARNING
+CONDITION_NUMBER_CRITICAL: float = 1e10  # κ(Λ) > 10¹⁰ → CRITICAL (force path enumeration)
+
+# ═══════════════════════════════════════════════════════════════
+#  GRAPH ASSEMBLY — ALG-A (§2.6, §2.11, §2.17)
+# ═══════════════════════════════════════════════════════════════
+
+# A1: Expected node count
+EXPECTED_NODE_COUNT: int = 63
+
+# A2: Edge functional forms
+EXPECTED_EDGE_COUNT_MIN: int = 100  # minimum edges for validation (actual registry may exceed 118)
+
+# A3: Residual variance floor (§2.6)
+# Formula A3-2: σ²_{ε,i} = max(1 − R²_i, RESIDUAL_VARIANCE_FLOOR)
+RESIDUAL_VARIANCE_FLOOR: float = 0.05
+
+# A3: Placeholder R² per parent edge (skeleton stage before parameterization)
+A3_R_SQUARED_PER_PARENT_PLACEHOLDER: float = 0.10
+A3_R_SQUARED_CEILING: float = 0.95
+
+# A4: Edge scaling factor for B_scaled (skeleton stage)
+A4_EDGE_SCALING_FACTOR: float = 0.3
+
+# A5c: Placeholder beta for feedback loop gain estimation (skeleton stage)
+A5C_FEEDBACK_LOOP_PLACEHOLDER_BETA: float = 0.4
+
+# Qualitative proxy R² mapping (NODE_REGISTRY.csv text → numeric)
+PROXY_R_SQ_QUALITATIVE_HIGH: float = 0.60
+PROXY_R_SQ_QUALITATIVE_MODERATE: float = 0.40
+PROXY_R_SQ_QUALITATIVE_LOW: float = 0.20
+
+# A3: Known residual correlation pairs (§2.17.2)
+# Format: (node_a, node_b, rho, block_name, source)
+RESIDUAL_CORRELATION_PAIRS: list[tuple[str, str, float, str, str]] = [
+    ("NODE_BIO_IL6", "NODE_BIO_TNF", 0.65, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_IL6", "NODE_BIO_CRP", 0.72, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_TNF", "NODE_BIO_CRP", 0.58, "inflammatory", "Felger et al., 2020"),
+    ("NODE_BIO_BDNF", "NODE_BIO_IL6", -0.35, "neuro_stress", "Ng et al., 2023"),
+    ("NODE_BIO_CORTISOL", "NODE_BIO_IL6", 0.28, "neuro_stress", "Adam et al., 2017"),
+    ("NODE_BIO_BDNF", "NODE_BIO_CORTISOL", -0.22, "neuro_stress", "Estimated"),
+    ("NODE_BIO_MDA", "NODE_BIO_IL6", 0.38, "inflammatory", "Zhao et al., 2025 [VERIFY]"),
+    ("NODE_BIO_NFL", "NODE_BIO_TNF", 0.31, "neuro_stress", "Schroyen et al., 2021"),
+]
+
+# A5b: Proxy validity R² thresholds and SE multiplier tiers (§2.17)
+PROXY_R_SQ_HIGH_THRESHOLD: float = 0.5   # R² threshold for HIGH validity
+PROXY_R_SQ_MODERATE_THRESHOLD: float = 0.3  # R² threshold for MODERATE
+PROXY_R_SQ_LOW_THRESHOLD: float = 0.2   # R² threshold for LOW
+PROXY_SE_MULTIPLIER_HIGH: float = 1.0    # R² ≥ 0.5
+PROXY_SE_MULTIPLIER_MODERATE: float = 1.25  # R² 0.3–0.5
+PROXY_SE_MULTIPLIER_LOW: float = 1.5     # R² 0.2–0.3
+PROXY_SE_MULTIPLIER_VERY_LOW: float = 2.0  # R² < 0.2
+
+# A2b: Secondary instrument loading factor
+INSTRUMENT_SECONDARY_LOADING_FACTOR: float = 0.5
+
+# Instrument CSV default fallback values
+INSTRUMENT_DEFAULT_LOADING_B_K: float = 1.0
+INSTRUMENT_DEFAULT_INTERCEPT_A_K: float = 0.0
+INSTRUMENT_DEFAULT_RELIABILITY_ALPHA: float = 0.80
+INSTRUMENT_DEFAULT_SE_MULTIPLIER: float = 1.0
+INSTRUMENT_RELIABILITY_ALPHA_FLOOR: float = 0.01  # prevent division by zero
+
+# S3: Conversion edge cases
+PERFECT_CORRELATION_CLAMP_D: float = 10.0  # |d| cap when |r| ≥ 1.0
+SE_DERIVATION_FALLBACK: float = 1.0        # Conservative SE fallback
+
+# A5c: Feedback loop stability thresholds
+FEEDBACK_GAIN_CRITICAL: float = 1.0   # gain ≥ 1 → CRITICAL: system unstable
+FEEDBACK_GAIN_WARNING: float = 0.5    # gain > 0.5 → WARNING: slow convergence
+
+# Node layer count (7 layers: 0-6)
+NODE_LAYER_COUNT: int = 7
+
+# ═══════════════════════════════════════════════════════════════
+#  ALG-B: EDGE PARAMETERIZATION (§2.8, §2.9, §2.10, §2.13)
+# ═══════════════════════════════════════════════════════════════
+
+# B2: Temporal mismatch (Layer 6) — range 1.0–1.6×
+B2_TEMPORAL_MISMATCH_MAX: float = 1.6
+B2_TEMPORAL_MISMATCH_HALF_DAYS: float = 180.0  # halflife for SE inflation
+
+# B3: RobustMAP prior (Schmidli et al., 2014)
+# Formula: w = min(W_MAX, W_BASE + W_PER_K × k)
+B3_ROBUST_MAP_W_BASE: float = 0.5
+B3_ROBUST_MAP_W_PER_K: float = 0.06
+B3_ROBUST_MAP_W_MAX: float = 0.8
+B3_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10²)
+
+# B3: Power Prior discount a₀ (Ibrahim & Chen, 2000)
+# Calibration: Hackam & Redelmeier 2006 (~37% overall); Kola & Landis 2004 (CNS ~8%)
+B3_POWER_PRIOR_A0: dict[str, float] = {
+    "rct_same": 0.80,
+    "rct_diff": 0.50,
+    "cohort": 0.40,
+    "observational": 0.30,
+    "animal": 0.15,
+    "mechanistic": 0.05,
+}
+
+# B3: Mechanistic Synthesis — enters as Power Prior with a₀ = 0.05 (95% discount)
+B3_MECHANISTIC_SYNTH_A0: float = 0.05
+
+# B3: Structural Placeholder variance: N(0, σ²) — wide to express ignorance
+B3_STRUCTURAL_PLACEHOLDER_VAR: float = 100.0  # σ² = 10²
+
+# B3: Decision tree thresholds — spec SYS_EX lines 1268-1272
+P4_K_THRESHOLD_ROBUST_MAP: int = 5      # k >= 5 → RobustMAP
+P4_K_THRESHOLD_POWER: int = 1            # k == 1 → Power Prior
+P4_MIN_RCTS_FOR_ROBUST_MAP: int = 2      # >= 2 RCTs required for RobustMAP
+
+# B3: Commensurate prior (Hobbs et al., 2011) — k ∈ [2,4]
+B3_COMMENSURATE_MIN_K: int = 2
+B3_COMMENSURATE_MAX_K: int = 4
+
+# B3: Design level threshold for RobustMAP ("best_design ≥ prospective")
+# Designs at or above this level qualify
+B3_PROSPECTIVE_DESIGNS: list[str] = [
+    "large_rct", "small_rct_default", "well_adjusted_cohort",
+    "unadjusted_longitudinal",
+]
+
+# B5: Turner et al. (2012) τ² prior distributions (14,886 meta-analyses)
+# Subjective outcomes (self-reported cognition)
+B5_TURNER_SUBJECTIVE_LOG_MU: float = -2.13
+B5_TURNER_SUBJECTIVE_LOG_SIGMA: float = 1.58   # median τ² ≈ 0.12
+
+# Semi-objective outcomes (neuropsych tests) & biomarkers
+B5_TURNER_SEMIOBJECTIVE_LOG_MU: float = -2.56
+B5_TURNER_SEMIOBJECTIVE_LOG_SIGMA: float = 1.07  # median τ² ≈ 0.08
+
+# B6: Chain-vs-Direct Z-score triage thresholds
+B6_Z_PASS: float = 1.5
+B6_Z_MILD: float = 2.0
+B6_Z_MODERATE: float = 3.0
+
+# B6: SE multipliers for chain-vs-direct triage tiers
+B6_SE_MULT_PASS: float = 1.0
+B6_SE_MULT_MILD: float = 1.2
+B6_SE_MULT_MODERATE: float = 1.5
+B6_SE_MULT_SUBSTANTIAL: float = 2.0
+
+# B6: Alignment Validity formula: AV(e) = 1 − min(Z/DIVISOR, 1.0)
+B6_AV_Z_DIVISOR: float = 3.0
+
+# B7: Number of context-matched prior specifications
+B7_N_CONTEXT_SPECS: int = 33
+
 # ═══════════════════════════════════════════════════════════════
 #  DATABASE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
@@ -413,6 +727,10 @@ LLM_MAX_RETRIES: int = 3
 LLM_RETRY_BASE_DELAY_SECONDS: float = 2.0
 LLM_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
 LLM_DEFAULT_MAX_TOKENS: int = 4096
+
+# LLM cost estimation (approx. Claude Sonnet per 1M tokens)
+LLM_PROMPT_COST_PER_M: float = 3.0
+LLM_COMPLETION_COST_PER_M: float = 15.0
 
 # ═══════════════════════════════════════════════════════════════
 #  AUTOMATED RETRIEVAL (AUTOMATED_RETRIEVAL_PLAN.md Part 9)

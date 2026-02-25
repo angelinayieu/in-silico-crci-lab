@@ -20,6 +20,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from crci.shared.config import (
+    P6_BETA_MAX_PLAUSIBLE,
+    P6_I_SQUARED_HIGH,
+    P6_MINIMUM_EDGE_COVERAGE,
+    P6_SE_INFLATION_COHERENCE_MAX,
+    P6_SE_INFLATION_PUB_BIAS_MAX,
+    P6_SE_MAX_PLAUSIBLE,
+)
 from crci.shared.models.enums import (
     BiasRisk,
     SufficiencyRecommendation,
@@ -132,7 +140,7 @@ def _rule_g3_all_edges_have_k(
 
 def _rule_g4_plausible_betas(
     compiled_edges: list[CompiledEdge],
-    beta_max: float = 5.0,
+    beta_max: float = P6_BETA_MAX_PLAUSIBLE,
 ) -> RuleResult:
     """G4: All |beta| values within plausible range."""
     extreme_edges = [
@@ -158,7 +166,7 @@ def _rule_g4_plausible_betas(
 
 def _rule_g5_se_not_excessive(
     compiled_edges: list[CompiledEdge],
-    se_max: float = 10.0,
+    se_max: float = P6_SE_MAX_PLAUSIBLE,
 ) -> RuleResult:
     """G5: SE values not excessively large."""
     bad_edges = [
@@ -294,7 +302,7 @@ def _rule_g9_no_severe_bias(
 
 def _rule_g10_coverage_minimum(
     sufficiency_report: SufficiencyReport | None,
-    min_coverage: float = 0.5,
+    min_coverage: float = P6_MINIMUM_EDGE_COVERAGE,
 ) -> RuleResult:
     """G10: At least 50% of expected edges covered."""
     if sufficiency_report is None:
@@ -356,7 +364,7 @@ def _rule_g11_edge_param_ids_present(
 
 def _rule_g12_heterogeneity_warnings(
     compiled_edges: list[CompiledEdge],
-    i_squared_high: float = 75.0,
+    i_squared_high: float = P6_I_SQUARED_HIGH,
 ) -> RuleResult:
     """G12: Flag edges with very high heterogeneity (I^2 > 75%)."""
     high_het = [
@@ -434,10 +442,11 @@ def _rule_g15_se_inflation_coherence(
     compiled_edges: list[CompiledEdge],
 ) -> RuleResult:
     """G15: SE inflation from coherence is documented and reasonable."""
+    threshold = P6_SE_INFLATION_COHERENCE_MAX
     high_inflation = [
         (e.edge_relation_id, e.se_inflation_coherence)
         for e in compiled_edges
-        if e.se_inflation_coherence > 2.0
+        if e.se_inflation_coherence > threshold
     ]
     if high_inflation:
         return RuleResult(
@@ -445,7 +454,7 @@ def _rule_g15_se_inflation_coherence(
             rule_name="se_inflation_coherence",
             status="WARN",
             message=(
-                f"{len(high_inflation)} edge(s) have coherence SE inflation > 2.0."
+                f"{len(high_inflation)} edge(s) have coherence SE inflation > {threshold}."
             ),
             details={"high_inflation": high_inflation[:5]},
         )
@@ -453,7 +462,7 @@ def _rule_g15_se_inflation_coherence(
         rule_id="G15",
         rule_name="se_inflation_coherence",
         status="PASS",
-        message="All coherence SE inflations <= 2.0.",
+        message=f"All coherence SE inflations <= {threshold}.",
     )
 
 
@@ -461,10 +470,11 @@ def _rule_g16_se_inflation_pub_bias(
     compiled_edges: list[CompiledEdge],
 ) -> RuleResult:
     """G16: SE inflation from publication bias is documented and reasonable."""
+    threshold = P6_SE_INFLATION_PUB_BIAS_MAX
     high_inflation = [
         (e.edge_relation_id, e.se_inflation_pub_bias)
         for e in compiled_edges
-        if e.se_inflation_pub_bias > 1.5
+        if e.se_inflation_pub_bias > threshold
     ]
     if high_inflation:
         return RuleResult(
@@ -472,7 +482,7 @@ def _rule_g16_se_inflation_pub_bias(
             rule_name="se_inflation_pub_bias",
             status="WARN",
             message=(
-                f"{len(high_inflation)} edge(s) have pub bias SE inflation > 1.5."
+                f"{len(high_inflation)} edge(s) have pub bias SE inflation > {threshold}."
             ),
             details={"high_inflation": high_inflation[:5]},
         )
@@ -480,7 +490,7 @@ def _rule_g16_se_inflation_pub_bias(
         rule_id="G16",
         rule_name="se_inflation_pub_bias",
         status="PASS",
-        message="All pub bias SE inflations <= 1.5.",
+        message=f"All pub bias SE inflations <= {threshold}.",
     )
 
 

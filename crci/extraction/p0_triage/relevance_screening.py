@@ -18,6 +18,7 @@ import logging
 import re
 from typing import Any
 
+from crci.shared.config import P0_RELEVANCE_ACCEPT_THRESHOLD, P0_RELEVANCE_REVIEW_THRESHOLD
 from crci.shared.models.enums import TriageDecision
 from crci.shared.models.intermediate_states import GateViolation
 
@@ -116,8 +117,8 @@ _SAMPLE_SIZE_PATTERN = re.compile(
 # Score >= ACCEPT_THRESHOLD -> ACCEPT
 # REVIEW_THRESHOLD <= Score < ACCEPT_THRESHOLD -> REVIEW
 # Score < REVIEW_THRESHOLD -> REJECT
-ACCEPT_THRESHOLD: float = 0.8
-REVIEW_THRESHOLD: float = 0.5
+ACCEPT_THRESHOLD: float = P0_RELEVANCE_ACCEPT_THRESHOLD
+REVIEW_THRESHOLD: float = P0_RELEVANCE_REVIEW_THRESHOLD
 
 
 def screen_relevance(
@@ -168,6 +169,15 @@ def screen_relevance(
         pubmed_metadata=pubmed_metadata,
         known_dois=known_dois,
     )
+
+    # ─── Gate P0-G3: Not duplicate ─────────────────────────────
+    if exclusion_criteria.get("duplicate_doi", False):
+        doi = pubmed_metadata.get("doi", "")
+        raise GateViolation(
+            "P0-G3",
+            f"Duplicate DOI detected: {doi}. Paper already processed.",
+            {"doi": doi},
+        )
 
     # ─── Compute relevance score ──────────────────────────────
     # Spec: Score = proportion of inclusion met x (1 - any exclusion)
@@ -255,7 +265,7 @@ def _check_inclusion_criteria(
         animal_translation = _keyword_density_check(
             text_lower, _ANIMAL_WITH_TRANSLATION_KEYWORDS, min_hits=1
         )
-        if animal_translation and "animal" in text_lower or "mouse" in text_lower or "rat" in text_lower:
+        if animal_translation and ("animal" in text_lower or "mouse" in text_lower or "rat" in text_lower):
             human_hit = True
             logger.info(
                 "Criterion 4 (human subjects): accepted as mechanistic animal "

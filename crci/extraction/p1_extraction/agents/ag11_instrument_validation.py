@@ -30,7 +30,9 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import InstrumentValidationResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
+    GateViolation,
     PaperMap,
     RawAnnotationEmission,
     SpanLabel,
@@ -205,13 +207,14 @@ class InstrumentValidationAgent(BaseAgent):
                 )
             )
 
-        # ─── Gate P1-G2 partial: at least 1 SpanLabel ───────
+        # ─── Gate P1-G2: at least 1 SpanLabel ─────────────────
         if not span_labels:
-            logger.warning(
-                "AG11: no valid SpanLabels produced for paper_id=%s. "
+            raise GateViolation(
+                "P1-G2",
+                f"AG11: no valid SpanLabels produced for paper_id={paper_map.paper_id}. "
                 "This may indicate the paper lacks psychometric content "
-                "or the LLM failed to extract. Returning empty output.",
-                paper_map.paper_id,
+                "or the LLM failed to extract.",
+                {"paper_id": paper_map.paper_id, "agent": "AG11"},
             )
 
         # ─── Build metadata ─────────────────────────────────
@@ -233,7 +236,7 @@ class InstrumentValidationAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag11_ann_{uuid.uuid4().hex[:12]}",
-                    category="measurement_limitation",
+                    category=AnnotationCategory.MEASUREMENT_LIMITATION,
                     content=(
                         f"Psychometric properties extracted for: "
                         f"{', '.join(set(instrument_names))}"

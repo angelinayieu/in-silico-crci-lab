@@ -23,6 +23,21 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from crci.shared.config import (
+    B3_COMMENSURATE_MAX_K,
+    B3_COMMENSURATE_MIN_K,
+    B3_MECHANISTIC_SYNTH_A0,
+    B3_POWER_PRIOR_A0,
+    B3_ROBUST_MAP_VAGUE_VAR,
+    B3_ROBUST_MAP_W_BASE,
+    B3_ROBUST_MAP_W_MAX,
+    B3_ROBUST_MAP_W_PER_K,
+    P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE,
+    P4_FALLBACK_SE_MULTIPLIER_EXACT,
+    P4_FALLBACK_SE_MULTIPLIER_GENERAL,
+    P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
+    P4_K_THRESHOLD_ROBUST_MAP,
+    P4_K_THRESHOLD_POWER,
+    P4_MIN_RCTS_FOR_ROBUST_MAP,
     PRIOR_MEAN_DEFAULT,
     PRIOR_SD_DEFAULT,
 )
@@ -47,39 +62,34 @@ logger = logging.getLogger(__name__)
 #  Prior Selection Constants (from spec, referenced in config)
 # ═══════════════════════════════════════════════════════════════
 
-# Decision tree thresholds — spec SYS_EX lines 1268-1272
-_K_THRESHOLD_ROBUST_MAP: int = 5
-_K_THRESHOLD_COMMENSURATE_LOW: int = 2
-_K_THRESHOLD_COMMENSURATE_HIGH: int = 4
-_K_THRESHOLD_POWER: int = 1
-_MIN_RCTS_FOR_ROBUST_MAP: int = 2
+# All prior selection constants sourced from config — no hardcoded values.
 
-# RobustMAP formula: w = min(0.8, 0.5 + 0.06k)
+# Decision tree thresholds — spec SYS_EX lines 1268-1272
+_K_THRESHOLD_ROBUST_MAP: int = P4_K_THRESHOLD_ROBUST_MAP
+_K_THRESHOLD_COMMENSURATE_LOW: int = B3_COMMENSURATE_MIN_K
+_K_THRESHOLD_COMMENSURATE_HIGH: int = B3_COMMENSURATE_MAX_K
+_K_THRESHOLD_POWER: int = P4_K_THRESHOLD_POWER
+_MIN_RCTS_FOR_ROBUST_MAP: int = P4_MIN_RCTS_FOR_ROBUST_MAP
+
+# RobustMAP formula: w = min(W_MAX, W_BASE + W_PER_K × k)
 # Spec SYS_ALG lines 1346 (B3a)
-_ROBUST_MAP_W_BASE: float = 0.5
-_ROBUST_MAP_W_PER_K: float = 0.06
-_ROBUST_MAP_W_CAP: float = 0.8
-_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10^2)
+_ROBUST_MAP_W_BASE: float = B3_ROBUST_MAP_W_BASE
+_ROBUST_MAP_W_PER_K: float = B3_ROBUST_MAP_W_PER_K
+_ROBUST_MAP_W_CAP: float = B3_ROBUST_MAP_W_MAX
+_ROBUST_MAP_VAGUE_VAR: float = B3_ROBUST_MAP_VAGUE_VAR
 
 # Power prior discount factors — spec SYS_ALG lines 1348 (B3c)
-# Design → a_0 discount
-_POWER_PRIOR_DISCOUNT: dict[str, float] = {
-    "RCT_same": 0.80,
-    "RCT_diff": 0.50,
-    "cohort": 0.40,
-    "observational": 0.30,
-    "animal": 0.15,
-    "mechanistic": 0.05,
-}
+# Sourced directly from config.B3_POWER_PRIOR_A0
+_POWER_PRIOR_DISCOUNT: dict[str, float] = B3_POWER_PRIOR_A0
 
 # Mechanistic synthesis discount — spec SYS_ALG lines 1349 (B3d)
-_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
+_MECHANISTIC_SYNTH_DISCOUNT: float = B3_MECHANISTIC_SYNTH_A0
 
 # 4-level fallback SE multipliers — spec SYS_ALG line 3876
-_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
-_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
-_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
-_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
+_FALLBACK_SE_MULTIPLIER_EXACT: float = P4_FALLBACK_SE_MULTIPLIER_EXACT
+_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE
+_FALLBACK_SE_MULTIPLIER_GENERAL: float = P4_FALLBACK_SE_MULTIPLIER_GENERAL
+_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -336,9 +346,10 @@ def _classify_design_for_power_prior(design: str) -> str:
     """Map StudyDesign to power prior discount category.
 
     Spec SYS_ALG lines 1348 (B3c).
+    Keys must match config.B3_POWER_PRIOR_A0 (lowercase).
     """
     if design == StudyDesign.RCT:
-        return "RCT_same"  # Conservative: assume same-population RCT
+        return "rct_same"  # Conservative: assume same-population RCT
     if design == StudyDesign.LONGITUDINAL:
         return "cohort"
     if design == StudyDesign.CROSS_SECTIONAL:

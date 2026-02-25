@@ -30,6 +30,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import TemporalExtendedResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -160,7 +161,7 @@ class TemporalAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag08_ann_{uuid.uuid4().hex[:12]}",
-                    category="temporal_onset",
+                    category=AnnotationCategory.TEMPORAL_ONSET,
                     content="; ".join(tp_content_parts),
                     evidence_strength="moderate",
                     extraction_snippet=tp_label,
@@ -210,7 +211,7 @@ class TemporalAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag08_ann_{uuid.uuid4().hex[:12]}",
-                    category="temporal_onset",
+                    category=AnnotationCategory.TEMPORAL_ONSET,
                     content=f"Temporal pattern: {temporal_resp.temporal_pattern}",
                     evidence_strength="moderate",
                     extraction_snippet=temporal_resp.temporal_pattern,
@@ -347,7 +348,7 @@ class TemporalAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag08ext_ann_{uuid.uuid4().hex[:12]}",
-                    category="temporal_onset",
+                    category=AnnotationCategory.TEMPORAL_ONSET,
                     content=(
                         f"Effect trajectory: {len(temporal_resp.effect_timepoints)} "
                         f"timepoints ({n_recovery} recovery); "

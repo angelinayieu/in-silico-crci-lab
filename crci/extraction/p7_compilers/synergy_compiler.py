@@ -96,13 +96,13 @@ def _compute_gamma(
 def _classify_interaction(gamma: float) -> str:
     """Classify interaction type from γ coefficient.
 
-    γ > 0.05 → synergistic
-    γ < -0.05 → antagonistic
+    γ > threshold → synergistic
+    γ < -threshold → antagonistic
     else → additive
     """
-    if gamma > 0.05:
+    if gamma > config.P7_SYNERGY_GAMMA_CLASSIFY_THRESHOLD:
         return "synergistic"
-    elif gamma < -0.05:
+    elif gamma < -config.P7_SYNERGY_GAMMA_CLASSIFY_THRESHOLD:
         return "antagonistic"
     else:
         return "additive"
@@ -213,7 +213,7 @@ def compile_synergy(
             gamma=gamma_pooled,
             interaction_type=interaction_type,
             k_studies=k_studies,
-            provenance_status="CURATED_TRACED" if k_studies > 0 else "SENSITIVITY_REQUIRED",
+            provenance_status="CURATED_TRACED" if k_studies > 0 else "APPROXIMATE_PENDING",
             provenance_ref="; ".join(study_ids),
         )
         results.append(compiled)

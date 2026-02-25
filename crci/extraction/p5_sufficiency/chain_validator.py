@@ -27,6 +27,7 @@ from crci.shared.config import (
     COHERENCE_Z_MONITOR,
     COHERENCE_Z_PASS,
     HETEROGENEITY_HIGH_THRESHOLD,
+    P5_FM5_NONLINEARITY_RATIO,
     SIGMA_SQ_STRUCTURAL_DEFAULT,
 )
 from crci.shared.models.enums import FailureMode, TriageTier
@@ -97,14 +98,16 @@ def compute_chain_product(
     sum_relative_var = 0.0
     for edge in edges_in_chain:
         if edge.beta_mean == 0.0:
-            # If any edge beta is exactly 0, the chain SE is not well defined
-            # Use a conservative large SE
+            # If any edge beta is exactly 0, the chain product is 0 and
+            # the delta-method SE is mathematically undefined (division by 0).
+            # Mark the chain as untestable: beta_chain=0, SE=0.
             logger.warning(
                 "P5-S2: Edge '%s' has beta_mean=0.0 in chain; "
-                "relative variance term undefined. Using SE directly.",
+                "chain product is 0 and delta-method SE undefined. "
+                "Marking chain as UNTESTABLE.",
                 edge.edge_relation_id,
             )
-            return 0.0, edge.beta_se
+            return 0.0, 0.0
         relative_se = edge.beta_se / edge.beta_mean
         sum_relative_var += relative_se ** 2
 
@@ -271,7 +274,7 @@ def classify_discrepancy(
         chain_product = 1.0
         for edge in edges_in_chain:
             chain_product *= abs(edge.beta_mean) if edge.beta_mean != 0 else 1.0
-        if chain_product > 3.0 * abs(direct_edge.beta_mean) and abs(direct_edge.beta_mean) > 0:
+        if chain_product > P5_FM5_NONLINEARITY_RATIO * abs(direct_edge.beta_mean) and abs(direct_edge.beta_mean) > 0:
             logger.warning(
                 "P5-S4 FM5: Non-linearity suspected in pathway '%s' "
                 "(chain_product=%.4f >> direct=%.4f)",

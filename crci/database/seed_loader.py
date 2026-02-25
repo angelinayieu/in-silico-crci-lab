@@ -68,7 +68,7 @@ SEED_TABLE_MAP: dict[str, tuple[type[Base], str]] = {
     "contraindication_rules.csv": (ContraindicationRule, "rule_id"),
     "validation_rules.csv": (ValidationRule, "rule_id"),
     "variables.csv": (VariableDefinition, "variable_id"),
-    "modifiers.csv": (None, "modifier_id"),  # loaded separately
+    "modifiers.csv": (None, "modifier_id"),  # requires custom loader (below)
     "features.csv": (DerivedFeatureDefinition, "feature_id"),
     "triangulation_sets.csv": (TriangulationSet, "triangulation_id"),
     "triangulation_members.csv": (TriangulationMember, "triangulation_id"),
@@ -303,7 +303,15 @@ def _do_load(
 
         model_class, pk_column = entry
         if model_class is None:
-            logger.info("Skipping %s (requires custom loader)", csv_name)
+            # Custom loader for modifiers.csv — log and skip for now
+            csv_path = seeds_dir / csv_name
+            if csv_path.exists():
+                logger.info(
+                    "Skipping %s (requires custom modifier loader — "
+                    "modifiers are compiled by P7-C5 from subgroup_evidence_v1)",
+                    csv_name,
+                )
+            results[csv_name] = 0
             continue
 
         csv_path = seeds_dir / csv_name
@@ -319,9 +327,17 @@ def _do_load(
         report = run_class_a_validation(session)
         logger.info(report.summary())
         if report.has_errors:
+            error_messages: list[str] = []
             for r in report.results:
                 if not r.passed and r.severity == "error":
                     logger.error("  %s: %s", r.rule_id, r.message)
+                    error_messages.append(f"{r.rule_id}: {r.message}")
+            if error_messages:
+                logger.error(
+                    "Class A validation found %d error(s) after seed loading. "
+                    "These must be resolved before extraction can proceed.",
+                    len(error_messages),
+                )
 
     total = sum(results.values())
     logger.info("Seed loading complete: %d total rows across %d files", total, len(results))
