@@ -725,6 +725,19 @@ RT_G_TOP_SCHEDULES: int = 5
 # G-G2 gate: SAFE_B threshold for confident recommendation (spec line 240)
 RT_G_SAFE_B_MID_THRESHOLD: float = 0.5
 
+# G1: Dose variant multipliers (spec lines 142-154)
+RT_G_DOSE_LOW_MULTIPLIER: float = 0.5
+RT_G_DOSE_HIGH_MULTIPLIER: float = 1.5
+
+# Constraint filtering: default patient context values
+RT_G_DEFAULT_PATIENT_AGE: int = 60
+RT_G_COMORBIDITY_SAFETY_THRESHOLD: int = 3
+RT_G_AGE_SAFETY_THRESHOLD: int = 80
+
+# RT-I: Report assembly defaults
+RT_I_DEFAULT_DURATION_WEEKS: int = 12
+RT_I_DECISION_TRACE_TOP_N: int = 3
+
 # ═══════════════════════════════════════════════════════════════
 #  RT-H: ADAPTIVE QUESTIONING (SYS_RT lines 260-388)
 # ═══════════════════════════════════════════════════════════════

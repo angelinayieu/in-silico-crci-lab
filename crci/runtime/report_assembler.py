@@ -23,6 +23,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from crci.shared import config
 from crci.shared.models.output_contracts import (
     CompositeScore,
     DecisionTrace,
@@ -311,7 +312,7 @@ def _build_schedule_plan(sched: Schedule, run_id: str) -> SchedulePlan:
             dose_unit=item.dose_unit,
             timing_summary=item.timing.value,
             frequency="as_prescribed",
-            duration_days=int((item.duration_weeks or 12) * 7),
+            duration_days=int((item.duration_weeks or config.RT_I_DEFAULT_DURATION_WEEKS) * 7),
         )
         for item in sched.items
     ]
@@ -380,7 +381,7 @@ def _build_decision_trace(
     ))
 
     # Top recommendations
-    for prov in provenance[:3]:
+    for prov in provenance[:config.RT_I_DECISION_TRACE_TOP_N]:
         entries.append(DecisionTraceEntry(
             step="recommendation",
             description=f"Recommend: {prov.intervention_label}",

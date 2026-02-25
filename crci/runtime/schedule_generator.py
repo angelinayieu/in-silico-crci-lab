@@ -197,9 +197,9 @@ def _expand_candidates(
                 dose_value = interv.dose_recommended
                 if dose_value is not None:
                     if dose_var == "low":
-                        dose_value *= 0.5
+                        dose_value *= config.RT_G_DOSE_LOW_MULTIPLIER
                     elif dose_var == "high":
-                        dose_value *= 1.5
+                        dose_value *= config.RT_G_DOSE_HIGH_MULTIPLIER
 
                 candidates.append(ScheduleCandidate(
                     candidate_id=f"cand_{cid:04d}",
@@ -284,7 +284,7 @@ def _filter_constraints(
     preferences_exclude = set(patient_context.get("excluded_categories", []))
     has_active_treatment = patient_context.get("has_active_treatment", False)
     comorbidity_count = patient_context.get("comorbidity_count", 0)
-    age = patient_context.get("age", 60)
+    age = patient_context.get("age", config.RT_G_DEFAULT_PATIENT_AGE)
 
     for cand in candidates:
         reasons: list[str] = []
@@ -306,7 +306,7 @@ def _filter_constraints(
         # Zero-rule catch-all: CATCH_ZERO_MATCH_RISKY (spec lines 189-203)
         if (
             len(reasons) == 0
-            and (has_active_treatment or comorbidity_count >= 3 or age > 80)
+            and (has_active_treatment or comorbidity_count >= config.RT_G_COMORBIDITY_SAFETY_THRESHOLD or age > config.RT_G_AGE_SAFETY_THRESHOLD)
         ):
             reasons.append(
                 "No specific safety rules matched, but patient has clinical "
