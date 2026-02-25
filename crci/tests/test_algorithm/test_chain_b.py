@@ -857,3 +857,198 @@ class TestChainBIntegration:
         assert frozen.n_edges_blocked == 5
         for ps in frozen.prior_audit_trail.values():
             assert ps.prior_type == "StructuralPlaceholder"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Regression tests for review-identified issues
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestReviewRegressions:
+    """Tests covering issues found during post-implementation review."""
+
+    def test_b6_se_multiplier_applied_to_sigma_eff(self):
+        """CRITICAL-2: B6 SE multiplier must be applied to Sigma_eff in FrozenModelState.
+
+        If chain-vs-direct triage returns se_multiplier > 1.0, the corresponding
+        Sigma_eff entry should be inflated.
+        """
+        graph = _make_mini_graph()
+
+        # Simulate B1-B6 outputs
+        adjusted = {
+            "E01": HeterogeneityAdjustedEdge(
+                edge_id="E01", mu_e=0.3, SE_within=0.05,
+                tau_sq=0.0, k=2, I_sq=0.0,
+                aggregation_method="IVW_FIXED",
+                contributing_studies=["S1", "S2"],
+                attenuation_factor=1.0, SE_eff=0.5,
+                layer_contributions={}, sigma_sq_structural=0.25,
+                w_scope=1.0, w_fresh=1.0,
+            ),
+        }
+        pooled = {
+            "E01": PooledEdge(
+                edge_id="E01", mu_e=0.3, SE_within=0.05,
+                tau_sq=0.0, k=2, I_sq=0.0,
+                aggregation_method="IVW_FIXED",
+                contributing_studies=["S1", "S2"],
+            ),
+        }
+        prior_specs = {
+            "E01": EdgePriorSpec(
+                edge_id="E01", prior_type="Commensurate",
+                prior_params={"beta_hist": 0.3, "sigma_sq_hist": 0.25, "tau": 0.5},
+                selection_rationale="test",
+            ),
+        }
+        inclusion_probs = {
+            "E01": InclusionProbEdge(
+                edge_id="E01", P_inclusion=0.8,
+                inclusion_inputs={"k": 2.0, "Z": 1.0, "has_RCT": 0.0},
+                is_decision_critical=True,
+            ),
+        }
+        tau_priors = {
+            "E01": TauSquaredPrior(
+                edge_id="E01", outcome_type="semi_objective",
+                log_mu=-2.56, log_sigma=1.07, median_tau_sq=0.077,
+            ),
+        }
+
+        # Simulate B6 result with Moderate triage (1.5× SE inflation)
+        chain_direct = {
+            "E01": ChainDirectResult(
+                edge_id="E01", has_chain_evidence=True, has_direct_evidence=True,
+                beta_chain=0.5, se_chain=0.2, beta_direct=0.3, se_direct=0.5,
+                Z_score=2.5, AV_score=0.167,
+                triage_action="Moderate", se_multiplier=1.5,
+            ),
+        }
+
+        # Build a mini 1-edge graph for this test
+        from crci.algorithm.chain_a_graph.node_loader import NodeDef, NodeMap
+        from crci.algorithm.chain_a_graph.edge_loader import EdgeDef, BSkeleton
+        from crci.algorithm.chain_a_graph.instrument_loader import InstrumentMap
+        from crci.algorithm.chain_a_graph.spectral_validator import DMatrix, LambdaStructure
+        from crci.algorithm.chain_a_graph.graph_object import GraphObject as GO
+
+        nodes = [
+            NodeDef(node_id="N0", node_label="A", layer=0,
+                    clinical_domain="exo", is_observable=True, is_latent=False,
+                    orientation="none", unit_of_measure="", pathway_membership=[],
+                    proxy_for=None, proxy_r_squared=None, description=""),
+            NodeDef(node_id="N1", node_label="B", layer=1,
+                    clinical_domain="bio", is_observable=True, is_latent=False,
+                    orientation="positive", unit_of_measure="", pathway_membership=[],
+                    proxy_for=None, proxy_r_squared=None, description=""),
+        ]
+        n = 2
+        edge = EdgeDef(edge_id="E01", source_node_id="N0", target_node_id="N1",
+                       relation_type="causal", mechanism_description="",
+                       primary_pathway="", secondary_pathways=[],
+                       expected_sign="+", functional_form="linear",
+                       fallback_form="linear", is_feedback_edge=False,
+                       feedback_loop_id=None)
+        B_s = np.zeros((n, n))
+        B_s[0, 1] = 1
+        b_sk = BSkeleton(
+            n_nodes=n, n_edges=1, edges=[edge],
+            edge_index={"E01": 0}, B_struct=B_s,
+            functional_forms={"E01": "linear"}, hill_params={},
+            edge_claim_levels={"E01": "causal"},
+            feedback_edges=[], forward_edges=["E01"],
+        )
+        nm = NodeMap(
+            nodes=nodes, node_index={"N0": 0, "N1": 1},
+            layer_assignment={"N0": 0, "N1": 1},
+            domain_assignment={"N0": "exo", "N1": "bio"},
+            observability={"N0": True, "N1": True},
+            orientation={"N0": "none", "N1": "positive"},
+            topological_order=["N0", "N1"],
+            nodes_by_layer={0: ["N0"], 1: ["N1"]},
+            n_observable=2, n_latent=0,
+        )
+        D = np.eye(n) * 0.8
+        dm = DMatrix(D=D, residual_variances=np.full(n, 0.8),
+                     R_squared_per_node=np.full(n, 0.2),
+                     correlation_pairs=[], D_blocks={}, is_positive_definite=True)
+        I_B = np.eye(n) - B_s * 0.1
+        L = I_B.T @ np.linalg.inv(D) @ I_B
+        L = (L + L.T) / 2
+        ls = LambdaStructure(Lambda=L, is_positive_definite=True,
+                             condition_number=float(np.linalg.cond(L)),
+                             sparsity_pattern=set(), spectral_radius_B=0.1)
+        im = InstrumentMap(instruments=[], instrument_index={},
+                           node_to_instruments={}, H=np.eye(n),
+                           observation_noise_var={}, intercepts={})
+        g = GO(node_map=nm, b_skeleton=b_sk, instrument_map=im,
+               d_matrix=dm, lambda_structure=ls, n_nodes=n, n_edges=1)
+
+        frozen = assemble_frozen_state(
+            graph=g,
+            pooled_edges=pooled,
+            adjusted_edges=adjusted,
+            prior_specs=prior_specs,
+            inclusion_probs=inclusion_probs,
+            tau_sq_priors=tau_priors,
+            chain_direct_results=chain_direct,
+        )
+
+        # SE_eff should be 0.5 × 1.5 = 0.75 (B6 multiplier applied)
+        assert frozen.Sigma_eff["E01"] == pytest.approx(0.75, abs=0.01)
+
+    def test_b3_k5_non_prospective_not_placeholder(self):
+        """CRITICAL-3: k>=5 without prospective design should NOT get StructuralPlaceholder.
+
+        Should fall to Commensurate instead of discarding all evidence.
+        """
+        graph = _make_mini_graph()
+        adj = HeterogeneityAdjustedEdge(
+            edge_id="E01", mu_e=0.3, SE_within=0.05,
+            tau_sq=0.01, k=6, I_sq=0.2,
+            aggregation_method="IVW_FIXED",
+            contributing_studies=[f"S{i}" for i in range(6)],
+            attenuation_factor=1.0, SE_eff=0.52,
+            layer_contributions={}, sigma_sq_structural=0.25,
+            w_scope=1.0, w_fresh=1.0,
+        )
+        # All cross-sectional (non-prospective) studies
+        recs = [_make_evidence("E01", 0.3, 0.05, study_id=f"S{i}",
+                               design="cross_sectional_adjusted")
+                for i in range(6)]
+
+        prior = select_prior(adj, recs, graph)
+
+        # Should be Commensurate (fallback), NOT StructuralPlaceholder
+        assert prior.prior_type == "Commensurate"
+        assert "fallback" in prior.selection_rationale
+
+    def test_tau_sq_added_for_single_best(self):
+        """MODERATE-3: τ² should be added to SE_eff for SINGLE_BEST method.
+
+        SINGLE_BEST doesn't incorporate τ² in its base SE, so the
+        double-counting guard 𝟙[not_in_base] should be True.
+        """
+        pooled = PooledEdge(
+            edge_id="E_test", mu_e=0.5, SE_within=0.10,
+            tau_sq=0.04,  # non-zero τ²
+            k=3, I_sq=0.8,
+            aggregation_method="SINGLE_BEST",
+            contributing_studies=["S1", "S2", "S3"],
+        )
+        recs = [_make_evidence("E_test", 0.5, 0.10, study_id="S1",
+                               design="large_rct")]
+
+        result = compute_se_eff(pooled, recs)
+
+        # With τ² = 0.04 added (not_in_base = True for SINGLE_BEST):
+        # SE_eff = √(SE² + σ²_struct + τ²) / (w_scope × w_fresh)
+        # The SE_eff should be larger than without τ²
+        se_without_tau = math.sqrt(0.10 ** 2 + config.SIGMA_SQ_STRUCTURAL_DEFAULT)
+        se_with_tau = math.sqrt(0.10 ** 2 + config.SIGMA_SQ_STRUCTURAL_DEFAULT + 0.04)
+        assert result.SE_eff >= se_with_tau - 0.01  # τ² is included
+
+    def test_freshness_reference_year_matches_spec(self):
+        """MODERATE-1: FRESHNESS_REFERENCE_YEAR should be 2025 per spec."""
+        assert config.FRESHNESS_REFERENCE_YEAR == 2025

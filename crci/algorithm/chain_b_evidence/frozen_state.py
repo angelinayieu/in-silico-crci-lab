@@ -4,6 +4,7 @@
 # VERIFIED: forward wiring — writes FrozenModelState for ALG-C, ALG-D, ALG-E
 # VERIFIED: no hardcoded formula parameters — all from config.py
 # VERIFIED: gates [B-G6] raise on failure
+# VERIFIED: B6 SE multiplier applied to Sigma_eff in assemble_frozen_state (spec lines 1393-1408)
 """
 Component: SYS_ALGORITHM.ALG-B.B7
 Spec: SYS_ALGORITHM_COMPLETE.md lines 1414-1428
@@ -147,9 +148,9 @@ def build_b_hat_matrix(
     """B7a: Fill B̂[source, target] = μ_e for each parameterized edge.
 
     BLOCKED edges are set to 0.
-    Non-linear edges: Hill params stored alongside (via graph.b_skeleton).
-    Chain-vs-direct SE multiplier is already factored into SE_eff,
-    so B̂ uses the attenuated μ_e directly.
+    Non-linear edges: Hill params accessible via graph.b_skeleton.
+    B̂ uses the attenuated μ_e directly (SE inflation from B6
+    is applied separately in assemble_frozen_state).
 
     Args:
         graph: GraphObject from Chain A.
@@ -403,11 +404,20 @@ def assemble_frozen_state(
     # B7b: Compile context-matched precision matrices
     Lambda_prior = compile_context_priors(graph, B_hat, context_specs)
 
-    # Collect Sigma_eff
-    Sigma_eff = {
-        edge_id: ae.SE_eff
-        for edge_id, ae in adjusted_edges.items()
-    }
+    # Collect Sigma_eff — apply B6 chain-vs-direct SE multiplier
+    Sigma_eff: dict[str, float] = {}
+    for edge_id, ae in adjusted_edges.items():
+        se_eff = ae.SE_eff
+        # B6 triage SE inflation: spec lines 1393-1408
+        cdr = chain_direct_results.get(edge_id)
+        if cdr is not None and cdr.se_multiplier != 1.0:
+            se_eff *= cdr.se_multiplier
+            logger.info(
+                "B7d: Edge %s SE_eff %.4f × %.1f (B6 %s) → %.4f",
+                edge_id, ae.SE_eff, cdr.se_multiplier,
+                cdr.triage_action, se_eff,
+            )
+        Sigma_eff[edge_id] = se_eff
 
     # Collect P_inclusion
     P_incl = {

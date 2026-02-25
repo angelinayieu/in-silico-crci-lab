@@ -36,10 +36,11 @@ P_INCLUSION_MIN: float = 0.05
 #  EVIDENCE FRESHNESS (§2.9, Layer 7)
 # ═══════════════════════════════════════════════════════════════
 
-# Formula P3-8: w_freshness = max(FLOOR, exp(-DECAY × age_years))
+# Formula P3-7/B2-L7: w_fresh = max(FLOOR, 1 − DECAY × (REF_YEAR − pub_year))
+# Calibration: Poynard et al. (2002) — 45-year half-life → ln(2)/45 ≈ 1.54%/yr
 FRESHNESS_DECAY_RATE: float = 0.015
 FRESHNESS_FLOOR: float = 0.70
-FRESHNESS_REFERENCE_YEAR: int = 2026
+FRESHNESS_REFERENCE_YEAR: int = 2025  # Spec lines 1091, 1307 all use 2025
 FRESHNESS_DEFAULT_WEIGHT: float = 0.85  # No pub date → default w_fresh = 0.85 + WARN
 
 # ═══════════════════════════════════════════════════════════════
@@ -93,7 +94,10 @@ DESIGN_MULTIPLIER_DEFAULT: float = 3.0       # unclassified → 3.0× + WARN
 SMALL_RCT_N_THRESHOLD: int = 200             # N ≤ 200 triggers interpolation
 SMALL_RCT_PENALTY_SLOPE: float = 0.5         # m = 1.0 + 0.5×(200−N)/200
 
-# Layer 5: GRADE quality multipliers — Formula P3-5
+# Layer 5: GRADE quality multipliers — Formula P3-5 / ALG-B2 L5
+# REVIEW: SPEC AMBIGUITY — ALG-B chain card line 1305 says MODERATE=1.15, LOW=1.3.
+#   SYS_EXTRACTION line 1089 and ALG-B worked example line 3857 say MODERATE=1.25, LOW=1.50.
+#   Using 1.25/1.50 (majority across specs + worked example agreement).
 GRADE_MULTIPLIERS: dict[str, float] = {
     "HIGH": 1.0,
     "MODERATE": 1.25,
@@ -241,7 +245,8 @@ IVW_MIN_STUDIES: int = 2
 HETEROGENEITY_HIGH_THRESHOLD: float = 75.0  # I² > 75% = high
 HETEROGENEITY_MODERATE_THRESHOLD: float = 50.0  # I² 50-75% = moderate
 
-# Formula P4-3: P_incl = logistic(INTERCEPT + LN_K_COEFF·ln(k+1) + Z_COEFF·Z + RCT_COEFF·𝟙_RCT)
+# Formula B4-1 / P4-3: P_incl = logistic(INTERCEPT + LN_K_COEFF·ln(k+1) + Z_COEFF·Z + RCT_COEFF·𝟙_RCT)
+# Used by ALG-B4 (structural inclusion probability)
 P4_3_INTERCEPT: float = -0.5
 P4_3_LN_K_COEFF: float = 1.2
 P4_3_Z_COEFF: float = 0.4

@@ -1,10 +1,13 @@
-# VERIFIED: formulas [B1-1, B1-2, B1-3, B1-4, B1-5, B2-1, B3-1..B3-5, B4-1, B5-1, B6-1, B6-2] match spec SYS_ALG lines 1270-1428
+# VERIFIED: formulas [B1-1..B1-5, B2-1, B3-1..B3-5, B4-1, B5-1, B6-1, B6-2] match spec SYS_ALG lines 1103-1428
 # VERIFIED: imports — all modules exist
 # VERIFIED: backward wiring — reads GraphObject from chain_a_graph.graph_object
 # VERIFIED: forward wiring — writes PooledEdge, HeterogeneityAdjustedEdge, EdgePriorSpec,
 #           InclusionProbEdge, TauSquaredPrior, ChainDirectResult for frozen_state.py
 # VERIFIED: no hardcoded formula parameters — all from config.py
 # VERIFIED: gates [B-G1, B-G2, B-G3, B-G4, B-G5] raise on failure
+# VERIFIED: τ² double-counting guard — adds τ² for all methods except IVW_RANDOM (which incorporates it)
+# VERIFIED: B3 decision tree — k≥5 non-prospective falls to Commensurate (no gap)
+# VERIFIED: Commensurate τ — weighted geometric product per spec line 1347
 """
 Component: SYS_ALGORITHM.ALG-B.B1-B6
 Spec: SYS_ALGORITHM_COMPLETE.md lines 1270-1428
@@ -753,8 +756,11 @@ def compute_se_eff(
         sigma_sq_structural = config.SIGMA_SQ_STRUCTURAL_DEFAULT
 
     # L3: Statistical heterogeneity (τ²)
-    # τ² added ONLY when not already in base SE
-    tau_sq_addition = pooled.tau_sq if pooled.aggregation_method == "IVW_FIXED" else 0.0
+    # Spec line 1303: τ² added ONLY when not already in base SE (𝟙[not_in_base])
+    # IVW_RANDOM already incorporates τ² via random-effects weights → don't add again
+    # IVW_FIXED, SINGLE_BEST, STRATIFIED: τ² is NOT in base SE → add
+    # BLOCKED, DIRECT: τ²=0 by construction → adding 0 is harmless
+    tau_sq_addition = 0.0 if pooled.aggregation_method == "IVW_RANDOM" else pooled.tau_sq
 
     # Formula B2-1: Master SE_eff computation
     # Numerator: √[(SE_pooled × m_claim × m_GRADE × m_temporal)² + σ²_structural + τ²·𝟙]
@@ -810,6 +816,40 @@ def _best_design_is_prospective(records: list[EvidenceRecord]) -> bool:
         if r.study_design in config.B3_PROSPECTIVE_DESIGNS:
             return True
     return False
+
+
+def _compute_commensurate_tau(records: list[EvidenceRecord]) -> float:
+    """Compute commensurate prior τ as weighted geometric product of scope dimensions.
+
+    Formula (spec line 1347): τ = Π_d w_d^{p_d}
+    where w_d are the 5 scope dimension weights and p_d are the config weights.
+
+    Takes the average across records of the per-record geometric product.
+    """
+    if not records:
+        return config.SCOPE_FLOOR
+
+    taus: list[float] = []
+    for r in records:
+        if not r.scope_weights:
+            taus.append(config.SCOPE_FLOOR)
+            continue
+        # Weighted geometric product: Π_d w_d^{p_d}
+        log_product = 0.0
+        total_weight = 0.0
+        for dim, p_d in config.SCOPE_WEIGHTS.items():
+            w_d = r.scope_weights.get(dim, config.SCOPE_FLOOR)
+            w_d = max(w_d, 0.01)  # prevent log(0)
+            log_product += p_d * math.log(w_d)
+            total_weight += p_d
+        if total_weight > 0:
+            taus.append(math.exp(log_product))
+        else:
+            taus.append(config.SCOPE_FLOOR)
+
+    # Average across records
+    tau = sum(taus) / len(taus)
+    return max(tau, config.SCOPE_FLOOR)
 
 
 def _has_chain_evidence(
@@ -975,16 +1015,29 @@ def select_prior(
             selection_rationale=f"k={k} ≥ 5, best_design ≥ prospective → RobustMAP (w={w:.3f})",
         )
 
-    if config.B3_COMMENSURATE_MIN_K <= k <= config.B3_COMMENSURATE_MAX_K:
+    if k >= config.B3_COMMENSURATE_MIN_K and (
+        k <= config.B3_COMMENSURATE_MAX_K or not _best_design_is_prospective(records)
+    ):
         # B3b: Commensurate (Hobbs et al., 2011)
-        # τ_commens = Π_d w_d^{p_d} (5 dimension match scores)
-        # Use average scope weight as τ proxy
+        # Also covers k >= 5 without prospective design (spec gap: these have evidence
+        # but don't qualify for RobustMAP; Commensurate is the best fallback).
+        # τ_commens = Π_d w_d^{p_d} (5 dimension match scores, spec line 1347)
         if records:
-            scope_weights_all = [_compute_scope_weight(r) for r in records]
-            tau_commens = sum(scope_weights_all) / len(scope_weights_all)
+            # Geometric product of scope dimension weights per spec
+            tau_commens = _compute_commensurate_tau(records)
         else:
             tau_commens = config.SCOPE_FLOOR
 
+        rationale = (
+            f"k={k} ∈ [2,4] → Commensurate (τ={tau_commens:.3f})" if k <= config.B3_COMMENSURATE_MAX_K
+            else f"k={k} ≥ 5, best_design < prospective → Commensurate fallback (τ={tau_commens:.3f})"
+        )
+        if k >= 5:
+            logger.warning(
+                "Edge %s: k=%d ≥ 5 but best_design < prospective — "
+                "using Commensurate instead of RobustMAP",
+                edge_id, k,
+            )
         return EdgePriorSpec(
             edge_id=edge_id,
             prior_type="Commensurate",
@@ -993,7 +1046,7 @@ def select_prior(
                 "sigma_sq_hist": adjusted.SE_eff ** 2,
                 "tau": tau_commens,
             },
-            selection_rationale=f"k={k} ∈ [2,4] → Commensurate (τ={tau_commens:.3f})",
+            selection_rationale=rationale,
         )
 
     if k == 1:
