@@ -3,7 +3,7 @@
 ## Current Position
 - **Phase:** 7 (Integration + CLI Scripts) — COMPLETE
 - **Prompt:** 7.2 completed (End-to-End Test)
-- **Last completed slice:** V-FINAL review round 3
+- **Last completed slice:** Extraction gap fill (11 missing files)
 - **Next:** CODE COMPLETE — all spec phases implemented and reviewed
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
 - **Total tests:** 720 passing
@@ -77,6 +77,21 @@
 | 7.1-d | `scripts/validate_model.py` | `ca6545a` | DONE |
 | 7.1-e | `scripts/validate_deployment_readiness.py` | `ca6545a` | DONE |
 | 7.2 | `tests/test_end_to_end/test_full_pipeline.py` | `ca6545a` | DONE (20 tests) |
+
+### Extraction Gap Fill — COMPLETE
+| Slice | File | Status |
+|-------|------|--------|
+| P2-SD | `extraction/p2_harmonization/sd_standardization.py` | DONE |
+| P2-S6 | `extraction/p2_harmonization/scope_matching.py` | DONE |
+| P0-R | `extraction/p0_triage/runner.py` | DONE |
+| P1-R | `extraction/p1_extraction/runner.py` | DONE |
+| TB-R | `extraction/tb_trust_boundary/runner.py` | DONE |
+| P2-R | `extraction/p2_harmonization/runner.py` | DONE |
+| P3-R | `extraction/p3_heterogeneity/runner.py` | DONE |
+| P4-R | `extraction/p4_aggregation/runner.py` | DONE |
+| P4B-R | `extraction/p4b_publication_bias/runner.py` | DONE |
+| P5-R | `extraction/p5_sufficiency/runner.py` | DONE |
+| P6-R | `extraction/p6_deployment/runner.py` | DONE |
 
 ### Review Fixes
 | Fix | Commit | Status |
