@@ -19,7 +19,7 @@ from crci.shared.models.intermediate_states import (
     LayeredSEResult,
 )
 from crci.shared.models.enums import EffectScale, HarmonizationStatusInMem, SESource
-from crci.extraction.heterogeneity.se_eff_assembly import (
+from crci.extraction.p3_heterogeneity.se_eff_assembly import (
     SEEffInput,
     compute_se_eff,
     compute_se_eff_for_claim,

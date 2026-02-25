@@ -14,7 +14,7 @@ import math
 import pytest
 
 from crci.shared import config
-from crci.extraction.heterogeneity.layers import (
+from crci.extraction.p3_heterogeneity.layers import (
     HeterogeneityResult,
     layer_1_study_design,
     layer_2_scope_match,

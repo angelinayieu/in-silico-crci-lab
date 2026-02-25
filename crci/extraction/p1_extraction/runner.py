@@ -1,4 +1,5 @@
 # VERIFIED: imports — canonical_reader, base_agent, reconciliation, annotation_trust_boundary
+# VERIFIED: imports — ma_multi_product (MA-1 through MA-8 dispatch)
 # VERIFIED: backward wiring — reads ingested paper + triage result from context
 # VERIFIED: forward wiring — writes PaperMap, agent outputs, validated annotations to context
 # VERIFIED: no hardcoded formula parameters
@@ -6,9 +7,10 @@
 """
 Component: SYS_EXTRACTION.EX-P1.RUNNER
 Spec: SYS_EXTRACTION_COMPLETE.md lines 330-600
-Purpose: Orchestrate P1 extraction: canonical read → multi-agent → reconcile → ATB.
+      PAPER_TYPE_ROUTING_AND_ACQUISITION.md §2 (MA Multi-Product)
+Purpose: Orchestrate P1 extraction: canonical read → MA plan → multi-agent → reconcile → ATB.
 Reads: ingested_paper, triage_result (from P0 context)
-Writes: PaperMap, agent outputs, reconciled + validated annotations
+Writes: PaperMap, agent outputs, MA extraction plan, reconciled + validated annotations
 Gates: Delegated to agents (AG-G*) and annotation_trust_boundary (AT-01 through AT-06)
 """
 from __future__ import annotations
@@ -32,8 +34,9 @@ def run_p1_extraction(
     """Run P1 hybrid multi-agent extraction chain.
 
     Steps:
-        P1-CR: Canonical Reader — build PaperMap (one read, many agents)
-        P1-AG: Multi-agent extraction — 11 agents in parallel
+        P1-CR:  Canonical Reader — build PaperMap (one read, many agents)
+        P1-MAP: MA multi-product plan (for MA/SR papers only)
+        P1-AG:  Multi-agent extraction — 11 agents in parallel
         P1-REC: Reconciliation — cross-agent consensus
         P1-ATB: Annotation Trust Boundary — validate + persist
 
@@ -73,6 +76,43 @@ def run_p1_extraction(
         len(paper_map.figures),
         len(paper_map.candidate_spans),
     )
+
+    # ── P1-MAP: MA Multi-Product Plan ──
+    # For meta-analysis and systematic review papers, build an extraction plan
+    # with up to 7 products (pooled estimate, heterogeneity, forest plot, etc.)
+    paper_subtype = context.get("triage_result", {})
+    subtype_str = (
+        paper_subtype.paper_subtype
+        if hasattr(paper_subtype, "paper_subtype")
+        else context.get("classified_paper", {}).get("paper_subtype", "")
+    )
+    subtype_val = subtype_str.value if hasattr(subtype_str, "value") else str(subtype_str)
+
+    ma_subtypes = {"meta_analysis", "systematic_review"}
+    if subtype_val in ma_subtypes:
+        from crci.extraction.p1_extraction.ma_multi_product import (
+            build_ma_extraction_plan,
+            get_product_agents,
+        )
+
+        ma_plan = build_ma_extraction_plan(
+            paper_id=paper_id,
+            paper_subtype=subtype_val,
+            paper_text=canonical_text,
+            title=ingested.get("metadata", {}).get("title"),
+        )
+        context["ma_extraction_plan"] = ma_plan
+        logger.info(
+            "P1-MAP: MA plan built — %d products (%d mandatory), "
+            "NMA=%s, dose-response=%s",
+            ma_plan.product_count,
+            len(ma_plan.mandatory_products),
+            ma_plan.is_network_ma,
+            ma_plan.is_dose_response_ma,
+        )
+    else:
+        context["ma_extraction_plan"] = None
+        logger.debug("P1-MAP: not an MA/SR paper, skipping MA plan")
 
     # ── P1-AG: Multi-Agent Extraction ──
     logger.info("P1-AG: Running %s-mode extraction agents", extraction_mode)
