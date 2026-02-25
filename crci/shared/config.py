@@ -442,6 +442,30 @@ E2_R_INFINITY_NOISE_SD: float = 0.10  # r_∞^(m) ~ N(r_∞, 0.10²)
 E2_TAU_R_LOG_NOISE_SD: float = 0.20  # τ_R^(m) ~ LogNormal(ln(τ_R), 0.20²)
 
 # ═══════════════════════════════════════════════════════════════
+#  E3: INTERVENTION TEMPORAL OVERLAY + AGING (spec lines 2783-2871)
+# ═══════════════════════════════════════════════════════════════
+
+# E3a: Kernel decay constant = ln(2) ≈ 0.693 (spec line 2805)
+E3_DECAY_LN2: float = 0.693
+
+# E3b: Accelerated Cognitive Aging (spec lines 2824-2837)
+# Base aging rate: 0.02 SD/year (normal cognitive decline)
+E3_BASE_AGING_RATE_SD_PER_YEAR: float = 0.02
+# Age adjustment reference: max(1, (age − 50) / 10)
+E3_AGING_AGE_REFERENCE: float = 50.0
+E3_AGING_AGE_DIVISOR: float = 10.0
+
+# ACC coefficients (spec lines 2827-2831)
+E3_ACC_COEFFICIENTS: dict[str, float] = {
+    "no_chemotherapy": 1.0,
+    "tc_docetaxel": 1.3,
+    "standard_chemo": 1.5,
+    "anthracycline": 2.0,
+    "childhood_cancer": 2.5,
+}
+E3_ACC_DEFAULT: float = 1.5  # standard_chemo fallback
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 
