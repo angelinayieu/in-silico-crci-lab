@@ -58,6 +58,18 @@ TEMPORAL_WEIGHT_FLOOR: float = 0.01  # max(w_temporal, 0.01) floor in Formula P3
 MC_DRAWS: int = 10_000
 MC_DEFAULT_SEED: int = 42
 
+# D1b: Structural inclusion sampling thresholds (spec lines 2214-2216)
+# Edges with P >= threshold treated as always-present (optimization)
+D1_INCLUSION_ALWAYS_PRESENT: float = 0.99
+# Edges with P <= threshold treated as always-absent (optimization)
+D1_INCLUSION_ALWAYS_ABSENT: float = 0.05
+
+# D1c: Patient baseline sampling — clip θ₀^(m) to ±N SD (spec line 2228)
+D1_BASELINE_CLIP_SD: float = 4.0
+
+# D1a: Maximum sign-preservation rejection attempts (truncated normal)
+D1_SIGN_PRESERVATION_MAX_RETRIES: int = 50
+
 # ═══════════════════════════════════════════════════════════════
 #  SCOPE MATCHING (§2.9) — Formula P3-2: w_scope
 # ═══════════════════════════════════════════════════════════════
