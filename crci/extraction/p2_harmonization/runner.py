@@ -70,19 +70,40 @@ def run_p2_harmonization(
 
     # ── P2-S2: Conversion ──
     logger.info("P2-S2: Converting effect sizes")
-    from crci.extraction.p2_harmonization.conversion_router import convert_effects
+    from crci.extraction.p2_harmonization.conversion_router import route_conversion
 
-    converted = convert_effects(passed_claims, session=session)
+    converted_list = []
+    failed_conversions = []
+    for claim in passed_claims:
+        try:
+            effect_type = getattr(claim, "effect_type_reported", "UNKNOWN")
+            has_orient = getattr(claim, "has_orientation_metadata", True)
+            routed = route_conversion(claim, effect_type, has_orientation_metadata=has_orient)
+            converted_list.append(routed)
+        except Exception as exc:
+            logger.debug("P2-S2: conversion failed for claim: %s", exc)
+            failed_conversions.append(claim)
+
+    converted = {"converted": converted_list, "failed": failed_conversions}
     context["p2_converted"] = converted
-    logger.info("P2-S2 complete: %d converted", len(converted.get("converted", [])))
+    logger.info("P2-S2 complete: %d converted", len(converted_list))
 
     # ── P2-S3: Scale Harmonization ──
     logger.info("P2-S3: Harmonizing scales")
-    from crci.extraction.p2_harmonization.scale_harmonizer import harmonize_scales
+    from crci.extraction.p2_harmonization.scale_harmonizer import harmonize_scale
 
-    harmonized = harmonize_scales(converted.get("converted", []), session=session)
+    harmonized_list = []
+    for routed_item in converted_list:
+        try:
+            effect_type = getattr(routed_item, "effect_type_reported", "UNKNOWN")
+            scaled = harmonize_scale(routed_item, effect_type)
+            harmonized_list.append(scaled)
+        except Exception as exc:
+            logger.debug("P2-S3: harmonization failed: %s", exc)
+
+    harmonized = {"harmonized": harmonized_list}
     context["p2_harmonized"] = harmonized
-    logger.info("P2-S3 complete: %d harmonized", len(harmonized.get("harmonized", [])))
+    logger.info("P2-S3 complete: %d harmonized", len(harmonized_list))
 
     # ── P2-S4: Orientation Alignment ──
     logger.info("P2-S4: Aligning orientation")

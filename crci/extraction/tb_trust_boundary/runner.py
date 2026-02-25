@@ -46,16 +46,34 @@ def run_tb_trust_boundary(
 
     # ── TB-S1: Numeric Parser ──
     logger.info("TB-S1: Parsing numeric claims for %s", paper_id)
-    from crci.extraction.tb_trust_boundary.numeric_parser import parse_numeric_claims
+    from crci.extraction.tb_trust_boundary.numeric_parser import parse_spans
 
-    raw_claims = context.get("raw_annotations", [])
-    parsed = parse_numeric_claims(raw_claims)
+    # Extract SpanLabel objects from raw annotations produced by P1 agents
+    raw_annotations = context.get("raw_annotations", [])
+    span_labels = []
+    for ann in raw_annotations:
+        if hasattr(ann, "span_labels"):
+            span_labels.extend(ann.span_labels)
+        elif hasattr(ann, "spans"):
+            span_labels.extend(ann.spans)
+
+    parsed_numerics = parse_spans(span_labels)
+
+    # Separate valid (parsed successfully) from failed
+    valid_claims = [p for p in parsed_numerics if p.status.value == "PARSED"]
+    failed_claims = [p for p in parsed_numerics if p.status.value != "PARSED"]
+
+    parsed = {
+        "valid_claims": valid_claims,
+        "failed_claims": failed_claims,
+        "total_spans": len(span_labels),
+    }
     context["parsed_claims"] = parsed
 
     logger.info(
-        "TB-S1 complete: %d claims parsed from %d raw annotations",
-        len(parsed.get("valid_claims", [])),
-        len(raw_claims),
+        "TB-S1 complete: %d claims parsed from %d span labels",
+        len(valid_claims),
+        len(span_labels),
     )
 
     # ── TB-S2: Consistency Checker ──

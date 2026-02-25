@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
 from crci.shared import config
 
@@ -464,3 +465,109 @@ def layer_7_freshness_decay(
         f"w_fresh={w_fresh:.4f}"
     )
     return w_fresh, notes
+
+
+# ═══════════════════════════════════════════════════════════════
+#  ORCHESTRATOR — applies all 7 layers to a batch of records
+# ═══════════════════════════════════════════════════════════════
+
+
+@dataclass
+class LayeredRecord:
+    """Record with all 7 layer outputs attached.
+
+    Carries the original record plus per-layer multipliers/weights
+    needed by se_eff_assembly.compute_se_eff().
+    """
+
+    record: Any
+    m_design: float = 1.0
+    w_scope: float = 1.0
+    i_squared: float = 0.0
+    tau_squared: float = 0.0
+    m_scale: float = 1.0
+    m_grade: float = 1.0
+    w_temporal: float = 1.0
+    temporal_excluded: bool = False
+    w_fresh: float = 1.0
+    layer_notes: list[str] = field(default_factory=list)
+
+
+def apply_all_layers(
+    records: list[Any],
+    session: Any = None,
+) -> list[LayeredRecord]:
+    """Apply all 7 heterogeneity layers to a batch of records.
+
+    Orchestrates L1 through L7 for each record and returns LayeredRecord
+    objects carrying per-layer multipliers for SE_eff assembly.
+
+    Args:
+        records: Harmonized records from P2 (HarmonizedClaim or similar).
+        session: Database session (currently unused, reserved for future
+                 DB-backed layer lookups).
+
+    Returns:
+        List of LayeredRecord objects with all layer outputs attached.
+    """
+    layered: list[LayeredRecord] = []
+
+    for rec in records:
+        notes: list[str] = []
+
+        # L1: Study design multiplier
+        study_design = getattr(rec, "study_design", "unclassified")
+        n_total = getattr(rec, "n_total", None) or getattr(rec, "sample_size", None)
+        m_design, l1_notes = layer_1_study_design(study_design, n_total=n_total)
+        notes.extend(l1_notes)
+
+        # L2: Scope matching weight
+        w_scope_val = getattr(rec, "w_scope", None) or getattr(rec, "scope_match", 1.0)
+        w_scope, l2_notes = layer_2_scope_match(w_scope_val)
+        notes.extend(l2_notes)
+
+        # L3: Statistical heterogeneity (I², τ²)
+        betas = getattr(rec, "group_betas", None) or []
+        ses = getattr(rec, "group_ses", None) or []
+        het_result = layer_3_statistical_heterogeneity(betas, ses)
+        notes.extend(het_result.notes)
+
+        # L4: Cancer-validation scale multiplier
+        validation_status = getattr(rec, "cancer_validation_status", "general_population")
+        m_scale, l4_notes = layer_4_scale_validation(validation_status)
+        notes.extend(l4_notes)
+
+        # L5: GRADE quality multiplier
+        grade_level = getattr(rec, "grade_level", "MODERATE")
+        m_grade, l5_notes = layer_5_grade_quality(grade_level)
+        notes.extend(l5_notes)
+
+        # L6: Temporal decay weight
+        days_since = getattr(rec, "days_since_measurement", 0) or 0
+        w_temporal, temporal_excluded, l6_notes = layer_6_temporal_decay(days_since)
+        notes.extend(l6_notes)
+
+        # L7: Freshness decay weight
+        pub_year = getattr(rec, "pub_year", None) or getattr(rec, "publication_year", None)
+        w_fresh, l7_notes = layer_7_freshness_decay(pub_year)
+        notes.extend(l7_notes)
+
+        layered.append(LayeredRecord(
+            record=rec,
+            m_design=m_design,
+            w_scope=w_scope,
+            i_squared=het_result.i_squared,
+            tau_squared=het_result.tau_squared,
+            m_scale=m_scale,
+            m_grade=m_grade,
+            w_temporal=w_temporal,
+            temporal_excluded=temporal_excluded,
+            w_fresh=w_fresh,
+            layer_notes=notes,
+        ))
+
+    logger.info(
+        "apply_all_layers: processed %d records through 7 layers",
+        len(layered),
+    )
+    return layered

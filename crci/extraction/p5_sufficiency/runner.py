@@ -67,24 +67,49 @@ def run_p5_sufficiency(
     else:
         logger.debug("P5-MISS: no missingness report in context, skipping")
 
-    # ── P5-CV: Chain validation ──
-    from crci.extraction.p5_sufficiency.chain_validator import validate_chains
+    # ── Build compiled edges list for downstream P5 modules ──
+    # P5 modules expect typed CompiledEdge objects. Build from context.
+    compiled_edges = context.get("compiled_edges", [])
+    pooled_estimates = context.get("pooled_estimates", [])
 
-    chain_result = validate_chains(session=session)
-    context["chain_validation"] = chain_result
-    logger.info("P5-CV: %d chains validated", chain_result.get("n_chains", 0))
+    # ── P5-CV: Chain validation ──
+    from crci.extraction.p5_sufficiency.chain_validator import (
+        PathwayDefinition,
+        validate_all_pathways,
+    )
+
+    # Build pathway definitions from session if available
+    pathways: list[PathwayDefinition] = []
+    compiled_edge_map: dict[str, Any] = {}
+    for edge in compiled_edges:
+        eid = getattr(edge, "edge_param_id", None) or getattr(edge, "edge_relation_id", None)
+        if eid:
+            compiled_edge_map[eid] = edge
+
+    chain_results, se_inflation_map = validate_all_pathways(pathways, compiled_edge_map)
+    context["chain_validation"] = {
+        "n_chains": len(chain_results),
+        "results": chain_results,
+        "se_inflation_map": se_inflation_map,
+    }
+    logger.info("P5-CV: %d chains validated", len(chain_results))
 
     # ── P5-COV: Coverage analysis ──
-    from crci.extraction.p5_sufficiency.coverage_analyzer import analyze_coverage
+    from crci.extraction.p5_sufficiency.coverage_analyzer import build_coverage_matrix
 
-    coverage = analyze_coverage(session=session)
+    coverage = build_coverage_matrix(compiled_edges)
     context["coverage_analysis"] = coverage
-    logger.info("P5-COV: coverage analysis complete")
+    logger.info(
+        "P5-COV: coverage %.1f%% (%d/%d edges)",
+        coverage.coverage_fraction * 100,
+        coverage.n_covered,
+        coverage.n_expected,
+    )
 
     # ── P5-EV: E-value computation ──
-    from crci.extraction.p5_sufficiency.evalue_computer import compute_evalues
+    from crci.extraction.p5_sufficiency.evalue_computer import compute_evalues_batch
 
-    evalues = compute_evalues(session=session)
+    evalues = compute_evalues_batch(compiled_edges)
     context["evalues"] = evalues
     logger.info("P5-EV: E-values computed for %d edges", len(evalues))
 
@@ -104,18 +129,21 @@ def run_p5_sufficiency(
         context["gap_diagnoses"] = []
 
     # ── P5-RPT: Sufficiency report ──
-    from crci.extraction.p5_sufficiency.sufficiency_reporter import generate_report
+    from crci.extraction.p5_sufficiency.sufficiency_reporter import (
+        generate_sufficiency_report,
+    )
 
-    sufficiency_report = generate_report(
-        chain_result=chain_result,
-        coverage=coverage,
-        evalues=evalues,
-        session=session,
+    sufficiency_report = generate_sufficiency_report(
+        compiled_edges=compiled_edges,
+        coverage_matrix=coverage,
+        chain_results=chain_results if chain_results else None,
+        bias_assessments=context.get("bias_results"),
+        evalue_results=evalues if evalues else None,
     )
     context["sufficiency_report"] = sufficiency_report
     logger.info(
         "P5 complete: overall grade=%s",
-        sufficiency_report.get("overall_grade", "unknown"),
+        getattr(sufficiency_report, "overall_grade", "unknown"),
     )
 
     return context

@@ -23,6 +23,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from crci.shared import config
 from crci.shared.models.enums import (
     AdjudicationStatus,
     AnnotationCategory,
@@ -62,24 +63,24 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── HIGH-IMPACT: affects pooled estimates directly ──
     AnnotationCategory.LIMITATION_UNMEASURED_CONFOUNDER: PromotionRule(
         category=AnnotationCategory.LIMITATION_UNMEASURED_CONFOUNDER,
-        min_confidence=0.70,
-        min_cross_agent_n=2,
+        min_confidence=config.PROM_CONFIDENCE_HIGH_IMPACT,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_HIGH_IMPACT,
         consumer="sigma_structural",
         auto_promote=False,
         notes="Adjusts sigma^2_structural; requires human review",
     ),
     AnnotationCategory.NULL_FINDING_CONTEXT: PromotionRule(
         category=AnnotationCategory.NULL_FINDING_CONTEXT,
-        min_confidence=0.70,
-        min_cross_agent_n=2,
+        min_confidence=config.PROM_CONFIDENCE_HIGH_IMPACT,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_HIGH_IMPACT,
         consumer="sigma_structural",
         auto_promote=False,
         notes="Adjusts P_inclusion via logit; requires human review",
     ),
     AnnotationCategory.CONFOUNDER_STRUCTURE: PromotionRule(
         category=AnnotationCategory.CONFOUNDER_STRUCTURE,
-        min_confidence=0.65,
-        min_cross_agent_n=2,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_HIGH,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_HIGH_IMPACT,
         consumer="sigma_structural",
         auto_promote=False,
         notes="Informs structural variance; moderate impact",
@@ -88,37 +89,37 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── SE INFLATION: affects standard error estimates ──
     AnnotationCategory.MEASUREMENT_LIMITATION: PromotionRule(
         category=AnnotationCategory.MEASUREMENT_LIMITATION,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="se_inflation",
         auto_promote=True,
         notes="May inflate SE via design quality penalty",
     ),
     AnnotationCategory.SELECTION_BIAS: PromotionRule(
         category=AnnotationCategory.SELECTION_BIAS,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="se_inflation",
         auto_promote=True,
     ),
     AnnotationCategory.ATTRITION_BIAS: PromotionRule(
         category=AnnotationCategory.ATTRITION_BIAS,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="se_inflation",
         auto_promote=True,
     ),
     AnnotationCategory.DETECTION_BIAS: PromotionRule(
         category=AnnotationCategory.DETECTION_BIAS,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="se_inflation",
         auto_promote=True,
     ),
     AnnotationCategory.REPORTING_BIAS: PromotionRule(
         category=AnnotationCategory.REPORTING_BIAS,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="se_inflation",
         auto_promote=True,
     ),
@@ -126,24 +127,24 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── DAG EXPANSION: affects model structure ──
     AnnotationCategory.MECHANISM_HYPOTHESIS: PromotionRule(
         category=AnnotationCategory.MECHANISM_HYPOTHESIS,
-        min_confidence=0.65,
-        min_cross_agent_n=2,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_HIGH,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_HIGH_IMPACT,
         consumer="dag_expansion",
         auto_promote=False,
         notes="May add new edges to causal DAG; requires review",
     ),
     AnnotationCategory.BIOLOGICAL_PLAUSIBILITY: PromotionRule(
         category=AnnotationCategory.BIOLOGICAL_PLAUSIBILITY,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="dag_expansion",
         auto_promote=True,
         notes="Supporting evidence for existing DAG edges",
     ),
     AnnotationCategory.THEORY_SUPPORT: PromotionRule(
         category=AnnotationCategory.THEORY_SUPPORT,
-        min_confidence=0.50,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="dag_expansion",
         auto_promote=True,
     ),
@@ -151,8 +152,8 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── ACQUISITION: triggers paper search ──
     AnnotationCategory.RESEARCH_GAP: PromotionRule(
         category=AnnotationCategory.RESEARCH_GAP,
-        min_confidence=0.50,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="acquisition",
         auto_promote=True,
         notes="Routes to acquisition loop for additional evidence",
@@ -161,8 +162,8 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── SAFETY: patient safety implications ──
     AnnotationCategory.ADVERSE_EVENT: PromotionRule(
         category=AnnotationCategory.ADVERSE_EVENT,
-        min_confidence=0.50,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="safety_rules",
         auto_promote=True,
         notes="Low threshold — safety signals always promoted",
@@ -171,15 +172,15 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── TEMPORAL + DOSE: intervention parameter refinement ──
     AnnotationCategory.TEMPORAL_ONSET: PromotionRule(
         category=AnnotationCategory.TEMPORAL_ONSET,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="temporal_kernel",
         auto_promote=True,
     ),
     AnnotationCategory.DOSE_RESPONSE_EVIDENCE: PromotionRule(
         category=AnnotationCategory.DOSE_RESPONSE_EVIDENCE,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="dose_bridge",
         auto_promote=True,
     ),
@@ -187,15 +188,15 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── SCOPE MATCHING: population applicability ──
     AnnotationCategory.POPULATION_SPECIFICITY: PromotionRule(
         category=AnnotationCategory.POPULATION_SPECIFICITY,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="scope_matching",
         auto_promote=True,
     ),
     AnnotationCategory.GENERALIZABILITY_CONCERN: PromotionRule(
         category=AnnotationCategory.GENERALIZABILITY_CONCERN,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="scope_matching",
         auto_promote=True,
     ),
@@ -203,15 +204,15 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── MODIFIER RESOLUTION ──
     AnnotationCategory.ADHERENCE_DATA: PromotionRule(
         category=AnnotationCategory.ADHERENCE_DATA,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="modifier_resolution",
         auto_promote=True,
     ),
     AnnotationCategory.EFFECT_MODIFICATION: PromotionRule(
         category=AnnotationCategory.EFFECT_MODIFICATION,
-        min_confidence=0.60,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="modifier_resolution",
         auto_promote=True,
     ),
@@ -219,15 +220,15 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── CONFIDENCE WEIGHTING ──
     AnnotationCategory.REPLICATION_STATUS: PromotionRule(
         category=AnnotationCategory.REPLICATION_STATUS,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="confidence_weighting",
         auto_promote=True,
     ),
     AnnotationCategory.CROSS_VALIDATION: PromotionRule(
         category=AnnotationCategory.CROSS_VALIDATION,
-        min_confidence=0.55,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_MEDIUM_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="confidence_weighting",
         auto_promote=True,
     ),
@@ -235,8 +236,8 @@ PROMOTION_RULES: dict[AnnotationCategory, PromotionRule] = {
     # ── REPORTING (lowest impact) ──
     AnnotationCategory.CLINICAL_SIGNIFICANCE: PromotionRule(
         category=AnnotationCategory.CLINICAL_SIGNIFICANCE,
-        min_confidence=0.50,
-        min_cross_agent_n=1,
+        min_confidence=config.PROM_CONFIDENCE_LOW,
+        min_cross_agent_n=config.PROM_CROSS_AGENT_DEFAULT,
         consumer="reporting",
         auto_promote=True,
     ),

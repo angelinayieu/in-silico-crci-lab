@@ -19,6 +19,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from crci.shared import config
 from crci.shared.models.tables import ExtractionRun
 
 logger = logging.getLogger(__name__)
@@ -56,16 +57,50 @@ def run_p3_heterogeneity(
         context["calibrated_records"] = []
         return context
 
-    # ── P3-L1 through P3-L7: Apply layers ──
+    # ── P3-L1 through P3-L7: Apply all 7 layers ──
     from crci.extraction.p3_heterogeneity.layers import apply_all_layers
 
     layered_records = apply_all_layers(harmonized_records, session=session)
     logger.info("P3 layers complete: %d records calibrated", len(layered_records))
 
-    # ── P3-ASM: Assemble SE_eff ──
-    from crci.extraction.p3_heterogeneity.se_eff_assembly import assemble_se_eff
+    # ── P3-ASM: Assemble SE_eff from layered components ──
+    from crci.extraction.p3_heterogeneity.se_eff_assembly import (
+        SEEffInput,
+        compute_se_eff,
+    )
 
-    calibrated_records = assemble_se_eff(layered_records)
+    calibrated_records = []
+    for layered in layered_records:
+        rec = layered.record
+        se_raw = getattr(rec, "se", None) or getattr(rec, "harmonized_se", None)
+        if se_raw is None:
+            logger.debug("P3-ASM: skipping record with no SE")
+            continue
+        try:
+            inp = SEEffInput(
+                ler_id=getattr(rec, "ler_id", ""),
+                se_raw=se_raw,
+                study_design=getattr(rec, "study_design", "unclassified"),
+                n_total=getattr(rec, "n_total", None),
+                w_scope=layered.w_scope,
+                betas=getattr(rec, "group_betas", None) or [],
+                ses=getattr(rec, "group_ses", None) or [],
+                validation_status=getattr(rec, "cancer_validation_status", "general_population"),
+                grade_level=getattr(rec, "grade_level", "MODERATE"),
+                days_since_measurement=getattr(rec, "days_since_measurement", 0.0),
+                is_trait=getattr(rec, "is_trait", False),
+            )
+            se_eff_result = compute_se_eff(inp)
+            # Attach SE_eff to the original record
+            if hasattr(rec, "se_eff"):
+                rec.se_eff = se_eff_result.se_eff
+            calibrated_records.append(rec)
+        except ValueError as exc:
+            # Temporal exclusion (>90 days) — record removed by design
+            logger.info("P3-ASM: record excluded: %s", exc)
+        except Exception as exc:
+            logger.warning("P3-ASM: SE_eff computation failed: %s", exc)
+
     context["calibrated_records"] = calibrated_records
 
     logger.info(

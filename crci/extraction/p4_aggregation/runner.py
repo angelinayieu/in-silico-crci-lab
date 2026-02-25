@@ -174,11 +174,34 @@ def run_p4_aggregation(
     )
 
     # ── P4-PRI: Prior selection ──
-    from crci.extraction.p4_aggregation.prior_selector import select_priors
+    from crci.extraction.p4_aggregation.prior_selector import (
+        EdgeContext,
+        select_priors_for_all_edges,
+    )
 
-    prior_assignments = select_priors(pooled_estimates, session=session)
-    context["prior_assignments"] = prior_assignments
-    logger.info("P4-PRI: priors assigned for %d edges", len(prior_assignments))
+    # Build EdgeContext for each edge from the resolved groups
+    edge_contexts: dict[str, EdgeContext] = {}
+    for group in resolved_groups:
+        eid = getattr(group, "edge_relation_id", None)
+        if eid:
+            claims = getattr(group, "claims", [])
+            has_rct = any(
+                getattr(c, "study_design", "").lower() in ("rct", "large_rct")
+                for c in claims
+            )
+            edge_contexts[eid] = EdgeContext(
+                edge_relation_id=eid,
+                k=len(claims),
+                has_rct=has_rct,
+                study_designs=[getattr(c, "study_design", "") for c in claims],
+            )
+
+    prior_specs, prior_logs = select_priors_for_all_edges(
+        pooled_estimates, edge_contexts, session,
+    )
+    context["prior_assignments"] = prior_logs
+    context["prior_specs"] = prior_specs
+    logger.info("P4-PRI: priors assigned for %d edges", len(prior_specs))
 
     # ── P4-WRT: Write compiled edges ──
     from crci.extraction.p4_aggregation.edge_writer import write_all_edges, build_compilation_inputs
@@ -191,14 +214,10 @@ def run_p4_aggregation(
 
     compilation_inputs = build_compilation_inputs(
         pooled_estimates=pooled_estimates,
-        prior_specs=[a.prior_spec for a in prior_assignments]
-            if hasattr(prior_assignments[0], "prior_spec") and prior_assignments
-            else [],
-        prior_logs=[a.log_entry for a in prior_assignments]
-            if hasattr(prior_assignments[0], "log_entry") and prior_assignments
-            else [],
+        prior_specs=prior_specs,
+        prior_logs=prior_logs,
         sigma_sq_map=sigma_sq_map,
-    ) if prior_assignments else []
+    ) if prior_specs else []
 
     if compilation_inputs:
         compiled_edges = write_all_edges(
@@ -208,17 +227,8 @@ def run_p4_aggregation(
         context["edges_written"] = len(compiled_edges)
         logger.info("P4-WRT: %d edges written to edges_v1", len(compiled_edges))
     else:
-        # Fallback: write directly from pooled estimates
-        from crci.extraction.p4_aggregation.edge_writer import write_edges
-
-        edges_written = write_edges(
-            pooled_estimates=pooled_estimates,
-            prior_assignments=prior_assignments,
-            extraction_run_id=context.get("extraction_run_id"),
-            session=session,
-        )
-        context["edges_written"] = edges_written
-        logger.info("P4-WRT: %d edges written to edges_v1", edges_written)
+        logger.warning("P4-WRT: no compilation inputs available, skipping edge write")
+        context["edges_written"] = 0
 
     return context
 

@@ -277,6 +277,25 @@ REC_JACCARD_MERGE_THRESHOLD: float = 0.80
 ATB_SPECULATIVE_CONFIDENCE_CEILING: float = 0.50
 
 # ═══════════════════════════════════════════════════════════════
+#  ANNOTATION PROMOTION THRESHOLDS (EX-PROM, §A.3)
+# ═══════════════════════════════════════════════════════════════
+# min_confidence thresholds by impact tier
+# High-impact (affects sigma^2_structural directly): requires human review
+PROM_CONFIDENCE_HIGH_IMPACT: float = 0.70
+# Medium-high (DAG expansion, confounder structure): moderate threshold
+PROM_CONFIDENCE_MEDIUM_HIGH: float = 0.65
+# Medium (SE inflation, temporal, dose, effect modification)
+PROM_CONFIDENCE_MEDIUM: float = 0.60
+# Medium-low (scope, adherence, replication, cross-validation)
+PROM_CONFIDENCE_MEDIUM_LOW: float = 0.55
+# Low (research gap, adverse event, theory, clinical significance)
+PROM_CONFIDENCE_LOW: float = 0.50
+
+# min_cross_agent_n thresholds
+PROM_CROSS_AGENT_HIGH_IMPACT: int = 2   # High-impact categories
+PROM_CROSS_AGENT_DEFAULT: int = 1       # All other categories
+
+# ═══════════════════════════════════════════════════════════════
 #  TRUST BOUNDARY PLAUSIBILITY (EX-TB, §2.5)
 # ═══════════════════════════════════════════════════════════════
 
