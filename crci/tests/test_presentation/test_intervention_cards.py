@@ -184,3 +184,55 @@ class TestInterventionCards:
         report = _make_report(primary_utility=0.75)
         view = render_intervention_cards(report)
         assert "0.75" in view.cards[0].expected_benefit_text
+
+    def test_cri_text_present_when_bounds_exist(self):
+        """CrI text should appear when SchedulePlan has CrI bounds."""
+        plan = _make_plan(rank=1, utility=0.62)
+        plan = plan.model_copy(update={"cri_95_lower": 0.41, "cri_95_upper": 0.83})
+
+        cs = CompositeScore(
+            run_id="run_001",
+            subject_ref="patient_001",
+            composite_z=-0.5,
+            overall_severity=SeverityTier.MODERATE,
+        )
+        report = RecommendationReport(
+            run_id="run_001",
+            subject_ref="patient_001",
+            output_mode=ReportOutputMode.CLINICAL,
+            composite_score=cs,
+            primary_schedule=plan,
+        )
+        view = render_intervention_cards(report)
+        card = view.cards[0]
+        assert card.cri_text != ""
+        assert "95% CrI" in card.cri_text
+        assert "0.41" in card.cri_text
+        assert "0.83" in card.cri_text
+
+    def test_cri_text_format_precision(self):
+        """CrI text should use 2 decimal places."""
+        plan = _make_plan(rank=1, utility=0.5)
+        plan = plan.model_copy(update={"cri_95_lower": 0.1, "cri_95_upper": 0.9})
+
+        cs = CompositeScore(
+            run_id="run_001",
+            subject_ref="patient_001",
+            composite_z=0.0,
+            overall_severity=SeverityTier.MODERATE,
+        )
+        report = RecommendationReport(
+            run_id="run_001",
+            subject_ref="patient_001",
+            output_mode=ReportOutputMode.CLINICAL,
+            composite_score=cs,
+            primary_schedule=plan,
+        )
+        view = render_intervention_cards(report)
+        assert view.cards[0].cri_text == "95% CrI [0.10, 0.90]"
+
+    def test_cri_text_unavailable_when_no_bounds(self):
+        """CrI text should show '(CrI unavailable)' when SchedulePlan has no CrI bounds."""
+        report = _make_report(n_alternatives=0)
+        view = render_intervention_cards(report)
+        assert view.cards[0].cri_text == "(CrI unavailable)"
