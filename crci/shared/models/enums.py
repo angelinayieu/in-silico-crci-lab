@@ -1144,16 +1144,32 @@ class AnnotationCategory(StrEnum):
 
 @unique
 class AnnotationMaturity(StrEnum):
-    """4-level annotation maturity."""
+    """Annotation lifecycle maturity (v2.0 Engineering Appendix §A.3).
+
+    Original: raw, reconciled, validated, integrated.
+    v2.0: raw, reviewed, promoted, archived.
+    Both sets retained for compatibility.
+    """
     RAW = "raw"
     RECONCILED = "reconciled"
     VALIDATED = "validated"
     INTEGRATED = "integrated"
+    # v2.0 additions
+    REVIEWED = "reviewed"
+    PROMOTED = "promoted"
+    ARCHIVED = "archived"
 
 
 @unique
 class AdjudicationStatus(StrEnum):
-    """Annotation adjudication status."""
+    """Annotation adjudication status (v2.0 Engineering Appendix §A.3)."""
+    UNREVIEWED = "unreviewed"
+    AUTO_MERGED = "auto_merged"
+    CONFLICT = "conflict"
+    HUMAN_REVIEWED = "human_reviewed"
+    HUMAN_APPROVED = "human_approved"
+    HUMAN_REJECTED = "human_rejected"
+    # Retained for backward compatibility with existing reconciliation code
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -1289,3 +1305,103 @@ class CaptureMethod(StrEnum):
     CHART_REVIEW = "chart_review"
     OTHER = "other"
     UNKNOWN = "unknown"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PART 8: v2.0 EXTRACTION PIPELINE ENUMS
+#  Engineering Appendix v2.0 §A.2
+# ═══════════════════════════════════════════════════════════════
+
+
+@unique
+class RetrievalStatus(StrEnum):
+    """Acquisition queue retrieval state machine.
+
+    Engineering Appendix §A.2: tracks each candidate through the
+    retrieval lifecycle. Updated by retriever.py on each attempt.
+    """
+    PENDING = "PENDING"
+    FULL_TEXT_PDF = "FULL_TEXT_PDF"
+    FULL_TEXT_XML = "FULL_TEXT_XML"
+    ABSTRACT_ONLY = "ABSTRACT_ONLY"
+    HUMAN_NEEDED = "HUMAN_NEEDED"
+    REJECTED = "REJECTED"
+    DUPLICATE = "DUPLICATE"
+
+
+@unique
+class AbstractRelevance(StrEnum):
+    """Pre-retrieval abstract screening result.
+
+    Engineering Appendix §A.2: set by abstract_screener.py per
+    Master Spec §9.2.1. Only HIGH and MODERATE proceed to retrieval.
+    """
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    LOW = "LOW"
+    IRRELEVANT = "IRRELEVANT"
+
+
+@unique
+class MetaSourceFlag(StrEnum):
+    """Meta-analysis source classification for edge_evidence_v1.
+
+    Engineering Appendix §A.2: tags entries extracted from
+    meta-analyses or special multi-paper compilations.
+    """
+    POOLED_ESTIMATE = "POOLED_ESTIMATE"
+    SUBGROUP_ESTIMATE = "SUBGROUP_ESTIMATE"
+    NMA_MIXED = "NMA_MIXED"
+    NMA_DIRECT = "NMA_DIRECT"
+    FOREST_PLOT_ENTRY = "FOREST_PLOT_ENTRY"
+    DOSE_RESPONSE_POINT = "DOSE_RESPONSE_POINT"
+
+
+@unique
+class EffectSizeType(StrEnum):
+    """Effect size measurement class.
+
+    Engineering Appendix §A.2: distinguishes between-group,
+    within-group, and pre-post change effect sizes.
+    Required by Trust Boundary gate TB-G1 (INV-12).
+    """
+    BETWEEN_GROUP = "BETWEEN_GROUP"
+    WITHIN_GROUP = "WITHIN_GROUP"
+    PRE_POST_CHANGE = "PRE_POST_CHANGE"
+
+
+@unique
+class FileType(StrEnum):
+    """Source file type for study_registry_v1.
+
+    Engineering Appendix §A.2: written by EX-INGEST PDFProcessor.
+    """
+    PDF = "pdf"
+    XML = "xml"
+    ABSTRACT_ONLY = "abstract_only"
+
+
+@unique
+class ParseQuality(StrEnum):
+    """PDF parse quality assessment.
+
+    Engineering Appendix §A.2: written by EX-INGEST PDFProcessor.
+    PARSE_FAILURE blocks entry to EX-P0.
+    """
+    GOOD = "GOOD"
+    DEGRADED = "DEGRADED"
+    SCAN = "SCAN"
+    PARSE_FAILURE = "PARSE_FAILURE"
+
+
+@unique
+class ExtractionModeStr(StrEnum):
+    """Annotation extraction mode for study_annotations_v1.
+
+    Engineering Appendix §A.3: how the annotation was derived.
+    """
+    EXPLICIT_AUTHOR_STATEMENT = "explicit_author_statement"
+    EXTRACTOR_INFERENCE = "extractor_inference"
+    COMPUTED_FROM_CONTEXT = "computed_from_context"
+
+

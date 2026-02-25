@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import (
     AdjudicationStatus,
@@ -115,18 +115,24 @@ class PaperMap(BaseModel):
 
     This is the key v2 efficiency improvement — one read, many agents.
     SYS_EX lines 330-370.
+
+    v2.0 (MS §5.2, INV-03): PaperMap is immutable after Canonical Reader
+    completes. Enforced via frozen=True. Uses tuples instead of lists
+    to prevent mutation of nested collections.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     paper_id: str
     title: str | None = None
     full_text: str
-    sections: list[SectionSegment] = Field(default_factory=list)
-    tables: list[TableEntry] = Field(default_factory=list)
-    figures: list[FigureEntry] = Field(default_factory=list)
-    candidate_spans: list[CandidateSpan] = Field(default_factory=list)
+    sections: tuple[SectionSegment, ...] = ()
+    tables: tuple[TableEntry, ...] = ()
+    figures: tuple[FigureEntry, ...] = ()
+    candidate_spans: tuple[CandidateSpan, ...] = ()
     n_total: int | None = None
     study_design: str | None = None
-    arms: list[str] = Field(default_factory=list)
+    arms: tuple[str, ...] = ()
 
 
 # ═══════════════════════════════════════════════════════════════
