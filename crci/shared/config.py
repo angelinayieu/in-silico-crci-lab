@@ -434,6 +434,14 @@ E_PREDICTION_HORIZONS: list[int] = [3, 6, 12, 24]
 E_MAX_HORIZON_MONTHS: int = 36
 
 # ═══════════════════════════════════════════════════════════════
+#  E2: NATURAL RECOVERY TRAJECTORY (§2.18 — spec lines 2728-2781)
+# ═══════════════════════════════════════════════════════════════
+
+# E2c: MC sampling noise on recovery parameters (spec line 2775-2777)
+E2_R_INFINITY_NOISE_SD: float = 0.10  # r_∞^(m) ~ N(r_∞, 0.10²)
+E2_TAU_R_LOG_NOISE_SD: float = 0.20  # τ_R^(m) ~ LogNormal(ln(τ_R), 0.20²)
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 
