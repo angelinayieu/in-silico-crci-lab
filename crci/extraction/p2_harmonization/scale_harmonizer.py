@@ -346,6 +346,17 @@ def harmonize_scale(
 
     elif effect_type_reported == EffectTypeReported.RR:
         # Treat similar to OR (log(RR) ≈ log(OR) for small effects)
+        # REVIEW: log(RR) ≈ log(OR) only when baseline risk is low.
+        # When events are common (prevalence > 0.3), OR diverges from RR
+        # and the log-OR → SMD conversion may be unreliable.
+        if routed.value.value > 2.0 or (routed.value.value > 0 and routed.value.value < 0.5):
+            logger.warning(
+                "span_id=%s: RR=%.3f suggests non-rare events; "
+                "log(RR)≈log(OR) approximation may be inaccurate. "
+                "Consider providing baseline prevalence for exact conversion.",
+                routed.span_id,
+                routed.value.value,
+            )
         log_rr = math.log(routed.value.value) if routed.value.value > 0 else routed.value.value
         if routed.target_scale == TargetScale.SD_SD:
             beta = _convert_or_to_smd(log_rr)

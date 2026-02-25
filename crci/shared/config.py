@@ -339,6 +339,42 @@ P7_MODIFIER_CLAMP_HIGH: float = 1.5
 P7_SYNERGY_GAMMA_MIN: float = -1.0
 P7_SYNERGY_GAMMA_MAX: float = 1.0
 
+# Compiler 6 (synergy): γ classification thresholds
+P7_SYNERGY_GAMMA_CLASSIFY_THRESHOLD: float = 0.05  # |γ| > 0.05 → non-additive
+
+# ═══════════════════════════════════════════════════════════════
+#  P5 CHAIN VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# FM5 nonlinearity ratio: chain_product > ratio × |direct_beta| → FM5
+P5_FM5_NONLINEARITY_RATIO: float = 3.0
+
+# ═══════════════════════════════════════════════════════════════
+#  P6 DEPLOYMENT VALIDATION THRESHOLDS
+# ═══════════════════════════════════════════════════════════════
+
+# G4: Plausible beta range
+P6_BETA_MAX_PLAUSIBLE: float = 5.0
+
+# G5: Maximum plausible SE
+P6_SE_MAX_PLAUSIBLE: float = 10.0
+
+# G12: High heterogeneity threshold for I²
+P6_I_SQUARED_HIGH: float = 75.0
+
+# ═══════════════════════════════════════════════════════════════
+#  P4 PRIOR SELECTION — FALLBACK SE MULTIPLIERS (SYS_ALG line 3876)
+# ═══════════════════════════════════════════════════════════════
+
+# 4-level fallback SE multipliers
+P4_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
+P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
+P4_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
+P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
+
+# Mechanistic synthesis discount a₀ (95% discount)
+P4_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
+
 # ═══════════════════════════════════════════════════════════════
 #  OPTIMIZATION (§2.16.3) — SAFE score
 # ═══════════════════════════════════════════════════════════════
@@ -541,6 +577,10 @@ LLM_MAX_RETRIES: int = 3
 LLM_RETRY_BASE_DELAY_SECONDS: float = 2.0
 LLM_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
 LLM_DEFAULT_MAX_TOKENS: int = 4096
+
+# LLM cost estimation (approx. Claude Sonnet per 1M tokens)
+LLM_PROMPT_COST_PER_M: float = 3.0
+LLM_COMPLETION_COST_PER_M: float = 15.0
 
 # ═══════════════════════════════════════════════════════════════
 #  AUTOMATED RETRIEVAL (AUTOMATED_RETRIEVAL_PLAN.md Part 9)

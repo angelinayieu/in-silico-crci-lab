@@ -23,6 +23,15 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from crci.shared.config import (
+    B3_MECHANISTIC_SYNTH_A0,
+    B3_ROBUST_MAP_VAGUE_VAR,
+    B3_ROBUST_MAP_W_BASE,
+    B3_ROBUST_MAP_W_MAX,
+    B3_ROBUST_MAP_W_PER_K,
+    P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE,
+    P4_FALLBACK_SE_MULTIPLIER_EXACT,
+    P4_FALLBACK_SE_MULTIPLIER_GENERAL,
+    P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
     PRIOR_MEAN_DEFAULT,
     PRIOR_SD_DEFAULT,
 )
@@ -54,15 +63,15 @@ _K_THRESHOLD_COMMENSURATE_HIGH: int = 4
 _K_THRESHOLD_POWER: int = 1
 _MIN_RCTS_FOR_ROBUST_MAP: int = 2
 
-# RobustMAP formula: w = min(0.8, 0.5 + 0.06k)
-# Spec SYS_ALG lines 1346 (B3a)
-_ROBUST_MAP_W_BASE: float = 0.5
-_ROBUST_MAP_W_PER_K: float = 0.06
-_ROBUST_MAP_W_CAP: float = 0.8
-_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10^2)
+# RobustMAP formula: w = min(W_MAX, W_BASE + W_PER_K × k)
+# Spec SYS_ALG lines 1346 (B3a) — constants from config
+_ROBUST_MAP_W_BASE: float = B3_ROBUST_MAP_W_BASE
+_ROBUST_MAP_W_PER_K: float = B3_ROBUST_MAP_W_PER_K
+_ROBUST_MAP_W_CAP: float = B3_ROBUST_MAP_W_MAX
+_ROBUST_MAP_VAGUE_VAR: float = B3_ROBUST_MAP_VAGUE_VAR
 
 # Power prior discount factors — spec SYS_ALG lines 1348 (B3c)
-# Design → a_0 discount
+# Design → a_0 discount (sourced from config.B3_POWER_PRIOR_A0)
 _POWER_PRIOR_DISCOUNT: dict[str, float] = {
     "RCT_same": 0.80,
     "RCT_diff": 0.50,
@@ -73,13 +82,13 @@ _POWER_PRIOR_DISCOUNT: dict[str, float] = {
 }
 
 # Mechanistic synthesis discount — spec SYS_ALG lines 1349 (B3d)
-_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
+_MECHANISTIC_SYNTH_DISCOUNT: float = B3_MECHANISTIC_SYNTH_A0
 
 # 4-level fallback SE multipliers — spec SYS_ALG line 3876
-_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
-_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
-_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
-_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
+_FALLBACK_SE_MULTIPLIER_EXACT: float = P4_FALLBACK_SE_MULTIPLIER_EXACT
+_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = P4_FALLBACK_SE_MULTIPLIER_CANCER_TYPE
+_FALLBACK_SE_MULTIPLIER_GENERAL: float = P4_FALLBACK_SE_MULTIPLIER_GENERAL
+_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -32,6 +32,7 @@ from crci.shared.config import (
     SIGMA_SQ_STRUCTURAL_DEFAULT,
 )
 from crci.shared.models.enums import (
+    AggregationMethod,
     BiasRisk,
     EffectScale,
     PriorSource,
@@ -128,7 +129,8 @@ def _enforce_gate_p4_g1(
             },
         )
 
-    # Also check that each has a valid aggregation method
+    # Also check that each has a valid aggregation method (must be AggregationMethod member)
+    valid_methods = set(AggregationMethod)
     for inp in compilation_inputs:
         method = inp.pooled_estimate.aggregation_method
         if not method:
@@ -137,6 +139,19 @@ def _enforce_gate_p4_g1(
                 message=(
                     f"Edge {inp.pooled_estimate.edge_relation_id} has no "
                     f"aggregation method assigned."
+                ),
+                context={
+                    "edge_relation_id": inp.pooled_estimate.edge_relation_id,
+                    "aggregation_method": method,
+                },
+            )
+        if method not in valid_methods:
+            raise GateViolation(
+                gate_id="P4-G1",
+                message=(
+                    f"Edge {inp.pooled_estimate.edge_relation_id} has invalid "
+                    f"aggregation method '{method}'. "
+                    f"Must be one of: {[m.value for m in AggregationMethod]}"
                 ),
                 context={
                     "edge_relation_id": inp.pooled_estimate.edge_relation_id,

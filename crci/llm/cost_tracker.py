@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
+from crci.shared import config
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,9 +99,9 @@ class CostTracker:
 
         Returns the CostRecord for inspection/testing.
         """
-        # Approximate pricing per 1M tokens
-        prompt_cost_per_m = 3.0
-        completion_cost_per_m = 15.0
+        # Pricing per 1M tokens from config
+        prompt_cost_per_m = config.LLM_PROMPT_COST_PER_M
+        completion_cost_per_m = config.LLM_COMPLETION_COST_PER_M
         total_tokens = prompt_tokens + completion_tokens
         estimated_cost = (
             (prompt_tokens / 1_000_000) * prompt_cost_per_m

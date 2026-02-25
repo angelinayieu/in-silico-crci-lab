@@ -171,6 +171,65 @@ def load_edges(registry_path: str | Path) -> list[EdgeDef]:
     return edges
 
 
+def _parse_hill_params_from_registry(
+    registry_path: str | Path,
+    edges: list[EdgeDef],
+) -> dict[str, HillParams]:
+    """Parse Hill/Emax parameters from EDGE_REGISTRY.csv for hill-type edges.
+
+    Reads columns: hill_e_max, hill_ec50, hill_coefficient.
+    Falls back to config defaults if columns are missing.
+
+    Returns:
+        Dict mapping edge_id -> HillParams for hill/emax edges only.
+    """
+    hill_params: dict[str, HillParams] = {}
+    hill_edge_ids = {e.edge_id for e in edges if e.functional_form in ("hill", "emax")}
+    if not hill_edge_ids:
+        return hill_params
+
+    registry_path = Path(registry_path)
+    with open(registry_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            edge_id = row.get("edge_relation_id", "").strip()
+            if edge_id not in hill_edge_ids:
+                continue
+
+            e_max = float(row["hill_e_max"]) if row.get("hill_e_max") else config.P7_EMAX_E0_DEFAULT
+            ec50 = float(row["hill_ec50"]) if row.get("hill_ec50") else 1.0
+            h = float(row["hill_coefficient"]) if row.get("hill_coefficient") else config.P7_HILL_COEFFICIENT_DEFAULT
+
+            if ec50 <= 0:
+                logger.warning(
+                    "Edge '%s': hill_ec50=%.4f <= 0, using default 1.0",
+                    edge_id, ec50,
+                )
+                ec50 = 1.0
+
+            hill_params[edge_id] = HillParams(e_max=e_max, ec50=ec50, h=h)
+            logger.info(
+                "Loaded Hill params for edge '%s': e_max=%.4f, ec50=%.4f, h=%.4f",
+                edge_id, e_max, ec50, h,
+            )
+
+    # Log edges that should have Hill params but didn't get any from CSV
+    missing = hill_edge_ids - set(hill_params.keys())
+    for eid in missing:
+        logger.warning(
+            "Edge '%s' has functional_form=hill but no Hill params in CSV; "
+            "using defaults (e_max=%.2f, ec50=1.0, h=%.2f)",
+            eid, config.P7_EMAX_E0_DEFAULT, config.P7_HILL_COEFFICIENT_DEFAULT,
+        )
+        hill_params[eid] = HillParams(
+            e_max=config.P7_EMAX_E0_DEFAULT,
+            ec50=1.0,
+            h=config.P7_HILL_COEFFICIENT_DEFAULT,
+        )
+
+    return hill_params
+
+
 # ═══════════════════════════════════════════════════════════════
 #  B Matrix Construction
 # ═══════════════════════════════════════════════════════════════
@@ -179,6 +238,7 @@ def load_edges(registry_path: str | Path) -> list[EdgeDef]:
 def build_b_skeleton(
     edges: list[EdgeDef],
     node_map: NodeMap,
+    registry_path: str | Path | None = None,
 ) -> BSkeleton:
     """Build the B matrix skeleton from edges and node hierarchy.
 
@@ -187,6 +247,7 @@ def build_b_skeleton(
     Args:
         edges: List of EdgeDef from load_edges().
         node_map: NodeMap from ALG-A1.
+        registry_path: Path to EDGE_REGISTRY.csv for Hill/Emax param loading.
 
     Returns:
         BSkeleton with sparse B pattern, functional forms, and validation.
@@ -216,7 +277,11 @@ def build_b_skeleton(
 
     edge_index: dict[str, int] = {}
     functional_forms: dict[str, str] = {}
-    hill_params_map: dict[str, HillParams] = {}
+    # Populate Hill/Emax params from registry if path is available
+    if registry_path is not None:
+        hill_params_map = _parse_hill_params_from_registry(registry_path, edges)
+    else:
+        hill_params_map = {}
     edge_claim_levels: dict[str, str] = {}
     feedback_edges: list[str] = []
     forward_edges: list[str] = []

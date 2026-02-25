@@ -20,6 +20,11 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from crci.shared.config import (
+    P6_BETA_MAX_PLAUSIBLE,
+    P6_I_SQUARED_HIGH,
+    P6_SE_MAX_PLAUSIBLE,
+)
 from crci.shared.models.enums import (
     BiasRisk,
     SufficiencyRecommendation,
@@ -132,7 +137,7 @@ def _rule_g3_all_edges_have_k(
 
 def _rule_g4_plausible_betas(
     compiled_edges: list[CompiledEdge],
-    beta_max: float = 5.0,
+    beta_max: float = P6_BETA_MAX_PLAUSIBLE,
 ) -> RuleResult:
     """G4: All |beta| values within plausible range."""
     extreme_edges = [
@@ -158,7 +163,7 @@ def _rule_g4_plausible_betas(
 
 def _rule_g5_se_not_excessive(
     compiled_edges: list[CompiledEdge],
-    se_max: float = 10.0,
+    se_max: float = P6_SE_MAX_PLAUSIBLE,
 ) -> RuleResult:
     """G5: SE values not excessively large."""
     bad_edges = [
@@ -356,7 +361,7 @@ def _rule_g11_edge_param_ids_present(
 
 def _rule_g12_heterogeneity_warnings(
     compiled_edges: list[CompiledEdge],
-    i_squared_high: float = 75.0,
+    i_squared_high: float = P6_I_SQUARED_HIGH,
 ) -> RuleResult:
     """G12: Flag edges with very high heterogeneity (I^2 > 75%)."""
     high_het = [
