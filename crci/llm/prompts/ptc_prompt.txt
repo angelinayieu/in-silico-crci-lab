@@ -1,0 +1,61 @@
+You are a scientific paper classifier for the CRCI (Cancer-Related Cognitive Impairment) evidence extraction system.
+
+Your task is to classify the given paper into exactly ONE of 27 paper subtypes based on its content. Read the paper text carefully, paying attention to the study design described in the Methods section, the type of data collected, and the primary research question.
+
+## Paper Subtypes (choose exactly one)
+
+1. RCT_exercise — Randomized controlled trial studying exercise/physical activity interventions for cognitive outcomes in cancer patients
+2. RCT_cognitive — Randomized controlled trial studying cognitive training or cognitive rehabilitation interventions
+3. RCT_pharmacological — Randomized controlled trial studying pharmacological interventions (drugs, supplements) for cognitive outcomes
+4. RCT_multimodal — Randomized controlled trial combining multiple intervention types (e.g., exercise + cognitive training)
+5. meta_analysis — Quantitative meta-analysis pooling effect sizes from multiple studies
+6. systematic_review — Systematic review without quantitative pooling (narrative synthesis)
+7. longitudinal_cohort — Prospective or retrospective cohort study following participants over time
+8. cross_sectional — Cross-sectional study measuring variables at a single time point
+9. intensive_longitudinal — Ecological momentary assessment, daily diary, or other intensive repeated-measures design
+10. mechanistic_animal — Animal model study investigating biological mechanisms of cancer-related cognitive changes
+11. mechanistic_human — Human study focused on biological mechanisms (neuroimaging, biomarkers) rather than interventions
+12. imaging_structural — Neuroimaging study focused on structural brain changes (MRI volumetrics, DTI)
+13. imaging_functional — Neuroimaging study focused on functional brain activity (fMRI, PET, EEG)
+14. biomarker_discovery — Study primarily focused on identifying or validating biomarkers related to cognitive outcomes
+15. dose_response — Study specifically examining dose-response relationships for interventions
+16. safety_report — Adverse event report, safety monitoring study, or toxicity analysis
+17. guideline — Clinical practice guideline or consensus statement
+18. case_report — Case report or case series (typically N < 10)
+19. editorial — Editorial, commentary, letter to the editor, or opinion piece
+20. review_narrative — Narrative review (non-systematic) of literature
+21. protocol — Study protocol or trial registration description (no results)
+22. qualitative — Qualitative study using interviews, focus groups, or thematic analysis
+23. psychometric_validation — Study primarily reporting instrument reliability, validity, or factor structure in cancer/clinical populations (e.g., Cronbach's alpha, CFA, test-retest, measurement invariance for FACT-Cog, MoCA, or similar instruments)
+24. normative_cohort — Large cohort study reporting population-level cognitive scores by cancer type/treatment phase WITHOUT intervention (e.g., baseline cognitive norms for breast cancer patients post-chemotherapy)
+25. dose_response_study — RCT or systematic review specifically reporting dose-response relationships with multiple dose arms for cognitive interventions (distinct from #15 which is general dose-response)
+26. longitudinal_followup — Study with 3+ cognitive measurement timepoints tracking trajectory during/after intervention or cancer treatment (distinct from #7 which is general longitudinal)
+27. other — Does not fit any of the above categories
+
+## Classification Rules
+
+- Choose the MOST SPECIFIC subtype that applies. For example, if a study is both an RCT and involves exercise, classify it as RCT_exercise, not just as a generic RCT.
+- If a study combines neuroimaging with an RCT design, classify by the PRIMARY purpose: if the RCT tests an intervention, use the appropriate RCT subtype; if the primary goal is understanding brain mechanisms, use imaging_structural or imaging_functional.
+- Meta-analyses that include their own systematic review component should be classified as meta_analysis (the quantitative pooling is the distinguishing feature).
+- psychometric_validation vs biomarker_discovery: If the paper's PRIMARY goal is validating a cognitive INSTRUMENT (questionnaire, test battery), use psychometric_validation. If it's identifying/validating a biological BIOMARKER, use biomarker_discovery.
+- normative_cohort vs longitudinal_cohort: If the paper reports population cognitive NORMS or baseline scores by cancer subgroup (without intervention), use normative_cohort. If it's a standard cohort study tracking outcomes over time, use longitudinal_cohort.
+- dose_response_study vs dose_response: Use dose_response_study when the paper compares 2+ explicit dose levels of the SAME intervention on cognitive outcomes. Use dose_response for general dose-response analyses.
+- longitudinal_followup vs longitudinal_cohort: Use longitudinal_followup when the paper has 3+ cognitive measurement timepoints AND tracks the trajectory shape (onset, peak, decay, recovery).
+- If you are genuinely uncertain between two categories, choose the one that better captures the paper's primary contribution.
+
+## Input
+
+Paper text:
+---
+{paper_text}
+---
+
+## Output Format
+
+Respond with ONLY a JSON object (no markdown code fences, no extra text):
+
+{{
+  "paper_subtype": "<one of the 27 subtype values listed above>",
+  "confidence": <float between 0.0 and 1.0>,
+  "reasoning": "<brief 1-2 sentence explanation of why this subtype was chosen>"
+}}

@@ -1055,6 +1055,57 @@ class ExtractionAudit(Base):
     notes = Column(Text)
 
 
+class StudyAnnotationsRaw(Base):
+    """B10. Every annotation emitted by every agent before reconciliation.
+
+    SYS_EX lines 2562-2583. 1 Row = one annotation emission from one agent.
+    Written by: EX-P1-REC | Read by: Reconciliation (dedup ref), Audit.
+    """
+    __tablename__ = "study_annotations_raw_v1"
+
+    raw_annotation_id = Column(Text, primary_key=True)
+    extraction_run_id = Column(Text, nullable=False)
+    study_id = Column(Text, nullable=False)
+    entered_by = Column(Text, nullable=False)
+    entered_at = Column(DateTime, nullable=False, server_default=func.now())
+    category = Column(Text, nullable=False)
+    target_entity_type = Column(Text)
+    target_entity_id = Column(Text)
+    content = Column(Text, nullable=False)
+    structured_data_json = Column(JSONB)
+    evidence_strength = Column(Text)
+    extraction_snippet = Column(Text)
+    source_span_id = Column(Text)
+
+
+class StudyAnnotations(Base):
+    """B11. Reconciled, deduplicated canonical annotations with maturity tracking.
+
+    SYS_EX lines 2585-2612. 1 Row = one reconciled canonical annotation.
+    Written by: EX-P1-ATB | Read by: EX-P4-MA, EX-ACQ-GAP, EX-PROM-THR.
+    """
+    __tablename__ = "study_annotations_v1"
+
+    annotation_id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    ler_id = Column(Text)
+    category = Column(Text, nullable=False)
+    consumer = Column(Text)
+    target_entity_type = Column(Text)
+    target_entity_id = Column(Text)
+    content = Column(Text, nullable=False)
+    structured_data_json = Column(JSONB)
+    evidence_strength = Column(Text)
+    extraction_snippet = Column(Text)
+    source_span_id = Column(Text)
+    cross_agent_support_n = Column(Integer, nullable=False, default=1)
+    adjudication_status = Column(Text, nullable=False, default="unreviewed")
+    duplicate_of_annotation_id = Column(Text)
+    reconciled_confidence = Column(Float)
+    maturity = Column(Text, nullable=False, default="raw")
+    promoted_to = Column(Text)
+
+
 # ═══════════════════════════════════════════════════════════════
 #  CLASS C: Compiled (Aggregated Parameters) — 7 tables
 # ═══════════════════════════════════════════════════════════════
@@ -1651,6 +1702,157 @@ class BuildManifest(Base):
     version = Column(Integer, default=1)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  B10-B14: New Intermediate Evidence Tables
+#  SYS_EXTRACTION_ADDENDUM Part 7
+# ═══════════════════════════════════════════════════════════════
+
+
+class InstrumentEvidence(Base):
+    """B10. Raw psychometric extractions per study.
+
+    Written by AG11 → consumed by psychometric_compiler.
+    """
+    __tablename__ = "instrument_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    instrument_id = Column(Text)
+    instrument_name = Column(Text, nullable=False)
+    instrument_subscale = Column(Text)
+    population_descriptor = Column(Text)
+    cancer_type = Column(Text)
+    treatment_phase = Column(Text)
+    N = Column(Integer)
+    cronbachs_alpha = Column(Float)
+    se_alpha = Column(Float)
+    factor_loading_mean = Column(Float)
+    factor_loading_per_subscale = Column(JSONB)
+    test_retest_reliability = Column(Float)
+    sem_value = Column(Float)
+    convergent_validity = Column(Float)
+    discriminant_validity = Column(Float)
+    factor_structure = Column(Text)
+    measurement_invariance = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class PopulationNorms(Base):
+    """B11. Raw population cognitive scores per study.
+
+    Written by AG03-EXT → consumed by prior_compiler.
+    """
+    __tablename__ = "population_norms_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    cancer_type = Column(Text)
+    treatment_phase = Column(Text)
+    node_id = Column(Text)
+    instrument_id = Column(Text)
+    instrument_name = Column(Text)
+    cognitive_domain = Column(Text)
+    population_descriptor = Column(Text)
+    mean_raw = Column(Float)
+    sd_raw = Column(Float)
+    mean_z = Column(Float)
+    sd_z = Column(Float)
+    N = Column(Integer)
+    percentile = Column(Float)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class TemporalEvidence(Base):
+    """B12. Raw timepoint x effect data per study.
+
+    Written by AG08-EXT → consumed by temporal_compiler.
+    """
+    __tablename__ = "temporal_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    action_id = Column(Text)
+    intervention_type = Column(Text)
+    timepoint_weeks = Column(Float, nullable=False)
+    effect = Column(Float)
+    se = Column(Float)
+    is_recovery = Column(Integer, default=0)
+    N = Column(Integer)
+    study_design = Column(Text)
+    onset_observed = Column(Text)
+    peak_observed = Column(Text)
+    decay_observed = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class DoseEvidence(Base):
+    """B13. Raw dose x effect data per study.
+
+    Written by AG06-EXT → consumed by dose_response_compiler.
+    """
+    __tablename__ = "dose_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    action_id = Column(Text)
+    intervention_type = Column(Text)
+    dose_level = Column(Float, nullable=False)
+    dose_unit = Column(Text)
+    effect = Column(Float)
+    se = Column(Float)
+    N = Column(Integer)
+    dose_response_shape = Column(Text)
+    effective_dose_range = Column(Text)
+    maximum_tolerated_dose = Column(Text)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
+class SubgroupEvidence(Base):
+    """B14. Raw subgroup interaction data per study.
+
+    Written by AG05-EXT → consumed by modifier_compiler.
+    """
+    __tablename__ = "subgroup_evidence_v1"
+
+    id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    extraction_run_id = Column(Text)
+    edge_id = Column(Text)
+    modifier_variable = Column(Text, nullable=False)
+    modifier_value = Column(Text, nullable=False)
+    interaction_beta = Column(Float)
+    interaction_se = Column(Float)
+    interaction_p = Column(Float)
+    subgroup_effect = Column(Float)
+    subgroup_se = Column(Float)
+    subgroup_n = Column(Integer)
+    provenance_status = Column(Text, default="CURATED_TRACED")
+    provenance_ref = Column(Text)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    notes = Column(Text)
+    version = Column(Integer, default=1)
+
+
 class ExtractionRun(Base):
     """Per-paper extraction run tracking."""
     __tablename__ = "extraction_runs"
@@ -1670,3 +1872,41 @@ class ExtractionRun(Base):
     stages_completed_json = Column(JSONB, default="[]")
     error_message = Column(Text)
     notes = Column(Text)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CLASS A EXTENSION: Search Term Reference
+# ═══════════════════════════════════════════════════════════════
+
+
+class NodeSearchTerm(Base):
+    """A34. Search synonyms per node for automated retrieval."""
+    __tablename__ = "node_search_terms_v1"
+
+    node_id = Column(Text, primary_key=True)
+    term = Column(Text, primary_key=True)
+    term_type = Column(Text, nullable=False)
+    active = Column(Integer, nullable=False, default=1)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CLASS B EXTENSION: Acquisition Queue
+# ═══════════════════════════════════════════════════════════════
+
+
+class AcquisitionQueue(Base):
+    """B13. Operational queue for directed acquisition."""
+    __tablename__ = "acquisition_queue_v1"
+
+    queue_id = Column(Text, primary_key=True)
+    candidate_doi = Column(Text)
+    candidate_pmid = Column(Text)
+    candidate_title = Column(Text)
+    target_edge_ids_json = Column(JSONB)
+    aps_score = Column(Float)
+    aps_components_json = Column(JSONB)
+    source_annotation_ids_json = Column(JSONB)
+    retrieval_tool = Column(Text)
+    status = Column(Text, nullable=False, default="queued")
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now())

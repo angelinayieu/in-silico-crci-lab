@@ -12,7 +12,7 @@ All specifications and implementation guides are in `docs/`:
 docs/
 ├── IMPLEMENTATION_BLUEPRINT_v1.1.md     — Architecture, phases, directory tree
 ├── FILE_CONTEXT_MANIFEST.md             — Per-file spec lines, formulas, tables, gates
-├── PROMPT_SEQUENCE.md                   — 31 ordered prompts (your build sequence)
+├── PROMPT_SEQUENCE.md                   — 42 ordered prompts (your build sequence)
 ├── CODE_QUALITY_ENFORCEMENT.md          — 12 rules + verification prompts + red flags
 ├── TABLE_FILL_ORDER.md                  — When each table gets populated, by what, dependencies
 ├── INTERFACE_SCHEMA_LOCK.md             — Field-level definitions for ALL intermediate states
@@ -27,6 +27,8 @@ docs/
 ├── SYS_ALGORITHM_COMPLETE.md            — Algorithm spec (4,418 lines)
 ├── SYS_RUNTIME_COMPLETE.md              — Runtime spec (752 lines)
 ├── SYS_PRESENTATION_COMPLETE.md         — Presentation spec (541 lines)
+├── SYS_EXTRACTION_ADDENDUM.md           — Full-spectrum extraction extensions (agents, compilers, TB)
+├── AUTOMATED_RETRIEVAL_PLAN.md          — Automated paper retrieval system (adapters, queries, APS)
 ├── 05_TABLE_SCHEMAS.md                  — Full column definitions for all 56 tables
 ├── 06_FK_WIRING_MAP.md                  — Foreign key relationships
 └── 11_CONTROLLED_VOCABULARIES.md        — All enum values
@@ -34,7 +36,7 @@ docs/
 
 ## How You Build This System
 
-Follow `docs/PROMPT_SEQUENCE.md` — it contains 31 prompts across 7 phases.
+Follow `docs/PROMPT_SEQUENCE.md` — it contains 42 prompts across 7 phases.
 Execute them ONE AT A TIME in order. Never skip ahead. Never batch across
 phases. The sequence is dependency-ordered: each prompt's output is the
 next prompt's input.

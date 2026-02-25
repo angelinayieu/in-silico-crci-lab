@@ -155,6 +155,7 @@ class PipelineStage(StrEnum):
     P4_AGGREGATION = "P4_aggregation"
     P5_SUFFICIENCY = "P5_sufficiency"
     P6_DEPLOYMENT_VALIDATION = "P6_deployment_validation"
+    P7_COMPILATION = "P7_compilation"
 
 
 @unique
@@ -967,6 +968,16 @@ class HarmonizationStatusInMem(StrEnum):
 
 
 @unique
+class DCRDecision(StrEnum):
+    """Double-counting resolution decision (SYS_EX lines 1102-1225)."""
+    USE_MA_POOLED = "USE_MA_POOLED"
+    USE_PRIMARIES = "USE_PRIMARIES"
+    USE_MA_EXCLUDE_OVERLAPPING = "USE_MA_EXCLUDE_OVERLAPPING"
+    AMBIGUOUS = "AMBIGUOUS"
+    N_A = "N_A"
+
+
+@unique
 class PriorSource(StrEnum):
     EMPIRICAL = "EMPIRICAL"
     LITERARY = "LITERARY"
@@ -1218,7 +1229,10 @@ class IdentificationStatus(StrEnum):
 
 @unique
 class PaperSubtype(StrEnum):
-    """23 paper subtypes for extraction mode selection."""
+    """27 paper subtypes for extraction mode selection.
+
+    Original 23 subtypes + 4 from SYS_EXTRACTION_ADDENDUM Part 2.
+    """
     RCT_EXERCISE = "RCT_exercise"
     RCT_COGNITIVE = "RCT_cognitive"
     RCT_PHARMACOLOGICAL = "RCT_pharmacological"
@@ -1241,6 +1255,11 @@ class PaperSubtype(StrEnum):
     REVIEW_NARRATIVE = "review_narrative"
     PROTOCOL = "protocol"
     QUALITATIVE = "qualitative"
+    # ─── 4 new subtypes (SYS_EXTRACTION_ADDENDUM Part 2) ─────
+    PSYCHOMETRIC_VALIDATION = "psychometric_validation"
+    NORMATIVE_COHORT = "normative_cohort"
+    DOSE_RESPONSE_STUDY = "dose_response_study"
+    LONGITUDINAL_FOLLOWUP = "longitudinal_followup"
     OTHER = "other"
 
 

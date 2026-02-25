@@ -10,14 +10,15 @@ Writes: Class A table rows via SQLAlchemy session
 from __future__ import annotations
 
 import csv
+import json
 import logging
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from shared.db import get_session
-from shared.models.tables import (
+from crci.shared.db import get_session
+from crci.shared.models.tables import (
     ActionCatalog,
     Base,
     BiomarkerCorrelation,
@@ -49,7 +50,7 @@ from shared.models.tables import (
     ValidationRule,
     VariableDefinition,
 )
-from shared.validators import run_class_a_validation
+from crci.shared.validators import run_class_a_validation
 
 logger = logging.getLogger(__name__)
 
@@ -130,10 +131,10 @@ def _parse_csv_value(value: str, column_name: str) -> Any:
     if value == "" or value.lower() == "null":
         return None
 
-    # Boolean columns
+    # Boolean-as-integer columns (DB stores 0/1, not True/False)
     if column_name in ("active", "is_actionable_input_node", "is_decision_critical",
                        "binary_outcome_bridge_allowed", "condition_dependent"):
-        return value.lower() in ("true", "1", "yes")
+        return 1 if value.lower() in ("true", "1", "yes") else 0
 
     # Integer columns
     int_cols = (
@@ -172,6 +173,13 @@ def _parse_csv_value(value: str, column_name: str) -> Any:
             return float(value)
         except (ValueError, TypeError):
             return None
+
+    # JSONB columns — parse JSON strings to Python objects
+    if column_name.endswith("_json"):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return value
 
     return value
 

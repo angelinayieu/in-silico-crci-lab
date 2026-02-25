@@ -610,6 +610,128 @@ class RankedSchedule(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  EX-P7: COMPILED PARAMETER TYPES
+# ═══════════════════════════════════════════════════════════════
+
+
+class CompiledInstrument(BaseModel):
+    """Compiled psychometric properties for one instrument.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 1.
+    """
+
+    instrument_id: str
+    instrument_name: str
+    a_k: float = 0.0  # intercept (default if unknown)
+    b_k: float  # loading coefficient
+    alpha_k: float  # compiled Cronbach's α
+    se_alpha: float
+    cancer_validation_status: str  # CANCER_VALIDATED|USED_IN_CANCER|GENERAL_POPULATION|CONFOUNDED
+    k_studies: int
+    total_n: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+class CompiledPriorNode(BaseModel):
+    """Compiled prior for one node in one context.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 2.
+    """
+
+    node_id: str
+    cancer_type: str
+    treatment_phase: str
+    mu_prior: float
+    sd_prior: float
+    n_total: int
+    k_studies: int
+    provenance_status: str = "CURATED_TRACED"
+    source_studies: list[str] = Field(default_factory=list)
+
+
+class CompiledTemporalKernel(BaseModel):
+    """Compiled temporal kernel for one intervention.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 3 (intervention kernels).
+    """
+
+    action_id: str
+    onset_weeks: float
+    peak_weeks: float
+    plateau_duration: float
+    decay_rate: float
+    k_timepoints: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+class CompiledRecoveryParams(BaseModel):
+    """Compiled recovery trajectory for one intervention class.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 3 (recovery params).
+    Formula: r(t) = r_inf * (1 - exp(-(t/tau_r)^gamma_r))
+    """
+
+    intervention_class: str
+    cancer_type: str = "any"
+    r_inf: float
+    tau_r: float  # months
+    gamma_r: float
+    k_timepoints: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+class CompiledDoseResponse(BaseModel):
+    """Compiled dose-response parameters for one intervention.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 4.
+    Formula: E(d) = E0 + Emax * d^h / (ED50^h + d^h)
+    """
+
+    action_id: str
+    e0: float
+    emax: float
+    ed50: float
+    hill: float
+    k_dose_levels: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+class CompiledModifier(BaseModel):
+    """Compiled subgroup modifier for one variable-value pair.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 5.
+    """
+
+    modifier_variable: str
+    modifier_value: str
+    edge_id: str | None = None
+    multiplier: float
+    grade: str  # HIGH|MODERATE|LOW
+    k_studies: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+class CompiledSynergy(BaseModel):
+    """Compiled synergy coefficient for one intervention pair.
+
+    SYS_EXTRACTION_ADDENDUM Part 6, Compiler 6.
+    """
+
+    action_a_id: str
+    action_b_id: str
+    gamma: float
+    interaction_type: str  # synergistic|additive|antagonistic
+    k_studies: int
+    provenance_status: str = "CURATED_TRACED"
+    provenance_ref: str = ""
+
+
+# ═══════════════════════════════════════════════════════════════
 #  Gate Violation Exception
 # ═══════════════════════════════════════════════════════════════
 

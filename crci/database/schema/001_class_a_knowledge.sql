@@ -1044,6 +1044,25 @@ COMMENT ON TABLE question_observation_models_v1 IS
     'A23: Maps question answers to node/feature updates for Bayesian state estimation.';
 
 
+-- ───────────────────────────────────────────────────────────────
+-- A34. node_search_terms_v1
+-- Purpose: PubMed-friendly search synonyms for each biomarker node.
+--          Used by query_generator.py for automated retrieval.
+--          GREEN provenance — human-curated design choices.
+-- FK: node_id → biomarker_node_definitions_v1.node_id
+-- ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS node_search_terms_v1 (
+    node_id             TEXT        NOT NULL,
+    term                TEXT        NOT NULL,
+    term_type           TEXT        NOT NULL,  -- {primary, synonym, abbreviation, mesh_heading}
+    active              INTEGER     NOT NULL DEFAULT 1,  -- {0,1}
+    PRIMARY KEY (node_id, term)
+);
+
+COMMENT ON TABLE node_search_terms_v1 IS
+    'A34: Search synonyms per node for automated retrieval query generation.';
+
+
 -- ═══════════════════════════════════════════════════════════════
--- End of Class A — Knowledge tables (33 tables total)
+-- End of Class A — Knowledge tables (34 tables total)
 -- ═══════════════════════════════════════════════════════════════

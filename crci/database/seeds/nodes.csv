@@ -1,0 +1,21 @@
+node_id,node_label,node_symbol,node_role,orientation,node_domain,node_subtype,default_state_space,state_update_scale,default_window_days,min_observation_window_days,allowed_source_types_json,is_actionable_input_node,active,version,description,notes
+NODE_SLEEP_QUALITY,Sleep Quality,,symptom,higher_worse,sleep,,z,weekly,7,7,"[""instrument""]",1,1,1,Subjective sleep quality as measured by validated instruments (PSQI),Primary sleep outcome node
+NODE_FATIGUE,Cancer-Related Fatigue,,symptom,higher_worse,fatigue,,z,weekly,7,7,"[""instrument""]",0,1,1,Subjective fatigue severity measured by validated instruments (FACIT-F BFI),Primary fatigue outcome node
+NODE_COGNITION,Cognitive Function,,outcome,higher_better,cognition,,z,study_window,30,14,"[""instrument"", ""measure""]",0,1,1,Overall cognitive function composite across domains,Primary cognitive outcome node
+NODE_IL6,Interleukin-6,,mediator,higher_worse,inflammation,pro_inflammatory,z,weekly,7,3,"[""measure""]",0,1,1,Pro-inflammatory cytokine IL-6 serum/plasma concentration,Key inflammatory mediator
+NODE_CRP,C-Reactive Protein,,mediator,higher_worse,inflammation,acute_phase,z,weekly,7,3,"[""measure""]",0,1,1,Acute-phase inflammatory marker CRP serum concentration,Systemic inflammation indicator
+NODE_CORTISOL,Cortisol,,mediator,higher_worse,hpa_axis,glucocorticoid,z,daily,1,1,"[""measure""]",0,1,1,Cortisol concentration (salivary or serum) reflecting HPA axis activity,Diurnal pattern relevant
+NODE_BDNF,Brain-Derived Neurotrophic Factor,,mediator,higher_better,neurotrophic,,z,weekly,7,7,"[""measure""]",0,1,1,BDNF serum/plasma concentration as neurotrophic marker,Neuroprotective factor
+NODE_EXERCISE,Physical Activity,,exposure,higher_better,exercise,,z,weekly,7,7,"[""instrument"", ""measure""]",1,1,1,Physical activity level from self-report or accelerometry,Modifiable behavior
+NODE_HRV,Heart Rate Variability,,mediator,higher_better,autonomic,,z,daily,1,1,"[""measure""]",0,1,1,HRV indices reflecting autonomic nervous system balance,Vagal tone indicator
+NODE_DEPRESSION,Depressive Symptoms,,symptom,higher_worse,mood,,z,weekly,14,7,"[""instrument""]",0,1,1,Depressive symptom severity from validated instruments,Comorbid mood disturbance
+NODE_ATTENTION,Attention/Concentration,,outcome,higher_better,cognition,attention,z,study_window,30,14,"[""instrument"", ""measure""]",0,1,1,Sustained and selective attention performance,Cognitive subdomain
+NODE_MEMORY,Memory Function,,outcome,higher_better,cognition,memory,z,study_window,30,14,"[""instrument"", ""measure""]",0,1,1,Verbal and visual memory performance,Cognitive subdomain
+NODE_EXEC_FUNCTION,Executive Function,,outcome,higher_better,cognition,executive,z,study_window,30,14,"[""instrument"", ""measure""]",0,1,1,Executive function including planning and cognitive flexibility,Cognitive subdomain
+NODE_PROCESSING_SPEED,Processing Speed,,outcome,higher_better,cognition,processing_speed,z,study_window,30,14,"[""instrument"", ""measure""]",0,1,1,Information processing speed performance,Cognitive subdomain
+NODE_TNF_ALPHA,Tumor Necrosis Factor Alpha,,mediator,higher_worse,inflammation,pro_inflammatory,z,weekly,7,3,"[""measure""]",0,1,1,Pro-inflammatory cytokine TNF-alpha serum/plasma concentration,Key inflammatory mediator
+NODE_CHEMO_EXPOSURE,Chemotherapy Exposure,,context,higher_worse,treatment,cytotoxic,z,static,,,"""[""measure""]""",0,1,1,Cumulative chemotherapy dose and regimen exposure,Treatment context
+NODE_ANXIETY,Anxiety Symptoms,,symptom,higher_worse,mood,,z,weekly,14,7,"[""instrument""]",0,1,1,Anxiety symptom severity from validated instruments,Comorbid distress
+NODE_PAIN,Pain Severity,,symptom,higher_worse,other,somatic,z,weekly,7,3,"[""instrument""]",0,1,1,Cancer-related pain intensity and interference,Somatic symptom
+NODE_AGE,Age,,context,neutral,demographic,,raw,static,,,"""[""node""]""",0,1,1,Chronological age at assessment,Demographic covariate
+NODE_MENOPAUSAL_STATUS,Menopausal Status,,context,neutral,demographic,endocrine,probability,static,,,"""[""node""]""",0,1,1,Menopausal status (pre peri post) relevant to endocrine therapy effects,Hormonal context
