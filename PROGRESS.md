@@ -1,13 +1,13 @@
 # CRCI Build Progress Tracker
 
 ## Current Position
-- **Phase:** 6 (Runtime + Presentation) — COMPLETE
-- **Prompt:** 6.2 completed (Presentation: all 7 modules)
-- **Last completed slice:** PR-7 (provenance_viewer.py)
-- **Next:** Phase 7 (CLI Scripts + End-to-End) or Extraction Pipeline
+- **Phase:** 7 (Integration + CLI Scripts) — COMPLETE
+- **Prompt:** 7.2 completed (End-to-End Test)
+- **Last completed slice:** E2E test (test_full_pipeline.py)
+- **Next:** Review round 3 (final V-FINAL audit)
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Latest commit:** `7e976be` — refactor: Migrate hardcoded constants
-- **Total tests:** 700 passing
+- **Latest commit:** `ca6545a` — feat: Phase 7 CLI scripts + E2E test
+- **Total tests:** 720 passing
 
 ## Review Summary
 - **Round 1:** Fixed SchedulePlan missing `warnings` field, fixed freshness decay test ref year mismatch (3 pre-existing failures fixed)
@@ -67,6 +67,16 @@
 | PR-5 | `presentation/dag_viz.py` | `1d9fc39` | DONE (5 tests) |
 | PR-6 | `presentation/evidence_browser.py` | `1d9fc39` | DONE (8 tests) |
 | PR-7 | `presentation/provenance_viewer.py` | `1d9fc39` | DONE (7 tests) |
+
+### Phase 7: CLI Scripts + End-to-End — COMPLETE
+| Slice | File | Commit | Status |
+|-------|------|--------|--------|
+| 7.1-a | `scripts/run_build.py` | `ca6545a` | DONE |
+| 7.1-b | `scripts/run_session.py` | `ca6545a` | DONE |
+| 7.1-c | `scripts/seed_database.py` | `ca6545a` | DONE |
+| 7.1-d | `scripts/validate_model.py` | `ca6545a` | DONE |
+| 7.1-e | `scripts/validate_deployment_readiness.py` | `ca6545a` | DONE |
+| 7.2 | `tests/test_end_to_end/test_full_pipeline.py` | `ca6545a` | DONE (20 tests) |
 
 ### Review Fixes
 | Fix | Commit | Status |
