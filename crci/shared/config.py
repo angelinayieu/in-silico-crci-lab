@@ -490,6 +490,73 @@ E4_CRI_LOWER_QUANTILE: float = 0.025
 E4_CRI_UPPER_QUANTILE: float = 0.975
 
 # ═══════════════════════════════════════════════════════════════
+#  F1: COMPOSITE OUTCOME SCORING (spec lines 3117-3191)
+# ═══════════════════════════════════════════════════════════════
+
+# F1b: Severity weight thresholds (spec lines 3153-3155)
+F1_SEVERITY_WEIGHT_MILD: float = 1.0   # |z| < 1.0 SD
+F1_SEVERITY_WEIGHT_MODERATE: float = 1.5  # 1.0 ≤ |z| < 2.0 SD
+F1_SEVERITY_WEIGHT_SEVERE: float = 2.0  # |z| ≥ 2.0 SD
+F1_SEVERITY_THRESHOLD_MODERATE: float = 1.0  # |z| boundary for 1.5×
+F1_SEVERITY_THRESHOLD_SEVERE: float = 2.0  # |z| boundary for 2.0×
+
+# F1c: Random effects threshold (spec line 3174)
+F1_I_SQUARED_RE_THRESHOLD: float = 50.0  # I² > 50% → random effects
+
+# F1c: Severity tier percentile boundaries (spec lines 3179-3185)
+F1_TIER_EXCELLENT_MIN: float = 85.0
+F1_TIER_GOOD_MIN: float = 70.0
+F1_TIER_MILD_MIN: float = 50.0
+F1_TIER_MODERATE_MIN: float = 30.0
+F1_TIER_POOR_MIN: float = 15.0
+# Below 15 → Severe
+
+# F-G1: Composite z-score clamp bounds (spec line 3190)
+F1_COMPOSITE_Z_MIN: float = -5.0
+F1_COMPOSITE_Z_MAX: float = 5.0
+
+# F1a: Cognitive domain names (spec lines 3142-3144)
+F1_COGNITIVE_DOMAINS: list[str] = [
+    "processing_speed",
+    "attention",
+    "executive_function",
+    "memory_verbal",
+    "memory_visual",
+    "working_memory",
+    "language",
+    "visuospatial",
+    "motor",
+    "mood",
+    "fatigue",
+]
+
+# ═══════════════════════════════════════════════════════════════
+#  F2: DECISION STABILITY (spec lines 3193-3255)
+# ═══════════════════════════════════════════════════════════════
+
+# F2b: Stability classification thresholds (spec lines 3228-3231)
+F2_STABILITY_STABLE: float = 0.80
+F2_STABILITY_MODERATE: float = 0.60
+F2_STABILITY_UNSTABLE: float = 0.40
+# Below 0.40 → HIGHLY_UNSTABLE
+
+# F2c: Minimum draws per partition for edge influence (spec line 3251)
+F2_MIN_DRAWS_PER_PARTITION: int = 100
+
+# F2c: Number of critical edges to identify (spec line 3248)
+F2_N_CRITICAL_EDGES: int = 3
+
+# ═══════════════════════════════════════════════════════════════
+#  F3: VARIANCE DECOMPOSITION (spec lines 3257-3363)
+# ═══════════════════════════════════════════════════════════════
+
+# F3d: Proxy validity warning threshold (spec line 3322)
+F3_PROXY_R2_LOW_THRESHOLD: float = 0.3
+
+# F3f: Validation tolerance (spec line 3362)
+F3_SUM_TOLERANCE: float = 0.01
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 
