@@ -228,13 +228,14 @@ def _check_group_consistency(
             if ci.parsed_lower is None or ci.parsed_upper is None:
                 continue
             ci_excludes_zero = not (ci.parsed_lower <= 0 <= ci.parsed_upper)
-            p_significant = pv.parsed_value < 0.05
+            p_threshold = config.TB_P_VALUE_SIGNIFICANCE_THRESHOLD
+            p_significant = pv.parsed_value < p_threshold
 
             if ci_excludes_zero and not p_significant:
                 warning = (
                     f"Paper {paper_id} group {group_id}: CI excludes 0 "
                     f"[{ci.parsed_lower:.4f}, {ci.parsed_upper:.4f}] "
-                    f"but p={pv.parsed_value:.4f} ≥ 0.05"
+                    f"but p={pv.parsed_value:.4f} ≥ {p_threshold}"
                 )
                 logger.warning(warning)
                 result.warnings.append(warning)
@@ -242,7 +243,7 @@ def _check_group_consistency(
                 warning = (
                     f"Paper {paper_id} group {group_id}: CI includes 0 "
                     f"[{ci.parsed_lower:.4f}, {ci.parsed_upper:.4f}] "
-                    f"but p={pv.parsed_value:.4f} < 0.05"
+                    f"but p={pv.parsed_value:.4f} < {p_threshold}"
                 )
                 logger.warning(warning)
                 result.warnings.append(warning)
@@ -254,7 +255,7 @@ def _check_group_consistency(
     if len(n_values) >= 2:
         max_n = max(n_values)
         min_n = min(n_values)
-        if max_n > 0 and (max_n - min_n) / max_n > 0.20:
+        if max_n > 0 and (max_n - min_n) / max_n > config.TB_SAMPLE_SIZE_DISCREPANCY:
             warning = (
                 f"Paper {paper_id} group {group_id}: N values inconsistent: "
                 f"min={min_n:.0f}, max={max_n:.0f} "

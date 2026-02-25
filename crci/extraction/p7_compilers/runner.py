@@ -344,7 +344,7 @@ def _run_synergy_compiler(
             1 for r in results if r.provenance_status == "CURATED_TRACED"
         )
         report.provenance_approximate = sum(
-            1 for r in results if r.provenance_status == "SENSITIVITY_REQUIRED"
+            1 for r in results if r.provenance_status == "APPROXIMATE_PENDING"
         )
         context["compiled_synergy"] = results
     except GateViolation as exc:

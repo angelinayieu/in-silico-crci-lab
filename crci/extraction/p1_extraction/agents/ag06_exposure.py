@@ -29,6 +29,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import ExposureExtendedResponse, ExposureResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -264,7 +265,7 @@ class ExposureAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag06_ann_{uuid.uuid4().hex[:12]}",
-                    category="adherence_data",
+                    category=AnnotationCategory.ADHERENCE_DATA,
                     content=f"Adherence rate: {exposure_resp.adherence_rate}%",
                     evidence_strength="moderate",
                     extraction_snippet=None,
@@ -289,7 +290,7 @@ class ExposureAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag06_ann_{uuid.uuid4().hex[:12]}",
-                    category="dose_response_evidence",
+                    category=AnnotationCategory.DOSE_RESPONSE_EVIDENCE,
                     content="; ".join(detail_parts),
                     evidence_strength="moderate",
                     extraction_snippet=None,
@@ -421,7 +422,7 @@ class ExposureAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag06ext_ann_{uuid.uuid4().hex[:12]}",
-                    category="dose_response_evidence",
+                    category=AnnotationCategory.DOSE_RESPONSE_EVIDENCE,
                     content=(
                         f"Dose-response data: {len(exposure_resp.dose_effect_pairs)} "
                         f"dose levels; shape={exposure_resp.dose_response_shape or 'unknown'}"

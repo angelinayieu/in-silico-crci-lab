@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .enums import (
     AdjudicationStatus,
@@ -28,6 +28,7 @@ from .enums import (
     AnnotationMaturity,
     BiasRisk,
     BoundType,
+    ConversionBiasRisk,
     ConversionGateResult,
     EffectScale,
     ExtractionMode,
@@ -39,6 +40,8 @@ from .enums import (
     PriorSource,
     PriorTypePaper,
     ProxyValidity,
+    SEDerivationLevel,
+    SEQualityTag,
     SESource,
     SafeMode,
     StabilityClass,
@@ -115,18 +118,24 @@ class PaperMap(BaseModel):
 
     This is the key v2 efficiency improvement — one read, many agents.
     SYS_EX lines 330-370.
+
+    v2.0 (MS §5.2, INV-03): PaperMap is immutable after Canonical Reader
+    completes. Enforced via frozen=True. Uses tuples instead of lists
+    to prevent mutation of nested collections.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     paper_id: str
     title: str | None = None
     full_text: str
-    sections: list[SectionSegment] = Field(default_factory=list)
-    tables: list[TableEntry] = Field(default_factory=list)
-    figures: list[FigureEntry] = Field(default_factory=list)
-    candidate_spans: list[CandidateSpan] = Field(default_factory=list)
+    sections: tuple[SectionSegment, ...] = ()
+    tables: tuple[TableEntry, ...] = ()
+    figures: tuple[FigureEntry, ...] = ()
+    candidate_spans: tuple[CandidateSpan, ...] = ()
     n_total: int | None = None
     study_design: str | None = None
-    arms: list[str] = Field(default_factory=list)
+    arms: tuple[str, ...] = ()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -237,7 +246,12 @@ class RoutedNumeric(BaseModel):
 
 
 class ScaledNumeric(BaseModel):
-    """After scale conversion with SE."""
+    """After scale conversion with SE.
+
+    v2.0: Includes SE derivation level tracking from the 6-level cascade
+    (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4) and conversion
+    provenance logging (Module 1 R4).
+    """
 
     span_id: str
     beta: float
@@ -245,6 +259,15 @@ class ScaledNumeric(BaseModel):
     se_source: SESource
     scale: EffectScale
     direction_aligned: bool = False
+    # v2.0: SE derivation cascade tracking
+    se_derivation_level: SEDerivationLevel | None = None
+    se_quality_tag: SEQualityTag | None = None
+    se_inflation_applied: float = 1.0
+    # v2.0: Conversion provenance (Module 1 R4)
+    conversion_formula: str | None = None
+    conversion_bias_risk: ConversionBiasRisk | None = None
+    fields_present: list[str] = Field(default_factory=list)
+    fields_missing: list[str] = Field(default_factory=list)
 
 
 class HarmonizedClaim(BaseModel):
@@ -485,15 +508,23 @@ class PosteriorState(BaseModel):
 
 
 class PreparedObservation(BaseModel):
-    """Observation prepared for simulation.
+    """Observation prepared for Bayesian update (one per instrument).
 
-    SYS_ALG lines 1630-1680.
+    SYS_ALG lines 1665-1720 (PreparedObservation state after C2).
+    Produced by: observation_mapper.py (C2)
+    Consumed by: bayesian_update.py (C3)
     """
 
-    node_id: str
-    z_value: float
-    noise_sd: float
-    source: str
+    instrument_id: str
+    node_i: int = Field(ge=0, le=62, description="Target latent node index")
+    y_k: float = Field(description="Observed measurement value")
+    a_k: float = Field(description="Instrument intercept (offset)")
+    b_k: float = Field(description="Instrument loading (slope)")
+    sigma_sq_y_k: float = Field(gt=0, description="Total observation noise variance")
+    cancer_SE_mult: float = Field(ge=1.0, le=1.5, description="Cancer validation SE mult")
+    w_temporal: float = Field(gt=0, le=1.0, description="Temporal decay weight")
+    t_days: float = Field(ge=0, description="Days since assessment")
+    tier: str = Field(description="Observation priority tier (TIER_0, TIER_1, TIER_2)")
 
 
 class ModifiedEdge(BaseModel):

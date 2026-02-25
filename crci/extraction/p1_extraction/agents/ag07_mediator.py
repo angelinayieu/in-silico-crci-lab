@@ -28,6 +28,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import MediatorResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -146,12 +147,12 @@ class MediatorAgent(BaseAgent):
                 content_parts.append(f"Direction: {claim.direction}")
 
             # Determine annotation category based on content
-            category = "mechanism_hypothesis"
+            category = AnnotationCategory.MECHANISM_HYPOTHESIS
             if claim.pathway and any(
                 kw in claim.pathway.lower()
                 for kw in ["biomarker", "cytokine", "inflammatory", "cortisol"]
             ):
-                category = "biological_plausibility"
+                category = AnnotationCategory.BIOLOGICAL_PLAUSIBILITY
 
             annotations.append(
                 RawAnnotationEmission(

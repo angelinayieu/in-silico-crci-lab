@@ -735,7 +735,12 @@ class MIDThreshold(Base):
 
 
 class StudyRegistry(Base):
-    """B1. ROOT — Paper-level canonical record."""
+    """B1. ROOT — Paper-level canonical record.
+
+    v2.0 additions (Engineering Appendix §A.2):
+    study_subtype, included_study_ids_json, included_k,
+    pdf_path, canonical_text_path, file_type, parse_quality.
+    """
     __tablename__ = "study_registry_v1"
 
     study_id = Column(Text, primary_key=True)
@@ -749,6 +754,26 @@ class StudyRegistry(Base):
     study_design = Column(Text)
     notes = Column(Text)
     version = Column(Integer, default=1)
+
+    # v2.0: Paper classification and MA decomposition
+    study_subtype = Column(Text)
+    included_study_ids_json = Column(Text)
+    included_k = Column(Integer)
+
+    # v2.0: EX-INGEST file tracking (INV-13, INV-14)
+    pdf_path = Column(Text)
+    canonical_text_path = Column(Text)
+    file_type = Column(Text)
+    parse_quality = Column(Text)
+
+    # v2.0: Cohort lineage (CONVERSION_VALIDITY_AND_HARDENING.md Module 4.2)
+    cohort_lineage_id = Column(Text)   # FK to self-group
+    lineage_role = Column(Text)        # PRIMARY, SUPPLEMENTARY, FOLLOW_UP
+
+    # v2.0: Multi-arm trial metadata (CONVERSION_VALIDITY_AND_HARDENING.md Module 4.1)
+    multi_arm = Column(Boolean, default=False)
+    n_arms = Column(Integer)
+    trial_registry_id = Column(Text)
 
 
 class StudyCohortProfile(Base):
@@ -961,6 +986,38 @@ class EdgeEvidence(Base):
     # Meta-analysis provenance
     parent_meta_study_id = Column(Text)
 
+    # v2.0: MA multi-product and effect size classification
+    # Engineering Appendix §A.2
+    meta_source_flag = Column(Text)
+    heterogeneity_json = Column(Text)
+    effect_size_type = Column(Text)
+
+    # v2.0: SE derivation cascade (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)
+    se_derivation_level = Column(Text)       # L1, L2a, ..., L6
+    se_inflation_applied = Column(Float)     # inflation factor (1.00-1.50)
+    se_quality_tag = Column(Text)            # DIRECT, DERIVED_EXACT, etc.
+
+    # v2.0: Conversion provenance (CONVERSION_VALIDITY_AND_HARDENING.md R4)
+    conversion_formula = Column(Text)        # formula ID (M1-SMD-d, M1-LOG-OR, etc.)
+    conversion_bias_risk = Column(Text)      # NONE, LOW, MODERATE, HIGH, VERY_HIGH, BLOCKED
+
+    # v2.0: Shared control & dependency (CONVERSION_VALIDITY_AND_HARDENING.md Module 4)
+    shared_control_flag = Column(Boolean, default=False)
+    shared_control_study_id = Column(Text)
+    endpoint_vs_change = Column(Text)        # ENDPOINT, CHANGE, UNCLEAR
+    comparison_arm_label = Column(Text)      # Module 4.1 SC-1
+
+    # v2.0: Verification escalation (CONVERSION_VALIDITY_AND_HARDENING.md Module 2)
+    verification_tier = Column(Text, default="TIER_3")
+    verification_status = Column(Text, default="UNVERIFIED")
+    escalation_rules_json = Column(Text)     # JSON array of escalation rule IDs
+    escalation_se_inflation = Column(Float, default=1.0)
+
+    # v2.0: Freshness provenance (CONVERSION_VALIDITY_AND_HARDENING.md Module 5)
+    parameter_family = Column(Text)          # psychometrics, edge_intervention, etc.
+    freshness_w = Column(Float)              # computed w_fresh
+    freshness_superseded = Column(Boolean, default=False)
+
     notes = Column(Text)
 
 
@@ -1081,7 +1138,7 @@ class StudyAnnotationsRaw(Base):
 class StudyAnnotations(Base):
     """B11. Reconciled, deduplicated canonical annotations with maturity tracking.
 
-    SYS_EX lines 2585-2612. 1 Row = one reconciled canonical annotation.
+    Engineering Appendix v2.0 §A.3: full 23-column specification.
     Written by: EX-P1-ATB | Read by: EX-P4-MA, EX-ACQ-GAP, EX-PROM-THR.
     """
     __tablename__ = "study_annotations_v1"
@@ -1104,6 +1161,15 @@ class StudyAnnotations(Base):
     reconciled_confidence = Column(Float)
     maturity = Column(Text, nullable=False, default="raw")
     promoted_to = Column(Text)
+
+    # v2.0 additions (Engineering Appendix §A.2, §A.3)
+    entered_by = Column(Text)
+    entered_at = Column(DateTime, server_default=func.now())
+    version = Column(Integer, default=1)
+    active = Column(Boolean, default=True)
+    span_id = Column(Text)
+    section_label = Column(Text)
+    extraction_mode = Column(Text)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1875,6 +1941,31 @@ class ExtractionRun(Base):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  EXTRACTION COMPLETENESS (CONVERSION_VALIDITY_AND_HARDENING.md Module 3)
+# ═══════════════════════════════════════════════════════════════
+
+
+class ExtractionCompleteness(Base):
+    """Missingness provenance for extraction components.
+
+    Module 3: Each component per paper gets a code explaining
+    WHY it is missing (or PRESENT). Used by P5 gap analysis
+    and acquisition loop to route corrective actions.
+    """
+    __tablename__ = "extraction_completeness_v1"
+
+    completeness_id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    component_id = Column(Text, nullable=False)
+    component_label = Column(Text)
+    missingness_code = Column(Text, nullable=False)
+    missingness_detail = Column(Text)
+    agent_id = Column(Text)
+    corrective_action = Column(Text)
+    created_at = Column(Text)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  CLASS A EXTENSION: Search Term Reference
 # ═══════════════════════════════════════════════════════════════
 
@@ -1895,7 +1986,12 @@ class NodeSearchTerm(Base):
 
 
 class AcquisitionQueue(Base):
-    """B13. Operational queue for directed acquisition."""
+    """B13. Operational queue for directed acquisition.
+
+    v2.0 additions (Engineering Appendix §A.2):
+    retrieval_status, abstract_relevance, saturation tracking,
+    hop tracking, paywall flagging.
+    """
     __tablename__ = "acquisition_queue_v1"
 
     queue_id = Column(Text, primary_key=True)
@@ -1910,3 +2006,18 @@ class AcquisitionQueue(Base):
     status = Column(Text, nullable=False, default="queued")
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now())
+
+    # v2.0: Acquisition lifecycle state machine (INV-13, INV-16)
+    retrieval_status = Column(Text, default="PENDING")
+    abstract_relevance = Column(Text)
+
+    # v2.0: Search saturation (MS §9.7)
+    saturation_cycle_count = Column(Integer, default=0)
+    saturation_flag = Column(Boolean, default=False)
+
+    # v2.0: Content-driven hops (MS §9.4)
+    hop_source_study_id = Column(Text)
+    hop_depth = Column(Integer, default=0)
+
+    # v2.0: Paywall tracking
+    paywall_flagged = Column(Boolean, default=False)

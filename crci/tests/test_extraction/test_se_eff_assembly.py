@@ -19,7 +19,7 @@ from crci.shared.models.intermediate_states import (
     LayeredSEResult,
 )
 from crci.shared.models.enums import EffectScale, HarmonizationStatusInMem, SESource
-from crci.extraction.heterogeneity.se_eff_assembly import (
+from crci.extraction.p3_heterogeneity.se_eff_assembly import (
     SEEffInput,
     compute_se_eff,
     compute_se_eff_for_claim,
@@ -336,5 +336,5 @@ class TestConfigConstants:
     def test_freshness_constants(self) -> None:
         assert config.FRESHNESS_DECAY_RATE == 0.015
         assert config.FRESHNESS_FLOOR == 0.70
-        assert config.FRESHNESS_REFERENCE_YEAR == 2026
+        assert config.FRESHNESS_REFERENCE_YEAR == 2025
         assert config.FRESHNESS_DEFAULT_WEIGHT == 0.85

@@ -28,6 +28,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import OutcomeResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -191,7 +192,7 @@ class OutcomeAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag04_ann_{uuid.uuid4().hex[:12]}",
-                    category="measurement_limitation",
+                    category=AnnotationCategory.MEASUREMENT_LIMITATION,
                     content="; ".join(content_parts),
                     evidence_strength="moderate",
                     extraction_snippet=instrument_name,

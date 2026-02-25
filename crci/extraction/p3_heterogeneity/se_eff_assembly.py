@@ -39,6 +39,7 @@ from crci.shared.models.intermediate_states import (
     LayeredSEResult,
 )
 
+from .freshness_policy import compute_freshness
 from .layers import (
     HeterogeneityResult,
     layer_1_study_design,
@@ -87,6 +88,9 @@ class SEEffInput:
 
     # L7: Freshness
     pub_year: int | None = None
+    # v2.0: Family-specific freshness (Module 5)
+    parameter_family: str | None = None
+    superseded_by_newer: bool = False
 
 
 def compute_se_eff(inp: SEEffInput) -> LayeredSEResult:
@@ -185,8 +189,19 @@ def compute_se_eff(inp: SEEffInput) -> LayeredSEResult:
         )
 
     # ─── L7: Freshness Decay ─────────────────────────────────
-    # Formula P3-7
-    w_fresh, l7_notes = layer_7_freshness_decay(pub_year=inp.pub_year)
+    # Formula P3-7 (universal) or F5-1 (family-specific, Module 5)
+    if inp.parameter_family is not None:
+        # v2.0: Use family-specific freshness policy
+        fr = compute_freshness(
+            pub_year=inp.pub_year,
+            family=inp.parameter_family,
+            superseded_by_newer=inp.superseded_by_newer,
+        )
+        w_fresh = fr.w_fresh
+        l7_notes = [f"L7: {fr.notes}"]
+    else:
+        # Backward-compatible: universal 1.5%/yr
+        w_fresh, l7_notes = layer_7_freshness_decay(pub_year=inp.pub_year)
     layer_multipliers["L7_freshness"] = w_fresh
     layers_applied.append("L7_freshness")
     all_notes.extend(l7_notes)
@@ -268,6 +283,9 @@ def compute_se_eff_for_claim(
     days_since_measurement: float = 0.0,
     is_trait: bool = False,
     pub_year: int | None = None,
+    *,
+    parameter_family: str | None = None,
+    superseded_by_newer: bool = False,
 ) -> LayeredSEResult:
     """Convenience wrapper: compute SE_eff from a HarmonizedClaim.
 
@@ -313,5 +331,7 @@ def compute_se_eff_for_claim(
         days_since_measurement=days_since_measurement,
         is_trait=is_trait,
         pub_year=pub_year,
+        parameter_family=parameter_family,
+        superseded_by_newer=superseded_by_newer,
     )
     return compute_se_eff(inp)

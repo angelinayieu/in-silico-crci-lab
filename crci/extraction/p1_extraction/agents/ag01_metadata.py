@@ -34,11 +34,6 @@ from crci.shared.models.intermediate_states import (
 
 logger = logging.getLogger(__name__)
 
-# Path to prompt template relative to this package
-_PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parents[2] / ".." / "llm" / "prompts" / "ag01_metadata.txt"
-_PROMPT_DIR = Path(__file__).resolve().parent.parent.parent.parent / "llm" / "prompts" / "ag01_metadata.txt"
-
-
 class MetadataAgent(BaseAgent):
     """AG01 — Extract study title, authors, DOI, journal, year, funding.
 

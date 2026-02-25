@@ -161,7 +161,7 @@ def _compile_kernel(
     # (weighted mean of absolute effect exceeds its SE)
     onset_weeks = sorted_t[0]
     for i in range(k):
-        if abs(sorted_e[i]) * math.sqrt(sorted_w[i]) > 1.96:
+        if abs(sorted_e[i]) * math.sqrt(sorted_w[i]) > config.P7_TEMPORAL_ONSET_Z_THRESHOLD:
             onset_weeks = sorted_t[i]
             break
 
@@ -174,7 +174,7 @@ def _compile_kernel(
     plateau_end = peak_weeks
     peak_abs_effect = abs(sorted_e[peak_idx])
     for i in range(peak_idx + 1, k):
-        if abs(sorted_e[i]) < 0.8 * peak_abs_effect:
+        if abs(sorted_e[i]) < config.P7_TEMPORAL_PLATEAU_DECAY_FRACTION * peak_abs_effect:
             plateau_end = sorted_t[i]
             break
         plateau_end = sorted_t[i]
@@ -265,7 +265,7 @@ def _compile_recovery(
 
     # Prepare data for fitting
     # Convert timepoint_weeks to months for recovery fitting (÷ 4.345)
-    t_data = np.array([r.timepoint_weeks / 4.345 for r in valid])
+    t_data = np.array([r.timepoint_weeks / config.P7_WEEKS_TO_MONTHS for r in valid])
     e_data = np.array([r.effect for r in valid])
 
     # Weights: 1/SE² if available

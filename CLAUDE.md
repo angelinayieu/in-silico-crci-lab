@@ -4,6 +4,7 @@ You are building the CRCI Bayesian Causal Model system: a scientifically
 rigorous evidence-to-recommendation pipeline. Every formula must be exact.
 Every gate must be enforced. Every module must connect to the next.
 
+<<<<<<< HEAD
 ## 📚 START HERE: Your Documentation Hub
 
 **Adding a new paper?** → Read **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** first.
@@ -25,6 +26,30 @@ Every gate must be enforced. Every module must connect to the next.
    - Progress tracking template
 
 **Then execute:** [docs/04_implementation/PROMPT_SEQUENCE.md](docs/04_implementation/PROMPT_SEQUENCE.md) — 42 prompts in order
+=======
+## Auto-Continue Protocol
+
+**When the user says "continue", "next slice", or this is a new session:**
+
+1. **Read `PROGRESS.md`** FIRST — it tracks exactly where you are
+2. Identify the **next slice** from the progress table
+3. Follow the **Slice Implementation Protocol** in PROGRESS.md (context → plan → implement → test → verify → commit)
+4. **Update PROGRESS.md** after committing (mark done, advance next)
+5. **Auto-continue to the next slice** without waiting — keep going until:
+   - The user says "stop" or "pause"
+   - You hit a spec ambiguity requiring user input
+   - You complete an entire chain (report summary, then continue)
+   - The session is running low on context
+
+**Context refreshing:** At the START of every slice, always re-read:
+- The FILE_CONTEXT_MANIFEST entry for the file you're building
+- The exact spec lines it references
+- The upstream file(s) that produce your input types
+- `config.py` for existing constants
+- The downstream consumer manifest entries
+
+This prevents drift from compaction and ensures type/naming consistency.
+>>>>>>> fbf772927bca154896eddc1b8cd909d635a8f01d
 
 ## Repository Documentation
 

@@ -563,6 +563,9 @@ class SEType(StrEnum):
 
 @unique
 class AggregationMethod(StrEnum):
+    BLOCKED = "BLOCKED"
+    DIRECT = "DIRECT"
+    STRATIFIED = "STRATIFIED"
     IVW_FIXED = "IVW_fixed"
     IVW_RANDOM = "IVW_random"
     SINGLE_BEST = "single_best"
@@ -958,6 +961,49 @@ class SESource(StrEnum):
 
 
 @unique
+class SEDerivationLevel(StrEnum):
+    """SE derivation cascade level (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4).
+
+    6 levels, tried in order L1→L6. First level where all required
+    fields are available is used. Each level has an associated inflation factor.
+    """
+    L1 = "L1"        # SE reported directly — inflation 1.00×
+    L2A = "L2a"      # 95% CI — inflation 1.00×
+    L2B = "L2b"      # 99% CI — inflation 1.00×
+    L2C = "L2c"      # 90% CI — inflation 1.00×
+    L3A = "L3a"      # Exact p-value + effect — inflation 1.05×
+    L3B = "L3b"      # Bounded p (e.g. p<0.05) — inflation 1.10×
+    L4A = "L4a"      # N per group + d — inflation 1.15×
+    L4B = "L4b"      # Total N only + d — inflation 1.20×
+    L5 = "L5"        # SD borrowed + N — inflation tier-dependent (1.15-1.50×)
+    L6 = "L6"        # Direction only, no numeric SE — qualitative
+
+
+@unique
+class SEQualityTag(StrEnum):
+    """Quality tag for SE derivation (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)."""
+    DIRECT = "DIRECT"
+    DERIVED_EXACT = "DERIVED_EXACT"
+    DERIVED_PVAL = "DERIVED_PVAL"
+    DERIVED_PBOUND = "DERIVED_PBOUND"
+    ESTIMATED_N = "ESTIMATED_N"
+    ESTIMATED_N_EQUAL_ASSUMED = "ESTIMATED_N_EQUAL_ASSUMED"
+    SD_BORROWED = "SD_BORROWED"
+    QUALITATIVE = "QUALITATIVE"
+
+
+@unique
+class ConversionBiasRisk(StrEnum):
+    """Bias risk level for effect-size conversion (CONVERSION_VALIDITY_AND_HARDENING.md Module 1)."""
+    NONE = "NONE"
+    LOW = "LOW"
+    MODERATE = "MODERATE"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
+    BLOCKED = "BLOCKED"
+
+
+@unique
 class HarmonizationStatusInMem(StrEnum):
     FULL = "FULL"
     PARTIAL = "PARTIAL"
@@ -1047,6 +1093,20 @@ class ProxyValidity(StrEnum):
     PROXY = "PROXY"
     INDIRECT = "INDIRECT"
     NONE = "NONE"
+
+
+@unique
+class ObservationTier(StrEnum):
+    """Observation priority tier (C2a).
+
+    TIER_0: Required — abort if missing (cancer_type, treatment, ≥1 cognitive).
+    TIER_1: Major gain (PSQI, PHQ-9, FACIT-F, age, IL-6/CRP, activity).
+    TIER_2: Pathway (BDNF, cortisol, GAD-7, glucose, APOE, ISI, NfL, etc.).
+    """
+
+    TIER_0 = "TIER_0"
+    TIER_1 = "TIER_1"
+    TIER_2 = "TIER_2"
 
 
 # ─── RUNTIME-G: Optimization ─────────────────────────────────
@@ -1144,16 +1204,32 @@ class AnnotationCategory(StrEnum):
 
 @unique
 class AnnotationMaturity(StrEnum):
-    """4-level annotation maturity."""
+    """Annotation lifecycle maturity (v2.0 Engineering Appendix §A.3).
+
+    Original: raw, reconciled, validated, integrated.
+    v2.0: raw, reviewed, promoted, archived.
+    Both sets retained for compatibility.
+    """
     RAW = "raw"
     RECONCILED = "reconciled"
     VALIDATED = "validated"
     INTEGRATED = "integrated"
+    # v2.0 additions
+    REVIEWED = "reviewed"
+    PROMOTED = "promoted"
+    ARCHIVED = "archived"
 
 
 @unique
 class AdjudicationStatus(StrEnum):
-    """Annotation adjudication status."""
+    """Annotation adjudication status (v2.0 Engineering Appendix §A.3)."""
+    UNREVIEWED = "unreviewed"
+    AUTO_MERGED = "auto_merged"
+    CONFLICT = "conflict"
+    HUMAN_REVIEWED = "human_reviewed"
+    HUMAN_APPROVED = "human_approved"
+    HUMAN_REJECTED = "human_rejected"
+    # Retained for backward compatibility with existing reconciliation code
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -1289,3 +1365,194 @@ class CaptureMethod(StrEnum):
     CHART_REVIEW = "chart_review"
     OTHER = "other"
     UNKNOWN = "unknown"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PART 8: v2.0 EXTRACTION PIPELINE ENUMS
+#  Engineering Appendix v2.0 §A.2
+# ═══════════════════════════════════════════════════════════════
+
+
+@unique
+class RetrievalStatus(StrEnum):
+    """Acquisition queue retrieval state machine.
+
+    Engineering Appendix §A.2: tracks each candidate through the
+    retrieval lifecycle. Updated by retriever.py on each attempt.
+    """
+    PENDING = "PENDING"
+    FULL_TEXT_PDF = "FULL_TEXT_PDF"
+    FULL_TEXT_XML = "FULL_TEXT_XML"
+    ABSTRACT_ONLY = "ABSTRACT_ONLY"
+    HUMAN_NEEDED = "HUMAN_NEEDED"
+    REJECTED = "REJECTED"
+    DUPLICATE = "DUPLICATE"
+
+
+@unique
+class AbstractRelevance(StrEnum):
+    """Pre-retrieval abstract screening result.
+
+    Engineering Appendix §A.2: set by abstract_screener.py per
+    Master Spec §9.2.1. Only HIGH and MODERATE proceed to retrieval.
+    """
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    LOW = "LOW"
+    IRRELEVANT = "IRRELEVANT"
+
+
+@unique
+class MetaSourceFlag(StrEnum):
+    """Meta-analysis source classification for edge_evidence_v1.
+
+    Engineering Appendix §A.2: tags entries extracted from
+    meta-analyses or special multi-paper compilations.
+    """
+    POOLED_ESTIMATE = "POOLED_ESTIMATE"
+    SUBGROUP_ESTIMATE = "SUBGROUP_ESTIMATE"
+    NMA_MIXED = "NMA_MIXED"
+    NMA_DIRECT = "NMA_DIRECT"
+    FOREST_PLOT_ENTRY = "FOREST_PLOT_ENTRY"
+    DOSE_RESPONSE_POINT = "DOSE_RESPONSE_POINT"
+
+
+@unique
+class EffectSizeType(StrEnum):
+    """Effect size measurement class.
+
+    Engineering Appendix §A.2: distinguishes between-group,
+    within-group, and pre-post change effect sizes.
+    Required by Trust Boundary gate TB-G1 (INV-12).
+    """
+    BETWEEN_GROUP = "BETWEEN_GROUP"
+    WITHIN_GROUP = "WITHIN_GROUP"
+    PRE_POST_CHANGE = "PRE_POST_CHANGE"
+
+
+@unique
+class FileType(StrEnum):
+    """Source file type for study_registry_v1.
+
+    Engineering Appendix §A.2: written by EX-INGEST PDFProcessor.
+    """
+    PDF = "pdf"
+    XML = "xml"
+    ABSTRACT_ONLY = "abstract_only"
+
+
+@unique
+class ParseQuality(StrEnum):
+    """PDF parse quality assessment.
+
+    Engineering Appendix §A.2: written by EX-INGEST PDFProcessor.
+    PARSE_FAILURE blocks entry to EX-P0.
+    """
+    GOOD = "GOOD"
+    DEGRADED = "DEGRADED"
+    SCAN = "SCAN"
+    PARSE_FAILURE = "PARSE_FAILURE"
+
+
+@unique
+class ExtractionModeStr(StrEnum):
+    """Annotation extraction mode for study_annotations_v1.
+
+    Engineering Appendix §A.3: how the annotation was derived.
+    """
+    EXPLICIT_AUTHOR_STATEMENT = "explicit_author_statement"
+    EXTRACTOR_INFERENCE = "extractor_inference"
+    COMPUTED_FROM_CONTEXT = "computed_from_context"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  PART 9: CONVERSION VALIDITY & HARDENING ENUMS
+#  CONVERSION_VALIDITY_AND_HARDENING.md Modules 2-5
+# ═══════════════════════════════════════════════════════════════
+
+
+@unique
+class ParameterFamily(StrEnum):
+    """Parameter family for freshness decay policies (Module 5).
+
+    Each family has its own decay rate and floor.
+    """
+    PSYCHOMETRICS = "psychometrics"               # α, b_k — 0.0%/yr, floor 1.00
+    NORMATIVE_DATA = "normative_data"             # Population norms — 0.5%/yr, floor 0.90
+    BIOLOGICAL_CORRELATIONS = "biological_correlations"  # Molecular — 0.5%/yr, floor 0.90
+    EDGE_INTERVENTION = "edge_intervention"       # Intervention→outcome — 1.5%/yr, floor 0.70
+    EDGE_MECHANISM = "edge_mechanism"             # Mechanism→mechanism — 1.0%/yr, floor 0.80
+    INTERVENTION_KERNELS = "intervention_kernels" # Temporal data — 2.0%/yr, floor 0.70
+    CONTEXT_PRIORS = "context_priors"             # Baseline levels — 1.0%/yr, floor 0.80
+    META_ANALYSIS_POOLED = "meta_analysis_pooled" # MA estimates — 1.5%/yr, floor 0.70
+    RECOVERY_CURVES = "recovery_curves"           # Recovery trajectories — 1.0%/yr, floor 0.80
+
+
+@unique
+class EndpointVsChange(StrEnum):
+    """Whether a study reports endpoint or change-from-baseline scores (Module 4.3)."""
+    ENDPOINT = "ENDPOINT"
+    CHANGE = "CHANGE"
+    UNCLEAR = "UNCLEAR"
+
+
+@unique
+class LineageRole(StrEnum):
+    """Role within a cohort lineage group (Module 4.2)."""
+    PRIMARY = "PRIMARY"
+    SUPPLEMENTARY = "SUPPLEMENTARY"
+    FOLLOW_UP = "FOLLOW_UP"
+
+
+@unique
+class VerificationTier(StrEnum):
+    """Verification intensity tier (Module 2)."""
+    TIER_1 = "TIER_1"  # 100% human verification
+    TIER_2 = "TIER_2"  # 25-30% spot-check
+    TIER_3 = "TIER_3"  # 10-15% sample verification
+
+
+@unique
+class EscalationRule(StrEnum):
+    """Which escalation rule triggered Tier 1 verification (Module 2.1)."""
+    E1_MAJORITY_WEIGHT = "E1"       # w_i > 0.50
+    E2_LOW_K = "E2"                 # k < 3
+    E3_SIGN_FLIP = "E3"             # removing record flips β̂ sign
+    E4_SOLE_CANCER_MATCH = "E4"     # only cancer-matched study + k ≤ 5
+    E5_SOFT_SE_HIGH_WEIGHT = "E5"   # se_derivation_level ≥ L4 + w_i > 0.30
+    E6_FOREST_PLOT = "E6"           # meta_source_flag = FOREST_PLOT_ENTRY
+
+
+@unique
+class VerificationStatus(StrEnum):
+    """Verification lifecycle status for evidence records (Module 2.2)."""
+    UNVERIFIED = "UNVERIFIED"
+    ESCALATED_TO_TIER1 = "ESCALATED_TO_TIER1"
+    PENDING_VERIFICATION = "PENDING_VERIFICATION"
+    VERIFIED = "VERIFIED"
+    VERIFIED_WITH_CORRECTIONS = "VERIFIED_WITH_CORRECTIONS"
+
+
+@unique
+class MissingnessCode(StrEnum):
+    """Why a component is missing from extraction (Module 3.2)."""
+    PRESENT = "PRESENT"
+    ABSENT_IN_PAPER = "ABSENT_IN_PAPER"
+    PARSE_FAILURE = "PARSE_FAILURE"
+    AGENT_MISS = "AGENT_MISS"
+    GUARDED_REJECTION = "GUARDED_REJECTION"
+    TB_REJECTION = "TB_REJECTION"
+    PARTIAL = "PARTIAL"
+
+
+@unique
+class CorrectiveAction(StrEnum):
+    """Corrective action for missing components (Module 3.3)."""
+    SEARCH = "search"
+    REPARSE = "reparse"
+    RERUN_AGENT = "rerun_agent"
+    MANUAL = "manual"
+    ACCEPT = "accept"
+    REVIEW_RULE = "review_rule"
+
+

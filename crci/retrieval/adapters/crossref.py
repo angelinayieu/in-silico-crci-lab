@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import requests
 
@@ -83,8 +84,8 @@ class CrossrefAdapter(SourceAdapter):
             "rows": str(min(max_results, 1000)),
         }
         if filters:
-            for key, value in filters.items():
-                params[f"filter"] = f"{key}:{value}"
+            filter_parts = [f"{key}:{value}" for key, value in filters.items()]
+            params["filter"] = ",".join(filter_parts)
 
         try:
             resp = requests.get(
@@ -156,7 +157,6 @@ class CrossrefAdapter(SourceAdapter):
         abstract = item.get("abstract")
         if abstract:
             # Crossref abstracts often contain XML/HTML tags
-            import re
             abstract = re.sub(r"<[^>]+>", "", abstract).strip()
 
         # Citation count

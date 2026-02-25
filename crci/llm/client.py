@@ -151,7 +151,13 @@ class LLMClient:
 
     def _call_with_retry(self, kwargs: dict[str, Any], prompt_hash: str) -> Any:
         """Execute API call with exponential backoff retry on transient errors."""
-        import anthropic
+        try:
+            import anthropic
+        except ImportError as exc:
+            raise LLMClientError(
+                "anthropic package not installed. "
+                "Install with: pip install anthropic"
+            ) from exc
 
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
@@ -251,9 +257,9 @@ class LLMClient:
 
         Uses approximate Claude Sonnet pricing.
         """
-        # Approximate pricing per 1M tokens (Claude Sonnet 4)
-        prompt_cost_per_m = 3.0
-        completion_cost_per_m = 15.0
+        # Pricing per 1M tokens from config
+        prompt_cost_per_m = config.LLM_PROMPT_COST_PER_M
+        completion_cost_per_m = config.LLM_COMPLETION_COST_PER_M
         prompt_cost = (self._total_prompt_tokens / 1_000_000) * prompt_cost_per_m
         completion_cost = (self._total_completion_tokens / 1_000_000) * completion_cost_per_m
         return prompt_cost + completion_cost

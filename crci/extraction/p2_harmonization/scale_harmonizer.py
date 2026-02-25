@@ -23,9 +23,11 @@ import math
 
 from crci.shared.config import (
     CONVERSION_OR_TO_SMD_FACTOR,
+    PERFECT_CORRELATION_CLAMP_D,
     SD_BORROW_TIER1_INFLATION,
     SD_BORROW_TIER2_INFLATION,
     SD_BORROW_TIER3_INFLATION,
+    SE_DERIVATION_FALLBACK,
     SE_FROM_CI_Z_MULTIPLIER,
 )
 from crci.shared.models.enums import (
@@ -89,7 +91,7 @@ class SDAnchor:
 
 
 def _derive_se_from_ci(ci_lower: float, ci_upper: float) -> float:
-    """Derive SE from a 95% confidence interval.
+    """Derive SE from a 95% confidence interval (linear scale).
 
     Formula S3-SE-CI: SE = (upper - lower) / (2 * 1.96)
     """
@@ -97,7 +99,37 @@ def _derive_se_from_ci(ci_lower: float, ci_upper: float) -> float:
     return (ci_upper - ci_lower) / (2 * SE_FROM_CI_Z_MULTIPLIER)
 
 
-def _resolve_se(routed: RoutedNumeric) -> tuple[float | None, SESource]:
+def _derive_se_from_ci_log_scale(ci_lower: float, ci_upper: float) -> float:
+    """Derive SE on the log scale from a 95% CI on the original ratio scale.
+
+    For ratio measures (OR, HR, RR), CIs are reported on the original scale
+    but SE is needed on the log scale.
+
+    Formula: SE_log = (ln(CI_u) - ln(CI_l)) / (2 * 1.96)
+    """
+    # Formula S3-SE-CI-LOG: SE = (ln(CI_u) - ln(CI_l)) / (2 * Z_0.975)
+    return (math.log(ci_upper) - math.log(ci_lower)) / (2 * SE_FROM_CI_Z_MULTIPLIER)
+
+
+def _is_ratio_measure(effect_type_reported: str) -> bool:
+    """Check if the reported effect type is a ratio measure (OR, HR, RR).
+
+    These require log-scale SE derivation when CI is on the original scale.
+    """
+    # Import here to avoid circular import at module level
+    from crci.shared.models.enums import EffectTypeReported
+
+    return effect_type_reported in {
+        EffectTypeReported.OR,
+        EffectTypeReported.HR,
+        EffectTypeReported.RR,
+    }
+
+
+def _resolve_se(
+    routed: RoutedNumeric,
+    effect_type_reported: str | None = None,
+) -> tuple[float | None, SESource]:
     """Resolve the best available SE for a record.
 
     Priority:
@@ -118,14 +150,26 @@ def _resolve_se(routed: RoutedNumeric) -> tuple[float | None, SESource]:
 
     # Priority 2: Derive from CI
     if value.ci_lower is not None and value.ci_upper is not None:
-        se = _derive_se_from_ci(value.ci_lower, value.ci_upper)
+        # For ratio measures (OR, HR, RR), CIs are on the original scale
+        # and SE must be derived on the log scale: (ln(CI_u)-ln(CI_l))/(2*Z)
+        use_log = (
+            effect_type_reported is not None
+            and _is_ratio_measure(effect_type_reported)
+            and value.ci_lower > 0
+            and value.ci_upper > 0
+        )
+        if use_log:
+            se = _derive_se_from_ci_log_scale(value.ci_lower, value.ci_upper)
+        else:
+            se = _derive_se_from_ci(value.ci_lower, value.ci_upper)
         if se > 0:
             logger.info(
-                "span_id=%s: SE derived from CI [%.4f, %.4f] = %.4f",
+                "span_id=%s: SE derived from CI [%.4f, %.4f] = %.4f%s",
                 routed.span_id,
                 value.ci_lower,
                 value.ci_upper,
                 se,
+                " (log-scale)" if use_log else "",
             )
             return se, SESource.SE_FROM_CI
 
@@ -193,9 +237,9 @@ def _convert_r_to_d(r: float) -> float:
     # Formula S3-R-D: d = 2r / sqrt(1 - r^2)
     r_sq = r * r
     if r_sq >= 1.0:
-        # Edge case: perfect correlation — use large d
-        logger.warning("r=%.4f has r^2 >= 1.0; clamping to |d|=10", r)
-        return 10.0 if r > 0 else -10.0
+        # Edge case: perfect correlation — clamp to configured max |d|
+        logger.warning("r=%.4f has r^2 >= 1.0; clamping to |d|=%.1f", r, PERFECT_CORRELATION_CLAMP_D)
+        return PERFECT_CORRELATION_CLAMP_D if r > 0 else -PERFECT_CORRELATION_CLAMP_D
     return 2 * r / math.sqrt(1 - r_sq)
 
 
@@ -207,13 +251,14 @@ def _convert_r_to_d_se(r: float, n: int) -> float:
     r_sq = r * r
     if r_sq >= 1.0:
         logger.warning(
-            "r=%.4f has r^2 >= 1.0; cannot compute SE_d from delta method",
-            r,
+            "r=%.4f has r^2 >= 1.0; cannot compute SE_d from delta method. "
+            "Defaulting to SE=%.2f.",
+            r, SE_DERIVATION_FALLBACK,
         )
-        return 1.0  # Conservative fallback
+        return SE_DERIVATION_FALLBACK
     denominator = ((1 - r_sq) ** 1.5) * math.sqrt(n)
     if denominator <= 0:
-        return 1.0  # Conservative fallback
+        return SE_DERIVATION_FALLBACK
     return 2 / denominator
 
 
@@ -258,7 +303,7 @@ def harmonize_scale(
             "span_id=%s: BLOCKED — passing through without conversion",
             routed.span_id,
         )
-        se, se_source = _resolve_se(routed)
+        se, se_source = _resolve_se(routed, effect_type_reported)
         return ScaledNumeric(
             span_id=routed.span_id,
             beta=routed.value.value,
@@ -268,8 +313,8 @@ def harmonize_scale(
             direction_aligned=False,
         )
 
-    # Resolve SE first
-    se, se_source = _resolve_se(routed)
+    # Resolve SE first (pass effect type so ratio measures get log-scale SE)
+    se, se_source = _resolve_se(routed, effect_type_reported)
 
     # Determine the SD to use for standardization
     used_sd: float | None = study_sd
@@ -343,6 +388,17 @@ def harmonize_scale(
 
     elif effect_type_reported == EffectTypeReported.RR:
         # Treat similar to OR (log(RR) ≈ log(OR) for small effects)
+        # REVIEW: log(RR) ≈ log(OR) only when baseline risk is low.
+        # When events are common (prevalence > 0.3), OR diverges from RR
+        # and the log-OR → SMD conversion may be unreliable.
+        if routed.value.value > 2.0 or (routed.value.value > 0 and routed.value.value < 0.5):
+            logger.warning(
+                "span_id=%s: RR=%.3f suggests non-rare events; "
+                "log(RR)≈log(OR) approximation may be inaccurate. "
+                "Consider providing baseline prevalence for exact conversion.",
+                routed.span_id,
+                routed.value.value,
+            )
         log_rr = math.log(routed.value.value) if routed.value.value > 0 else routed.value.value
         if routed.target_scale == TargetScale.SD_SD:
             beta = _convert_or_to_smd(log_rr)
@@ -389,12 +445,6 @@ def harmonize_scale(
             effect_type_reported,
         )
         output_scale = EffectScale.RAW_PER_SD
-
-    # Apply SE inflation from SD borrowing
-    if converted_se is not None and se_inflation > 1.0 and se_source != SESource.SE_MISSING:
-        # Only inflate if we actually borrowed SD (already applied above for
-        # standardization cases, but apply here for direct SE cases)
-        pass  # Inflation already applied in division path above
 
     return ScaledNumeric(
         span_id=routed.span_id,
