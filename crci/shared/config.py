@@ -443,6 +443,75 @@ FEEDBACK_GAIN_WARNING: float = 0.5    # gain > 0.5 → WARNING: slow convergence
 NODE_LAYER_COUNT: int = 7
 
 # ═══════════════════════════════════════════════════════════════
+#  ALG-B: EDGE PARAMETERIZATION (§2.8, §2.9, §2.10, §2.13)
+# ═══════════════════════════════════════════════════════════════
+
+# B2: Temporal mismatch (Layer 6) — range 1.0–1.6×
+B2_TEMPORAL_MISMATCH_MAX: float = 1.6
+B2_TEMPORAL_MISMATCH_HALF_DAYS: float = 180.0  # halflife for SE inflation
+
+# B3: RobustMAP prior (Schmidli et al., 2014)
+# Formula: w = min(W_MAX, W_BASE + W_PER_K × k)
+B3_ROBUST_MAP_W_BASE: float = 0.5
+B3_ROBUST_MAP_W_PER_K: float = 0.06
+B3_ROBUST_MAP_W_MAX: float = 0.8
+B3_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10²)
+
+# B3: Power Prior discount a₀ (Ibrahim & Chen, 2000)
+# Calibration: Hackam & Redelmeier 2006 (~37% overall); Kola & Landis 2004 (CNS ~8%)
+B3_POWER_PRIOR_A0: dict[str, float] = {
+    "rct_same": 0.80,
+    "rct_diff": 0.50,
+    "cohort": 0.40,
+    "observational": 0.30,
+    "animal": 0.15,
+    "mechanistic": 0.05,
+}
+
+# B3: Mechanistic Synthesis — enters as Power Prior with a₀ = 0.05 (95% discount)
+B3_MECHANISTIC_SYNTH_A0: float = 0.05
+
+# B3: Structural Placeholder variance: N(0, σ²) — wide to express ignorance
+B3_STRUCTURAL_PLACEHOLDER_VAR: float = 100.0  # σ² = 10²
+
+# B3: Commensurate prior (Hobbs et al., 2011) — k ∈ [2,4]
+B3_COMMENSURATE_MIN_K: int = 2
+B3_COMMENSURATE_MAX_K: int = 4
+
+# B3: Design level threshold for RobustMAP ("best_design ≥ prospective")
+# Designs at or above this level qualify
+B3_PROSPECTIVE_DESIGNS: list[str] = [
+    "large_rct", "small_rct_default", "well_adjusted_cohort",
+    "unadjusted_longitudinal",
+]
+
+# B5: Turner et al. (2012) τ² prior distributions (14,886 meta-analyses)
+# Subjective outcomes (self-reported cognition)
+B5_TURNER_SUBJECTIVE_LOG_MU: float = -2.13
+B5_TURNER_SUBJECTIVE_LOG_SIGMA: float = 1.58   # median τ² ≈ 0.12
+
+# Semi-objective outcomes (neuropsych tests) & biomarkers
+B5_TURNER_SEMIOBJECTIVE_LOG_MU: float = -2.56
+B5_TURNER_SEMIOBJECTIVE_LOG_SIGMA: float = 1.07  # median τ² ≈ 0.08
+
+# B6: Chain-vs-Direct Z-score triage thresholds
+B6_Z_PASS: float = 1.5
+B6_Z_MILD: float = 2.0
+B6_Z_MODERATE: float = 3.0
+
+# B6: SE multipliers for chain-vs-direct triage tiers
+B6_SE_MULT_PASS: float = 1.0
+B6_SE_MULT_MILD: float = 1.2
+B6_SE_MULT_MODERATE: float = 1.5
+B6_SE_MULT_SUBSTANTIAL: float = 2.0
+
+# B6: Alignment Validity formula: AV(e) = 1 − min(Z/DIVISOR, 1.0)
+B6_AV_Z_DIVISOR: float = 3.0
+
+# B7: Number of context-matched prior specifications
+B7_N_CONTEXT_SPECS: int = 33
+
+# ═══════════════════════════════════════════════════════════════
 #  DATABASE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
