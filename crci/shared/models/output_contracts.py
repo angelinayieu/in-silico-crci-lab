@@ -90,6 +90,7 @@ class SchedulePlan(BaseModel):
     risk_summary: dict[str, float] = Field(default_factory=dict)
     rationale: list[str] = Field(default_factory=list)
     constraints_applied: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════════════════
