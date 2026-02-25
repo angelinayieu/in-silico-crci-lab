@@ -97,14 +97,16 @@ def compute_chain_product(
     sum_relative_var = 0.0
     for edge in edges_in_chain:
         if edge.beta_mean == 0.0:
-            # If any edge beta is exactly 0, the chain SE is not well defined
-            # Use a conservative large SE
+            # If any edge beta is exactly 0, the chain product is 0 and
+            # the delta-method SE is mathematically undefined (division by 0).
+            # Mark the chain as untestable: beta_chain=0, SE=0.
             logger.warning(
                 "P5-S2: Edge '%s' has beta_mean=0.0 in chain; "
-                "relative variance term undefined. Using SE directly.",
+                "chain product is 0 and delta-method SE undefined. "
+                "Marking chain as UNTESTABLE.",
                 edge.edge_relation_id,
             )
-            return 0.0, edge.beta_se
+            return 0.0, 0.0
         relative_se = edge.beta_se / edge.beta_mean
         sum_relative_var += relative_se ** 2
 

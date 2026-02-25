@@ -434,11 +434,21 @@ RESIDUAL_CORRELATION_PAIRS: list[tuple[str, str, float, str, str]] = [
     ("NODE_BIO_NFL", "NODE_BIO_TNF", 0.31, "neuro_stress", "Schroyen et al., 2021"),
 ]
 
-# A5b: Proxy validity SE multiplier tiers (§2.17)
+# A5b: Proxy validity R² thresholds and SE multiplier tiers (§2.17)
+PROXY_R_SQ_HIGH_THRESHOLD: float = 0.5   # R² threshold for HIGH validity
+PROXY_R_SQ_MODERATE_THRESHOLD: float = 0.3  # R² threshold for MODERATE
+PROXY_R_SQ_LOW_THRESHOLD: float = 0.2   # R² threshold for LOW
 PROXY_SE_MULTIPLIER_HIGH: float = 1.0    # R² ≥ 0.5
 PROXY_SE_MULTIPLIER_MODERATE: float = 1.25  # R² 0.3–0.5
 PROXY_SE_MULTIPLIER_LOW: float = 1.5     # R² 0.2–0.3
 PROXY_SE_MULTIPLIER_VERY_LOW: float = 2.0  # R² < 0.2
+
+# A2b: Secondary instrument loading factor
+INSTRUMENT_SECONDARY_LOADING_FACTOR: float = 0.5
+
+# S3: Conversion edge cases
+PERFECT_CORRELATION_CLAMP_D: float = 10.0  # |d| cap when |r| ≥ 1.0
+SE_DERIVATION_FALLBACK: float = 1.0        # Conservative SE fallback
 
 # A5c: Feedback loop stability thresholds
 FEEDBACK_GAIN_CRITICAL: float = 1.0   # gain ≥ 1 → CRITICAL: system unstable

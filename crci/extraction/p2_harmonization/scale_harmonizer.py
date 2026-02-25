@@ -23,9 +23,11 @@ import math
 
 from crci.shared.config import (
     CONVERSION_OR_TO_SMD_FACTOR,
+    PERFECT_CORRELATION_CLAMP_D,
     SD_BORROW_TIER1_INFLATION,
     SD_BORROW_TIER2_INFLATION,
     SD_BORROW_TIER3_INFLATION,
+    SE_DERIVATION_FALLBACK,
     SE_FROM_CI_Z_MULTIPLIER,
 )
 from crci.shared.models.enums import (
@@ -193,9 +195,9 @@ def _convert_r_to_d(r: float) -> float:
     # Formula S3-R-D: d = 2r / sqrt(1 - r^2)
     r_sq = r * r
     if r_sq >= 1.0:
-        # Edge case: perfect correlation — use large d
-        logger.warning("r=%.4f has r^2 >= 1.0; clamping to |d|=10", r)
-        return 10.0 if r > 0 else -10.0
+        # Edge case: perfect correlation — clamp to configured max |d|
+        logger.warning("r=%.4f has r^2 >= 1.0; clamping to |d|=%.1f", r, PERFECT_CORRELATION_CLAMP_D)
+        return PERFECT_CORRELATION_CLAMP_D if r > 0 else -PERFECT_CORRELATION_CLAMP_D
     return 2 * r / math.sqrt(1 - r_sq)
 
 
@@ -207,13 +209,14 @@ def _convert_r_to_d_se(r: float, n: int) -> float:
     r_sq = r * r
     if r_sq >= 1.0:
         logger.warning(
-            "r=%.4f has r^2 >= 1.0; cannot compute SE_d from delta method",
-            r,
+            "r=%.4f has r^2 >= 1.0; cannot compute SE_d from delta method. "
+            "Defaulting to SE=%.2f.",
+            r, SE_DERIVATION_FALLBACK,
         )
-        return 1.0  # Conservative fallback
+        return SE_DERIVATION_FALLBACK
     denominator = ((1 - r_sq) ** 1.5) * math.sqrt(n)
     if denominator <= 0:
-        return 1.0  # Conservative fallback
+        return SE_DERIVATION_FALLBACK
     return 2 / denominator
 
 

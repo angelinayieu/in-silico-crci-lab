@@ -28,6 +28,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import CohortExtendedResponse, CohortResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -222,7 +223,7 @@ class CohortAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag03_ann_{uuid.uuid4().hex[:12]}",
-                    category="population_specificity",
+                    category=AnnotationCategory.POPULATION_SPECIFICITY,
                     content=f"Cancer type: {cohort_resp.cancer_type}",
                     evidence_strength="moderate",
                     extraction_snippet=cohort_resp.demographics_notes,
@@ -234,7 +235,7 @@ class CohortAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag03_ann_{uuid.uuid4().hex[:12]}",
-                    category="population_specificity",
+                    category=AnnotationCategory.POPULATION_SPECIFICITY,
                     content=f"Treatment phase: {cohort_resp.treatment_phase}",
                     evidence_strength="moderate",
                     extraction_snippet=cohort_resp.demographics_notes,
@@ -246,7 +247,7 @@ class CohortAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag03_ann_{uuid.uuid4().hex[:12]}",
-                    category="population_specificity",
+                    category=AnnotationCategory.POPULATION_SPECIFICITY,
                     content=cohort_resp.demographics_notes,
                     evidence_strength="weak",
                     extraction_snippet=cohort_resp.demographics_notes,
@@ -350,7 +351,7 @@ class CohortAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag03ext_ann_{uuid.uuid4().hex[:12]}",
-                    category="population_specificity",
+                    category=AnnotationCategory.POPULATION_SPECIFICITY,
                     content=(
                         f"Cognitive score: {cog.instrument_name} "
                         f"domain={cog.domain or 'overall'} "

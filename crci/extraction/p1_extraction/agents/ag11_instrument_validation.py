@@ -30,6 +30,7 @@ from crci.extraction.p1_extraction.agents.base_agent import (
 )
 from crci.llm.client import LLMClient
 from crci.llm.response_schemas import InstrumentValidationResponse
+from crci.shared.models.enums import AnnotationCategory
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -233,7 +234,7 @@ class InstrumentValidationAgent(BaseAgent):
             annotations.append(
                 RawAnnotationEmission(
                     annotation_id=f"ag11_ann_{uuid.uuid4().hex[:12]}",
-                    category="measurement_limitation",
+                    category=AnnotationCategory.MEASUREMENT_LIMITATION,
                     content=(
                         f"Psychometric properties extracted for: "
                         f"{', '.join(set(instrument_names))}"

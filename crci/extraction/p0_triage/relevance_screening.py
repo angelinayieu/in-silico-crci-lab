@@ -169,6 +169,15 @@ def screen_relevance(
         known_dois=known_dois,
     )
 
+    # ─── Gate P0-G3: Not duplicate ─────────────────────────────
+    if exclusion_criteria.get("duplicate_doi", False):
+        doi = pubmed_metadata.get("doi", "")
+        raise GateViolation(
+            "P0-G3",
+            f"Duplicate DOI detected: {doi}. Paper already processed.",
+            {"doi": doi},
+        )
+
     # ─── Compute relevance score ──────────────────────────────
     # Spec: Score = proportion of inclusion met x (1 - any exclusion)
     inclusion_count = sum(1 for v in inclusion_criteria.values() if v)
@@ -255,7 +264,7 @@ def _check_inclusion_criteria(
         animal_translation = _keyword_density_check(
             text_lower, _ANIMAL_WITH_TRANSLATION_KEYWORDS, min_hits=1
         )
-        if animal_translation and "animal" in text_lower or "mouse" in text_lower or "rat" in text_lower:
+        if animal_translation and ("animal" in text_lower or "mouse" in text_lower or "rat" in text_lower):
             human_hit = True
             logger.info(
                 "Criterion 4 (human subjects): accepted as mechanistic animal "

@@ -134,6 +134,7 @@ def resolve_double_counting(
         # Step 2 — Formula DCR-2: n_weighted_overlap
         n_weighted_overlap = _compute_n_weighted_overlap(
             primary_claims=primary_claims,
+            primary_study_ids=primary_study_ids,
             ma_included_study_ids=ma_included,
         )
 
@@ -223,6 +224,7 @@ def _compute_count_overlap(
 
 def _compute_n_weighted_overlap(
     primary_claims: list[HarmonizedClaim],
+    primary_study_ids: set[str],
     ma_included_study_ids: set[str],
 ) -> float:
     """Formula DCR-2: n_weighted = sum(N_i overlapping) / sum(N_i all MA included).
@@ -231,6 +233,7 @@ def _compute_n_weighted_overlap(
 
     Args:
         primary_claims: Primary study claims in this edge group.
+        primary_study_ids: Set of study_ids from primary claims (for overlap check).
         ma_included_study_ids: Set of study_ids included in the MA.
 
     Returns:
@@ -253,17 +256,16 @@ def _compute_n_weighted_overlap(
     total_ma_n = 0
 
     for study_id in ma_included_study_ids:
-        # For total_ma_n: we need N for ALL MA-included studies.
-        # We only know N for those that appear as primaries in our registry.
         n_for_study = primary_n_by_study.get(study_id, 0)
 
         if n_for_study > 0:
+            # We have N data for this MA constituent study
             total_ma_n += n_for_study
-            # This study is in the registry intersection
-            if study_id in primary_n_by_study:
+            # Only count as overlapping if ALSO in our primary study registry
+            if study_id in primary_study_ids:
                 overlapping_n += n_for_study
         else:
-            # Study is in MA but not in our primary registry — no N available.
+            # Study is in MA but we have no N data.
             # Log the default: we treat missing N as 0 contribution.
             logger.debug(
                 "DCR-2: MA constituent study %s has no N in primary registry. "

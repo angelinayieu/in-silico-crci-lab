@@ -563,6 +563,9 @@ class SEType(StrEnum):
 
 @unique
 class AggregationMethod(StrEnum):
+    BLOCKED = "BLOCKED"
+    DIRECT = "DIRECT"
+    STRATIFIED = "STRATIFIED"
     IVW_FIXED = "IVW_fixed"
     IVW_RANDOM = "IVW_random"
     SINGLE_BEST = "single_best"

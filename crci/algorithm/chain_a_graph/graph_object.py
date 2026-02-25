@@ -270,13 +270,13 @@ def build_proxy_table(node_map: NodeMap) -> list[ProxyDef]:
         r_sq = node.proxy_r_squared
 
         # Compute SE multiplier and validity level
-        if r_sq is not None and r_sq >= 0.5:
+        if r_sq is not None and r_sq >= config.PROXY_R_SQ_HIGH_THRESHOLD:
             se_mult = config.PROXY_SE_MULTIPLIER_HIGH
             validity = "HIGH"
-        elif r_sq is not None and r_sq >= 0.3:
+        elif r_sq is not None and r_sq >= config.PROXY_R_SQ_MODERATE_THRESHOLD:
             se_mult = config.PROXY_SE_MULTIPLIER_MODERATE
             validity = "MODERATE"
-        elif r_sq is not None and r_sq >= 0.2:
+        elif r_sq is not None and r_sq >= config.PROXY_R_SQ_LOW_THRESHOLD:
             se_mult = config.PROXY_SE_MULTIPLIER_LOW
             validity = "LOW"
         else:

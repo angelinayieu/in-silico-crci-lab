@@ -235,8 +235,8 @@ def assemble_instrument_map(
         for sec_node in inst.maps_to_node_ids:
             if sec_node in node_map.node_index and sec_node != primary_node:
                 sec_idx = node_map.node_index[sec_node]
-                # Secondary nodes get a reduced loading (loading × 0.5)
-                H[i, sec_idx] = inst.loading_b_k * 0.5
+                # Secondary nodes get a reduced loading
+                H[i, sec_idx] = inst.loading_b_k * config.INSTRUMENT_SECONDARY_LOADING_FACTOR
                 node_to_instruments.setdefault(sec_node, []).append(
                     inst.instrument_id
                 )
