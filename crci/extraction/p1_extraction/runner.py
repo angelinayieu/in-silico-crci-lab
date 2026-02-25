@@ -149,11 +149,11 @@ def run_p1_extraction(
         agent_name = agent.__class__.__name__
         logger.info("Running agent %s", agent_name)
         try:
-            raw_annotations = agent.extract(paper_map, extraction_mode=extraction_mode)
-            all_raw_annotations.extend(raw_annotations)
+            agent_output = agent.extract(paper_map)
+            all_raw_annotations.extend(agent_output.annotations)
             logger.info(
                 "Agent %s produced %d annotations",
-                agent_name, len(raw_annotations),
+                agent_name, len(agent_output.annotations),
             )
         except Exception as exc:
             logger.error("Agent %s failed: %s", agent_name, exc)
@@ -167,17 +167,17 @@ def run_p1_extraction(
     from crci.extraction.p1_extraction.reconciliation import reconcile_annotations
 
     reconciliation_result = reconcile_annotations(
-        raw_annotations=all_raw_annotations,
-        paper_id=paper_id,
-        extraction_run_id=extraction_run_id,
         session=session,
+        raw_annotations=all_raw_annotations,
+        study_id=paper_id,
+        extraction_run_id=extraction_run_id,
     )
     context["reconciliation_result"] = reconciliation_result
 
     logger.info(
         "P1-REC complete: %d reconciled, %d conflicts",
-        reconciliation_result.n_reconciled,
-        reconciliation_result.n_conflicts,
+        len(reconciliation_result.reconciled_annotations),
+        reconciliation_result.total_conflicts,
     )
 
     # ── P1-ATB: Annotation Trust Boundary ──
@@ -185,18 +185,15 @@ def run_p1_extraction(
     from crci.extraction.p1_extraction.annotation_trust_boundary import validate_annotations
 
     atb_result = validate_annotations(
-        reconciled_annotations=reconciliation_result.reconciled,
-        paper_id=paper_id,
-        extraction_run_id=extraction_run_id,
         session=session,
+        reconciliation_result=reconciliation_result,
     )
     context["atb_result"] = atb_result
 
     logger.info(
-        "P1-ATB complete: %d accepted, %d rejected, %d review",
-        atb_result.n_accepted,
-        atb_result.n_rejected,
-        atb_result.n_review,
+        "P1-ATB complete: %d accepted, %d rejected",
+        atb_result.total_accepted,
+        atb_result.total_rejected,
     )
 
     return context

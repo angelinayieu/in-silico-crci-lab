@@ -396,10 +396,10 @@ class TestLayer7FreshnessDecay:
         assert w == pytest.approx(1.0)
 
     def test_3_years_old(self) -> None:
-        """pub_year = 2023, ref = 2026 → w = 1 − 0.015×3 = 0.955."""
-        w, notes = layer_7_freshness_decay(2023)
+        """pub_year = 2022, ref = 2025 → w = 1 − 0.015×3 = 0.955."""
+        w, notes = layer_7_freshness_decay(2022)
         expected = 1.0 - config.FRESHNESS_DECAY_RATE * (
-            config.FRESHNESS_REFERENCE_YEAR - 2023
+            config.FRESHNESS_REFERENCE_YEAR - 2022
         )
         assert w == pytest.approx(expected)
         assert w == pytest.approx(0.955, rel=1e-6)
@@ -407,9 +407,9 @@ class TestLayer7FreshnessDecay:
     def test_20_years_old_floor(self) -> None:
         """Very old study → floor at 0.70.
 
-        pub_year = 2006 → age = 20 → w_raw = 1 − 0.015×20 = 0.70 (exactly at floor)
+        pub_year = 2005 → age = 20 → w_raw = 1 − 0.015×20 = 0.70 (exactly at floor)
         """
-        w, notes = layer_7_freshness_decay(2006)
+        w, notes = layer_7_freshness_decay(2005)
         assert w == pytest.approx(config.FRESHNESS_FLOOR)
         assert w == pytest.approx(0.70)
 

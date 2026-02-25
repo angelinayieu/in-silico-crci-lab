@@ -74,8 +74,10 @@ class TestWorkedExample:
             expected_w_temporal, rel=1e-4
         )
 
-        # L7: freshness
-        expected_w_fresh = 1.0 - config.FRESHNESS_DECAY_RATE * 3.0
+        # L7: freshness (ref_year=2025, pub_year=2023 → age=2)
+        expected_w_fresh = 1.0 - config.FRESHNESS_DECAY_RATE * (
+            config.FRESHNESS_REFERENCE_YEAR - 2023
+        )
         assert result.layer_multipliers["L7_freshness"] == pytest.approx(
             expected_w_fresh, rel=1e-6
         )

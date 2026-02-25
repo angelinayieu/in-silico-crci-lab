@@ -138,10 +138,10 @@ def run_p0_triage(
     context["extraction_mode"] = triage_result.extraction_mode.value
 
     logger.info(
-        "P0-S3 complete: paper_id=%s, mode=%s, route=%s",
+        "P0-S3 complete: paper_id=%s, mode=%s, subtype=%s",
         paper_id,
         triage_result.extraction_mode.value,
-        triage_result.route,
+        triage_result.paper_subtype,
     )
 
     # ── Register in study_registry_v1 with v2.0 columns ──

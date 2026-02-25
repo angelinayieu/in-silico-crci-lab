@@ -466,6 +466,201 @@ D3_MAX_BUNDLE_SIZE: int = 4
 D3_EXHAUSTIVE_SEARCH_MAX_CANDIDATES: int = 8
 
 # ═══════════════════════════════════════════════════════════════
+#  D4: SAFE SCORE RANKING (§2.16.2 — spec lines 2374-2424)
+# ═══════════════════════════════════════════════════════════════
+
+# D4a Formula D-3: SAFE_A(a) = MSS_cog(a) − λ × MSS_burden(a)
+# λ = 0.3 (burden penalty weight, AUTHOR-CONSTRUCTED, spec line 2390)
+# REVIEW: config.SAFE_MODE_A_DEFAULT_LAMBDA (0.5) exists from a different spec section;
+#   D4a chain card explicitly says 0.3. Using 0.3 per spec line 2390.
+D4_BURDEN_PENALTY_WEIGHT: float = 0.3
+
+# D4b Formula D-4: SAFE_B(a) = SAFE_A(a) + α × ln(P_adhere(a))
+# α = 0.5 (adherence adjustment weight, spec line 2402)
+D4_ADHERENCE_ADJUSTMENT_WEIGHT: float = 0.5
+
+# D4b Formula D-5: logit(P_adhere) = intercept − β_burden·Burden − β_dur·Duration
+# Coefficients from 6-trial author estimate (spec line 2404)
+D4_ADHERENCE_INTERCEPT: float = 1.8
+D4_ADHERENCE_BURDEN_COEFF: float = 0.42
+D4_ADHERENCE_DURATION_COEFF: float = 0.03
+
+# D4b: Bundle adherence — P_adhere(B) = Π_a P_adhere(a) × (1 − δ(|B|−1))
+# δ = 0.05 per additional member (spec line 2406)
+D4_BUNDLE_ADHERENCE_REDUCTION: float = 0.05
+
+# D4b: P_adhere < 0.30 → WARNING flag (spec line 2409)
+D4_ADHERENCE_WARNING_THRESHOLD: float = 0.30
+
+# D4: 95% CrI from 2.5th/97.5th percentiles (spec line 2394)
+D4_CRI_LOWER_QUANTILE: float = 0.025
+D4_CRI_UPPER_QUANTILE: float = 0.975
+
+# D4c: Top N edges by discovery_score reported in Chain F (spec line 2423)
+D4_TOP_DISCOVERY_COUNT: int = 5
+
+# ═══════════════════════════════════════════════════════════════
+#  D5: DOSE OPTIMIZATION (§2.16.3 — spec lines 2426-2472)
+# ═══════════════════════════════════════════════════════════════
+
+# D5b: Dose conflict ratio threshold (spec line 2459)
+D5_DOSE_CONFLICT_RATIO_THRESHOLD: float = 1.3
+
+# D5a: Grid search resolution (number of dose levels to evaluate)
+D5_DOSE_GRID_STEPS: int = 100
+
+# ═══════════════════════════════════════════════════════════════
+#  D6: CAUSAL LANGUAGE ASSIGNMENT (§2.16.4 — spec lines 2474-2497)
+# ═══════════════════════════════════════════════════════════════
+
+# D6: Chain-vs-direct Z threshold for demotion to model_implied (spec line 2495)
+D6_CHAIN_VS_DIRECT_Z_DEMOTE: float = 3.0
+
+# ═══════════════════════════════════════════════════════════════
+#  E1: NADIR ESTIMATION (§2.18 — spec lines 2677-2726)
+# ═══════════════════════════════════════════════════════════════
+
+# E1a: Treatment timeline classification (spec line 2698)
+# EARLY_POST: Δt < 6 months; LATE_POST: Δt ≥ 6 months
+E1_EARLY_POST_THRESHOLD_MONTHS: float = 6.0
+
+# E1b: Back-estimation stability limit (spec line 2711)
+# If R(Δt) ≥ 0.8 → switch to Scenario (c) context-based
+E1_BACK_ESTIMATION_R_LIMIT: float = 0.8
+
+# E1: Confidence by scenario (author-constructed)
+E1_CONFIDENCE_DURING_TX: float = 0.90
+E1_CONFIDENCE_EARLY_POST: float = 0.70
+E1_CONFIDENCE_LATE_POST: float = 0.50
+
+# E: Standard prediction horizons in months (spec line 2870)
+E_PREDICTION_HORIZONS: list[int] = [3, 6, 12, 24]
+E_MAX_HORIZON_MONTHS: int = 36
+
+# ═══════════════════════════════════════════════════════════════
+#  E2: NATURAL RECOVERY TRAJECTORY (§2.18 — spec lines 2728-2781)
+# ═══════════════════════════════════════════════════════════════
+
+# E2c: MC sampling noise on recovery parameters (spec line 2775-2777)
+E2_R_INFINITY_NOISE_SD: float = 0.10  # r_∞^(m) ~ N(r_∞, 0.10²)
+E2_TAU_R_LOG_NOISE_SD: float = 0.20  # τ_R^(m) ~ LogNormal(ln(τ_R), 0.20²)
+
+# ═══════════════════════════════════════════════════════════════
+#  E3: INTERVENTION TEMPORAL OVERLAY + AGING (spec lines 2783-2871)
+# ═══════════════════════════════════════════════════════════════
+
+# E3a: Kernel decay constant = ln(2) ≈ 0.693 (spec line 2805)
+E3_DECAY_LN2: float = 0.693
+
+# E3b: Accelerated Cognitive Aging (spec lines 2824-2837)
+# Base aging rate: 0.02 SD/year (normal cognitive decline)
+E3_BASE_AGING_RATE_SD_PER_YEAR: float = 0.02
+# Age adjustment reference: max(1, (age − 50) / 10)
+E3_AGING_AGE_REFERENCE: float = 50.0
+E3_AGING_AGE_DIVISOR: float = 10.0
+
+# ACC coefficients (spec lines 2827-2831)
+E3_ACC_COEFFICIENTS: dict[str, float] = {
+    "no_chemotherapy": 1.0,
+    "tc_docetaxel": 1.3,
+    "standard_chemo": 1.5,
+    "anthracycline": 2.0,
+    "childhood_cancer": 2.5,
+}
+E3_ACC_DEFAULT: float = 1.5  # standard_chemo fallback
+
+# ═══════════════════════════════════════════════════════════════
+#  E4: UNCERTAINTY + COUNTERFACTUALS (spec lines 2872-2934)
+# ═══════════════════════════════════════════════════════════════
+
+# E4a: Uncertainty growth model (Formula E-6, spec line 2884)
+# Var(θ(t)) = Var(θ₀) + LINEAR·t + QUADRATIC·t²
+E4_VAR_LINEAR_COEFF: float = 0.01   # 0.1 SD/month — epistemic drift
+E4_VAR_QUADRATIC_COEFF: float = 0.005  # second-order uncertainty about uncertainty
+
+# E4a: Default kernel scale factor for conservative (unfitted) kernels
+E4_VAR_DEFAULT_KERNEL_SCALE: float = 1.5  # 1.5× coefficients for default kernels
+
+# E4c: Severity threshold for ARR/RRR/NNT (composite score threshold)
+# "Impaired" if composite cognitive score < this threshold (in SD units)
+E4_SEVERITY_THRESHOLD_SD: float = -0.5  # 0.5 SD below population mean
+
+# E4c: NNT classification thresholds (spec line 2929-2931)
+E4_NNT_STRONG_THRESHOLD: float = 3.0   # NNT < 3 → strong recommendation
+E4_NNT_MODERATE_THRESHOLD: float = 10.0  # NNT 3-10 → moderate; > 10 → weak
+
+# E4c: CrI quantiles for ITE and NNT (same as D4)
+E4_CRI_LOWER_QUANTILE: float = 0.025
+E4_CRI_UPPER_QUANTILE: float = 0.975
+
+# ═══════════════════════════════════════════════════════════════
+#  F1: COMPOSITE OUTCOME SCORING (spec lines 3117-3191)
+# ═══════════════════════════════════════════════════════════════
+
+# F1b: Severity weight thresholds (spec lines 3153-3155)
+F1_SEVERITY_WEIGHT_MILD: float = 1.0   # |z| < 1.0 SD
+F1_SEVERITY_WEIGHT_MODERATE: float = 1.5  # 1.0 ≤ |z| < 2.0 SD
+F1_SEVERITY_WEIGHT_SEVERE: float = 2.0  # |z| ≥ 2.0 SD
+F1_SEVERITY_THRESHOLD_MODERATE: float = 1.0  # |z| boundary for 1.5×
+F1_SEVERITY_THRESHOLD_SEVERE: float = 2.0  # |z| boundary for 2.0×
+
+# F1c: Random effects threshold (spec line 3174)
+F1_I_SQUARED_RE_THRESHOLD: float = 50.0  # I² > 50% → random effects
+
+# F1c: Severity tier percentile boundaries (spec lines 3179-3185)
+F1_TIER_EXCELLENT_MIN: float = 85.0
+F1_TIER_GOOD_MIN: float = 70.0
+F1_TIER_MILD_MIN: float = 50.0
+F1_TIER_MODERATE_MIN: float = 30.0
+F1_TIER_POOR_MIN: float = 15.0
+# Below 15 → Severe
+
+# F-G1: Composite z-score clamp bounds (spec line 3190)
+F1_COMPOSITE_Z_MIN: float = -5.0
+F1_COMPOSITE_Z_MAX: float = 5.0
+
+# F1a: Cognitive domain names (spec lines 3142-3144)
+F1_COGNITIVE_DOMAINS: list[str] = [
+    "processing_speed",
+    "attention",
+    "executive_function",
+    "memory_verbal",
+    "memory_visual",
+    "working_memory",
+    "language",
+    "visuospatial",
+    "motor",
+    "mood",
+    "fatigue",
+]
+
+# ═══════════════════════════════════════════════════════════════
+#  F2: DECISION STABILITY (spec lines 3193-3255)
+# ═══════════════════════════════════════════════════════════════
+
+# F2b: Stability classification thresholds (spec lines 3228-3231)
+F2_STABILITY_STABLE: float = 0.80
+F2_STABILITY_MODERATE: float = 0.60
+F2_STABILITY_UNSTABLE: float = 0.40
+# Below 0.40 → HIGHLY_UNSTABLE
+
+# F2c: Minimum draws per partition for edge influence (spec line 3251)
+F2_MIN_DRAWS_PER_PARTITION: int = 100
+
+# F2c: Number of critical edges to identify (spec line 3248)
+F2_N_CRITICAL_EDGES: int = 3
+
+# ═══════════════════════════════════════════════════════════════
+#  F3: VARIANCE DECOMPOSITION (spec lines 3257-3363)
+# ═══════════════════════════════════════════════════════════════
+
+# F3d: Proxy validity warning threshold (spec line 3322)
+F3_PROXY_R2_LOW_THRESHOLD: float = 0.3
+
+# F3f: Validation tolerance (spec line 3362)
+F3_SUM_TOLERANCE: float = 0.01
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 
@@ -610,6 +805,58 @@ SAFE_MODE_A_DEFAULT_LAMBDA: float = 0.5  # burden penalty weight
 SAFE_BOOTSTRAP_RESAMPLES: int = 1000
 SAFE_STABILITY_THRESHOLD_STABLE: float = 0.80
 SAFE_STABILITY_THRESHOLD_SOFT: float = 0.60
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-G: SCHEDULE OPTIMIZATION (SYS_RT lines 90-258)
+# ═══════════════════════════════════════════════════════════════
+
+# G1: Top-K candidates to expand (spec line 147, default 10)
+RT_G_TOP_K_DEFAULT: int = 10
+
+# G1: Maximum expanded pool size (computational limit, spec line 153)
+RT_G_MAX_POOL_SIZE: int = 100
+
+# G2: Bundle ceiling total effect (spec line 164, Formula G-4)
+RT_G_BUNDLE_CEILING_SD: float = 1.5
+
+# G2: Evidence reliability threshold (Formula G-5, spec line 249)
+RT_G_EVIDENCE_R_EXCLUDED: float = 0.25   # R < 0.25 → excluded
+RT_G_EVIDENCE_R_LIMITED: float = 0.50    # R < 0.50 → limited
+
+# G3: Number of top schedules for detailed output (spec line 219)
+RT_G_TOP_SCHEDULES: int = 5
+
+# G-G2 gate: SAFE_B threshold for confident recommendation (spec line 240)
+RT_G_SAFE_B_MID_THRESHOLD: float = 0.5
+
+# G1: Dose variant multipliers (spec lines 142-154)
+RT_G_DOSE_LOW_MULTIPLIER: float = 0.5
+RT_G_DOSE_HIGH_MULTIPLIER: float = 1.5
+
+# Constraint filtering: default patient context values
+RT_G_DEFAULT_PATIENT_AGE: int = 60
+RT_G_COMORBIDITY_SAFETY_THRESHOLD: int = 3
+RT_G_AGE_SAFETY_THRESHOLD: int = 80
+
+# RT-I: Report assembly defaults
+RT_I_DEFAULT_DURATION_WEEKS: int = 12
+RT_I_DECISION_TRACE_TOP_N: int = 3
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-H: ADAPTIVE QUESTIONING (SYS_RT lines 260-388)
+# ═══════════════════════════════════════════════════════════════
+
+# H-3: Maximum questions per session (spec line 311)
+RT_H_MAX_QUESTIONS: int = 15
+
+# H-3: Information gain stopping threshold (spec line 379)
+RT_H_IG_THRESHOLD: float = 0.01
+
+# H-3: Variance reduction stopping threshold (spec line 331)
+RT_H_VAR_REDUCTION_THRESHOLD: float = 0.05
+
+# H-3: P(rank₁) stability stopping threshold (spec line 328)
+RT_H_STABILITY_STOP_THRESHOLD: float = 0.80
 
 # ═══════════════════════════════════════════════════════════════
 #  SEVERITY TIERS (§2.20)
