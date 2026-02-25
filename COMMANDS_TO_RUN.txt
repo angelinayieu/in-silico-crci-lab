@@ -1,0 +1,12 @@
+# CRCI Quick Setup - Copy and paste these commands ONE AT A TIME into a fresh terminal
+
+# 1. Create database (one command)
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS crci; DROP ROLE IF EXISTS crci; CREATE ROLE crci WITH LOGIN PASSWORD 'crci' SUPERUSER CREATEDB; CREATE DATABASE crci OWNER crci;"
+
+# 2. Initialize schema (one command)
+cd /workspaces/in-silico-crci-lab && export DATABASE_URL="postgresql://crci:crci@localhost:5432/crci" && export PYTHONPATH="/workspaces/in-silico-crci-lab" && python scripts/setup_database.py --init --seed
+
+# 3. Run extraction on your paper
+cd /workspaces/in-silico-crci-lab && export DATABASE_URL="postgresql://crci:crci@localhost:5432/crci" && export PYTHONPATH="/workspaces/in-silico-crci-lab" && python scripts/run_extraction.py /workspaces/in-silico-crci-lab/cherrier2013.pdf
+
+# Note: If sudo asks for a password, just press Enter or Ctrl+C and try the alternative below
