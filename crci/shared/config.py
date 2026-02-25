@@ -413,6 +413,27 @@ D5_DOSE_GRID_STEPS: int = 100
 D6_CHAIN_VS_DIRECT_Z_DEMOTE: float = 3.0
 
 # ═══════════════════════════════════════════════════════════════
+#  E1: NADIR ESTIMATION (§2.18 — spec lines 2677-2726)
+# ═══════════════════════════════════════════════════════════════
+
+# E1a: Treatment timeline classification (spec line 2698)
+# EARLY_POST: Δt < 6 months; LATE_POST: Δt ≥ 6 months
+E1_EARLY_POST_THRESHOLD_MONTHS: float = 6.0
+
+# E1b: Back-estimation stability limit (spec line 2711)
+# If R(Δt) ≥ 0.8 → switch to Scenario (c) context-based
+E1_BACK_ESTIMATION_R_LIMIT: float = 0.8
+
+# E1: Confidence by scenario (author-constructed)
+E1_CONFIDENCE_DURING_TX: float = 0.90
+E1_CONFIDENCE_EARLY_POST: float = 0.70
+E1_CONFIDENCE_LATE_POST: float = 0.50
+
+# E: Standard prediction horizons in months (spec line 2870)
+E_PREDICTION_HORIZONS: list[int] = [3, 6, 12, 24]
+E_MAX_HORIZON_MONTHS: int = 36
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 

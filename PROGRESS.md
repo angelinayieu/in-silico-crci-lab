@@ -3,10 +3,10 @@
 ## Current Position
 - **Phase:** 5 (Algorithm Chains)
 - **Prompt:** 5.4 (ALG-D: Monte Carlo Simulation)
-- **Last completed slice:** D3-synergy (synergy_bundle.py)
-- **Next slice:** D4-D6 (ranker.py — SAFE Scoring, Ranking, Dose Optimization)
+- **Last completed slice:** D4-D6 (ranker.py)
+- **Next slice:** E1 (trajectory_simulator.py — Natural Recovery + Intervention Trajectories)
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Latest commit:** `2b3e83f` — feat: Implement ALG-D3-synergy synergy_bundle.py
+- **Latest commit:** `1e262f3` — feat: Implement ALG-D4-D6 ranker.py
 
 ## Completed Slices (this phase)
 
@@ -19,7 +19,7 @@
 | C4 | `chain_c_posterior/modifier_application.py` | `c33b52e` | DONE |
 | C5 | `chain_c_posterior/posterior_writer.py` | `988866a` | DONE |
 
-### ALG-D (Chain D: Monte Carlo Simulation) — IN PROGRESS
+### ALG-D (Chain D: Monte Carlo Simulation) — COMPLETE
 | Slice | File | Commit | Status |
 |-------|------|--------|--------|
 | D0 | `chain_d_simulation/intervention_loader.py` | `e5a09a4` | DONE |
@@ -27,13 +27,15 @@
 | D2 | `chain_d_simulation/effect_propagation.py` | `0c434ce` | DONE |
 | D3 | `chain_d_simulation/safety_checker.py` | `610c101` | DONE |
 | D3-syn | `chain_d_simulation/synergy_bundle.py` | `2b3e83f` | DONE |
-| D4-D6 | `chain_d_simulation/ranker.py` | — | **NEXT** |
+| D4-D6 | `chain_d_simulation/ranker.py` | `1e262f3` | DONE |
 
-### ALG-E (Chain E: Temporal Prediction) — NOT STARTED
+### ALG-E (Chain E: Temporal Prediction) — IN PROGRESS
 | Slice | File | Commit | Status |
 |-------|------|--------|--------|
-| E1-E2 | `chain_e_temporal/trajectory_simulator.py` | — | PENDING |
-| E3 | `chain_e_temporal/recovery_model.py` | — | PENDING |
+| E1 | `chain_e_temporal/nadir_estimator.py` | — | **NEXT** |
+| E2 | `chain_e_temporal/recovery_trajectory.py` | — | PENDING |
+| E3 | `chain_e_temporal/intervention_overlay.py` | — | PENDING |
+| E4 | `chain_e_temporal/uncertainty_counterfactual.py` | — | PENDING |
 
 ### ALG-F (Chain F: Analytics) — NOT STARTED
 | Slice | File | Commit | Status |
