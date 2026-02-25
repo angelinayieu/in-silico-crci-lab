@@ -404,12 +404,6 @@ def harmonize_scale(
         )
         output_scale = EffectScale.RAW_PER_SD
 
-    # Apply SE inflation from SD borrowing
-    if converted_se is not None and se_inflation > 1.0 and se_source != SESource.SE_MISSING:
-        # Only inflate if we actually borrowed SD (already applied above for
-        # standardization cases, but apply here for direct SE cases)
-        pass  # Inflation already applied in division path above
-
     return ScaledNumeric(
         span_id=routed.span_id,
         beta=beta,
