@@ -1,0 +1,7 @@
+doi,node_id,instrument_id,mean,sd,sample_size,cancer_type,treatment_phase,age_range
+10.1002/pon.4370,NODE_COG_PROC_SPEED,INST_TMT_B,33.8,9.1,9,breast,early_recovery,40-65
+10.1002/pon.4370,NODE_COG_EPISODIC_MEM,INST_HVLTR,25.2,4.0,9,breast,early_recovery,40-65
+10.1002/pon.4370,NODE_COG_VERBAL_FLUENCY,INST_COWAT,18.0,4.3,9,breast,early_recovery,40-65
+10.1002/pon.4370,NODE_SYM_COG_COMPLAINTS,INST_FACTCOG_PCI,28.8,14.8,9,breast,early_recovery,40-65
+10.1002/pon.4370,NODE_SYM_DEPRESSION,INST_CESD,15.4,2.4,9,breast,early_recovery,40-65
+10.1002/pon.4370,NODE_SYM_FATIGUE,INST_FACIT_FATIGUE,113.0,23.3,9,breast,early_recovery,40-65

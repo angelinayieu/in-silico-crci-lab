@@ -819,64 +819,27 @@ WRITES
 
 
 ───────────────────────────────────────────────────────────────────────────
-7. GATES & CHECKPOINTS
-Gate ID
-Position
-Condition
-Pass
-Fail
-A-G1
-After A1
-63 nodes loaded; layering valid; no orphans
-→ A2
-ABORT: registry corrupt
-A-G2
-After A2
-118 edges; acyclicity (modulo feedback); all endpoints valid
-→ A3
-ABORT: DAG invalid
-A-G3
-After A3
-D positive-definite; all ρ ∈ (−1, 1)
-→ A4
-ABORT: covariance invalid
-A-G4
-After A4
-Λ positive-definite; ρ(B) < 1; κ(Λ) < 10¹⁰
-→ A5
-CRITICAL: matrix unstable
-A-G5
-After A5
-All pathways, proxies, loops registered; GraphObject complete
-→ ALG-B
-ABORT: graph incomplete
+### 7. Gates & Checkpoints
 
-───────────────────────────────────────────────────────────────────────────
-8. CHAIN-LEVEL ASSUMPTIONS
-#
-Assumption
-Impact if Violated
-Binding Assumption #
-1
-Node hierarchy (7 layers) correctly represents causal ordering
-Wrong topological order → wrong propagation direction
-— (structural)
-2
-118 edges capture all relevant biological relationships
-Missing edges = missing pathways; 8 edgeless nodes known
-— (§2.22)
-3
-Block-diagonal D (8 pairs) captures all important residual correlations
-Missing correlations → under-estimated cross-node uncertainty
-Assumption 3 (parent independence)
-4
-Feedback loop gains computed from static β are valid
-If β changes substantially, gains change → stability could shift
-Assumption 4 (static β)
-5
-Linear-Gaussian SEM appropriate for z-score-transformed nodes
-Non-Gaussian nodes (binary, ordinal) misspecified
-Assumption 6 (linear SEM)
+| Gate ID | Position | Condition | Pass | Fail |
+| --- | --- | --- | --- | --- |
+| A-G1 | After A1 | 63 nodes loaded; layering valid; no orphans | → A2 | ABORT: registry corrupt |
+| A-G2 | After A2 | 118 edges; acyclicity (modulo feedback); all endpoints valid | → A3 | ABORT: DAG invalid |
+| A-G3 | After A3 | D positive-definite; all ρ ∈ (−1, 1) | → A4 | ABORT: covariance invalid |
+| A-G4 | After A4 | Λ positive-definite; ρ(B) < 1; κ(Λ) < 10¹⁰ | → A5 | CRITICAL: matrix unstable |
+| A-G5 | After A5 | All pathways, proxies, loops registered; GraphObject complete | → ALG-B | ABORT: graph incomplete |
+
+---
+
+### 8. Chain-Level Assumptions
+
+| # | Assumption | Impact if Violated | Binding Assumption # |
+| --- | --- | --- | --- |
+| 1 | Node hierarchy (7 layers) correctly represents causal ordering | Wrong topological order → wrong propagation direction | — (structural) |
+| 2 | 118 edges capture all relevant biological relationships | Missing edges = missing pathways; 8 edgeless nodes known | — (§2.22) |
+| 3 | Block-diagonal D (8 pairs) captures all important residual correlations | Missing correlations → under-estimated cross-node uncertainty | Assumption 3 (parent independence) |
+| 4 | Feedback loop gains computed from static β are valid | If β changes substantially, gains change → stability could shift | Assumption 4 (static β) |
+| 5 | Linear-Gaussian SEM appropriate for z-score-transformed nodes | Non-Gaussian nodes (binary, ordinal) misspecified | Assumption 6 (linear SEM) |
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -884,541 +847,505 @@ Assumption 6 (linear SEM)
 ## CHAIN CARD: ALG-B
 
 ═══════════════════════════════════════════════════════════════════════════ CHAIN CARD: ALG-B (Edge Parameterization) ═══════════════════════════════════════════════════════════════════════════ Version: 1.1-CORRECTED Parent System: SYS_ALGORITHM
-1. IDENTITY
-Field
-Value
-Chain ID
-ALG-B
-System
-SYS_ALGORITHM
-Name
-Edge Parameterization
-Purpose
-Transform raw evidence records into parameterized edge weights with calibrated effective standard errors, prior distributions, structural inclusion probabilities, and chain-vs-direct validation — producing the frozen model state that crosses the cut boundary
-Phase
-PHASE_B — Build-time, per-evidence-update (re-run when SYS_EXTRACTION delivers new evidence)
+### 1. Identity
+
+| Field | Value |
+| --- | --- |
+| Chain ID | ALG-B |
+| System | SYS_ALGORITHM |
+| Name | Edge Parameterization |
+| Purpose | Transform raw evidence records into parameterized edge weights with calibrated effective standard errors, prior distributions, structural inclusion probabilities, and chain-vs-direct validation — producing the frozen model state that crosses the cut boundary |
+| Phase | PHASE_B — Build-time, per-evidence-update (re-run when SYS_EXTRACTION delivers new evidence) |
 
 This is the most methodologically complex chain in the system. It contains the central contribution (7-layer SE_eff) and the most author-constructed parameters.
-───────────────────────────────────────────────────────────────────────────
-2. CHAIN DIAGRAM
+
+---
+
+### 2. Chain Diagram
+
+```text
 FROM CHAIN ALG-A                    FROM SYS_EXTRACTION
 ══════════════                      ═══════════════════
 
  GraphObject ─────┐  evidence_registry ──┐  synergy_registry ──┐
-                  │  (446+ rows)         │  (15 rows)          │
-                  ▼                      ▼                     │
-          ┌──────────────┐                                     │
-          │  B1           │                                    │
-          │  IVW Pooling  │◀── per edge: k evidence records    │
-          │  (per-edge)   │    DerSimonian-Laird τ²            │
-          └──────┬───────┘                                     │
-                 │                                             │
-           PooledEdge[]                                        │
-           {μ_e, SE_within,                                    │
-            τ²_e, k, I²,                                      │
-            aggregation_method}                                │
-                 │                                             │
-                 ▼                                             │
-          ┌──────────────┐                                     │
-          │  B2           │                                    │
-          │  Seven-Layer  │                                    │
-          │  Heterogeneity│                                    │
-          │  Pipeline     │                                    │
-          │  (per-record) │                                    │
-          └──────┬───────┘                                     │
-                 │                                             │
-           SE_eff per edge                                     │
-           (post-7-layer)                                      │
-                 │                                             │
-          ┌──────▼───────┐                                     │
-          │  B3           │                                    │
-          │  Prior        │                                    │
-          │  Selection    │                                    │
-          │  (per-edge)   │                                    │
-          └──────┬───────┘                                     │
-                 │                                             │
-           PriorSpec per edge                                  │
-           {type, params, w}                                   │
-                 │                                             │
-          ┌──────▼───────┐                                     │
-          │  B4           │                                    │
-          │  Structural   │                                    │
-          │  Inclusion    │                                    │
-          │  P_inclusion  │                                    │
-          └──────┬───────┘                                     │
-                 │                                             │
-           P_inclusion per edge                                │
-                 │                                             │
-          ┌──────▼───────┐                                     │
-          │  B5           │                                    │
-          │  Heterogeneity│                                    │
-          │  Priors       │                                    │
-          │  (Turner 2012)│                                    │
-          └──────┬───────┘                                     │
-                 │                                             │
-           τ² priors per edge                                  │
-                 │                                             │
-          ┌──────▼───────┐                                     │
-          │  B6           │                                    │
-          │  Chain-vs-    │                                    │
-          │  Direct       │                                    │
-          │  Validation   │                                    │
-          └──────┬───────┘                                     │
-                 │                                             │
-           AV scores, Z-tests                                  │
-                 │                                             │
-          ┌──────▼───────┐◀────────────────────────────────────┘
-          │  B7           │
-          │  Context-     │
-          │  Matched Prior│
-          │  Assembly     │
-          └──────┬───────┘
-                 │
-                 ▼
-          FrozenModelState
-          (complete output)
-                 │
-          TO CHAINS ALG-C, ALG-D, ALG-E
+          │  (446+ rows)         │  (15 rows)          │
+          ▼                      ▼                     │
+      ┌──────────────┐                                     │
+      │  B1           │                                    │
+      │  IVW Pooling  │◀── per edge: k evidence records    │
+      │  (per-edge)   │    DerSimonian-Laird τ²            │
+      └──────┬───────┘                                     │
+         │                                             │
+       PooledEdge[]                                        │
+       {μ_e, SE_within,                                    │
+        τ²_e, k, I²,                                      │
+        aggregation_method}                                │
+         │                                             │
+         ▼                                             │
+      ┌──────────────┐                                     │
+      │  B2           │                                    │
+      │  Seven-Layer  │                                    │
+      │  Heterogeneity│                                    │
+      │  Pipeline     │                                    │
+      │  (per-record) │                                    │
+      └──────┬───────┘                                     │
+         │                                             │
+       SE_eff per edge                                     │
+       (post-7-layer)                                      │
+         │                                             │
+      ┌──────▼───────┐                                     │
+      │  B3           │                                    │
+      │  Prior        │                                    │
+      │  Selection    │                                    │
+      │  (per-edge)   │                                    │
+      └──────┬───────┘                                     │
+         │                                             │
+       PriorSpec per edge                                  │
+       {type, params, w}                                   │
+         │                                             │
+      ┌──────▼───────┐                                     │
+      │  B4           │                                    │
+      │  Structural   │                                    │
+      │  Inclusion    │                                    │
+      │  P_inclusion  │                                    │
+      └──────┬───────┘                                     │
+         │                                             │
+       P_inclusion per edge                                │
+         │                                             │
+      ┌──────▼───────┐                                     │
+      │  B5           │                                    │
+      │  Heterogeneity│                                    │
+      │  Priors       │                                    │
+      │  (Turner 2012)│                                    │
+      └──────┬───────┘                                     │
+         │                                             │
+       τ² priors per edge                                  │
+         │                                             │
+      ┌──────▼───────┐                                     │
+      │  B6           │                                    │
+      │  Chain-vs-    │                                    │
+      │  Direct       │                                    │
+      │  Validation   │                                    │
+      └──────┬───────┘                                     │
+         │                                             │
+       AV scores, Z-tests                                  │
+         │                                             │
+      ┌──────▼───────┐◀────────────────────────────────────┘
+      │  B7           │
+      │  Context-     │
+      │  Matched Prior│
+      │  Assembly     │
+      └──────┬───────┘
+         │
+         ▼
+      FrozenModelState
+      (complete output)
+         │
+      TO CHAINS ALG-C, ALG-D, ALG-E
+```
 
-───────────────────────────────────────────────────────────────────────────
-3. INTERMEDIATE STATE SCHEMAS
-State: PooledEdge (after B1, one per edge)
-Field
-Type
-Description
-edge_id
-str
-Unique edge identifier
-μ_e
-float
-IVW pooled point estimate
-SE_within
-float
-Pooled within-study variance (1/Σ(1/σ²_i))
-τ²_e
-float
-DerSimonian-Laird between-study heterogeneity
-k
-int
-Number of contributing studies
-I²
-float [0,1]
-Inconsistency index
-aggregation_method
-enum{BLOCKED, DIRECT, IVW_FIXED, IVW_RANDOM, STRATIFIED, SINGLE_BEST}
-Decision tree outcome
-contributing_studies
-list[study_id]
-For audit trail
+---
 
-State: HeterogeneityAdjustedEdge (after B2, one per edge)
-Field
-Type
-Description
-(all PooledEdge fields)
+### 3. Intermediate State Schemas
 
+#### State: PooledEdge (after B1, one per edge)
 
+| Field | Type | Description |
+| --- | --- | --- |
+| edge_id | str | Unique edge identifier |
+| μ_e | float | IVW pooled point estimate |
+| SE_within | float | Pooled within-study variance (1/Σ(1/σ²_i)) |
+| τ²_e | float | DerSimonian-Laird between-study heterogeneity |
+| k | int | Number of contributing studies |
+| I² | float [0,1] | Inconsistency index |
+| aggregation_method | enum{BLOCKED, DIRECT, IVW_FIXED, IVW_RANDOM, STRATIFIED, SINGLE_BEST} | Decision tree outcome |
+| contributing_studies | list[study_id] | For audit trail |
 
+#### State: HeterogeneityAdjustedEdge (after B2, one per edge)
 
-SE_eff
-float
-Effective SE after 7-layer compounding
-layer_contributions
-dict[L1-L7 → float]
-Per-layer SE inflation factor
-σ²_structural
-float
-Additive structural variance
-w_scope
-float [0.3, 1.0]
-Transportability weight
-w_fresh
-float [0.70, 1.0]
-Evidence freshness weight
-attenuation_factor
-float
-Claim-level β attenuation
+| Field | Type | Description |
+| --- | --- | --- |
+| (all PooledEdge fields) | — | Inherits all PooledEdge fields |
+| SE_eff | float | Effective SE after 7-layer compounding |
+| layer_contributions | dict[L1-L7 → float] | Per-layer SE inflation factor |
+| σ²_structural | float | Additive structural variance |
+| w_scope | float [0.3, 1.0] | Transportability weight |
+| w_fresh | float [0.70, 1.0] | Evidence freshness weight |
+| attenuation_factor | float | Claim-level β attenuation |
 
-State: PriorSpec (after B3, one per edge)
-Field
-Type
-Description
-prior_type
-enum{RobustMAP, Commensurate, PowerPrior, MechanisticSynth, StructuralPlaceholder}
-Selected type
-prior_params
-dict
-Type-specific: {w, MAP, vague} or {β_hist, σ²_hist, τ} or {a₀, D₀} or ...
-selection_rationale
-str
-Why this type was selected (k, best_design)
+#### State: PriorSpec (after B3, one per edge)
 
-State: InclusionProbEdge (after B4, one per edge)
-Field
-Type
-Description
-P_inclusion
-float [0, 1]
-Structural inclusion probability
-inclusion_inputs
-{k, Z, has_RCT}
-Inputs to logistic
-is_decision_critical
-bool
-True if force-ON vs force-OFF changes top rank
+| Field | Type | Description |
+| --- | --- | --- |
+| prior_type | enum{RobustMAP, Commensurate, PowerPrior, MechanisticSynth, StructuralPlaceholder} | Selected type |
+| prior_params | dict | Type-specific: {w, MAP, vague} or {β_hist, σ²_hist, τ} or {a₀, D₀} or ... |
+| selection_rationale | str | Why this type was selected (k, best_design) |
 
-State: FrozenModelState (final output)
-Field
-Type
-Description
-B̂
-ℝ^{63×63}
-Parameterized edge weight matrix
-Σ_eff
-ℝ^{118}
-Vector of effective SEs (post-7-layer)
-Λ_prior
-dict[context → ℝ^{63×63}]
-33 context-matched precision matrices
-P_inclusion
-ℝ^{118}
-Structural inclusion probabilities
-prior_audit_trail
-118 × PriorSpec
-Complete prior documentation
-AV_scores
-dict[edge_id → float]
-Alignment validity (chain+direct edges only)
-τ²_estimates
-ℝ^{118}
-Per-edge heterogeneity variance
-synergy_records
-15 × SynergyRecord
-Pairwise interaction data
+#### State: InclusionProbEdge (after B4, one per edge)
 
-───────────────────────────────────────────────────────────────────────────
-4. SUBSYSTEM INVENTORY
-Order
-Subsystem ID
-Name
-Input State
-Output State
-Type
-1
-ALG-B1
-IVW Pooling & Aggregation
-GraphObject + evidence_registry
-PooledEdge[]
-COMPOSITE
-2
-ALG-B2
-Seven-Layer Heterogeneity Pipeline
-PooledEdge[] + evidence records
-HeterogeneityAdjustedEdge[]
-COMPOSITE (7 layers)
-3
-ALG-B3
-Prior Selection Framework
-HeterogeneityAdjustedEdge[]
-PriorSpec[]
-COMPOSITE (5 prior types)
-4
-ALG-B4
-Structural Inclusion Probability
-HeterogeneityAdjustedEdge[]
-InclusionProbEdge[]
-ATOMIC
-5
-ALG-B5
-Heterogeneity Priors
-PooledEdge[] (outcome type)
-τ² prior distributions
-ATOMIC
-6
-ALG-B6
-Chain-vs-Direct Validation
-All parameterized edges
-AV_scores, Z-tests
-ATOMIC
-7
-ALG-B7
-Context-Matched Prior Assembly
-All B1-B6 outputs + synergy_registry
-FrozenModelState
-COMPOSITE
+| Field | Type | Description |
+| --- | --- | --- |
+| P_inclusion | float [0, 1] | Structural inclusion probability |
+| inclusion_inputs | {k, Z, has_RCT} | Inputs to logistic |
+| is_decision_critical | bool | True if force-ON vs force-OFF changes top rank |
 
-───────────────────────────────────────────────────────────────────────────
-5. SUBSYSTEM DETAIL
-B1 — IVW Pooling & Aggregation
-Field
-Value
-ID
-ALG-B1
-Type
-COMPOSITE
-Purpose
-For each edge, pool contributing evidence records via inverse-variance weighting with DerSimonian-Laird heterogeneity estimation
+#### State: FrozenModelState (final output)
 
-Sub-steps:
-┌─────────────────────────────────────────────────────────────┐ │ SUB-STEP: B1a — Evidence Retrieval (per-edge) │ │ Purpose: Pull all evidence records targeting this edge │ │ Input: edge_id + evidence_registry │ │ Output: k records × {β_i, SE_i, design, year, scope...} │ │ Logic: Filter evidence_registry by target_edge_id │ │ Apply diminishing returns: w_base × 1/(1+0.3·ln(k))│ │ Apply precision caps: │ │ Cross-sectional: cap at 30% of best RCT precision│ │ Animal: cap at 10% of best human RCT precision │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ SUB-STEP: B1b — Aggregation Decision Tree │ │ Purpose: Select aggregation method based on evidence count │ │ and heterogeneity │ │ Decision tree: │ │ k = 0 → BLOCKED │ │ k = 1 → DIRECT (passthrough) │ │ k ≥ 2, ≥2 have SE: │ │ I² < 50% → IVW_FIXED │ │ 50% ≤ I² < 75% AND stratifiable → STRATIFIED │ │ 50% ≤ I² < 75% AND not strat. → IVW_RANDOM │ │ I² ≥ 75% AND stratifiable → STRATIFIED │ │ I² ≥ 75% AND not stratifiable → SINGLE_BEST │ │ Sign conflict among high-quality → BLOCKED │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ SUB-STEP: B1c — IVW Computation │ │ Purpose: Compute pooled estimate and heterogeneity │ │ Formulas: │ │ μ_e = Σ(β_i/σ²_i) / Σ(1/σ²_i) (IVW mean) │ │ SE_within = 1 / √(Σ(1/σ²_i)) (pooled SE) │ │ Q = Σ w_i(β_i − μ_e)² (Cochran's Q) │ │ τ² = max(0, (Q−(k−1)) / (Σw−Σw²/Σw)) (DL estimator) │ │ I² = max(0, (Q−(k−1))/Q) (inconsistency) │ │ SE_random = √(1/Σ(1/(σ²_i + τ²))) (random-effects)│ └─────────────────────────────────────────────────────────────┘
-B2 — Seven-Layer Heterogeneity Pipeline
-Field
-Value
-ID
-ALG-B2
-Type
-COMPOSITE (7 sequential layers)
-Purpose
-Compound 7 orthogonal uncertainty sources into SE_eff per edge
+| Field | Type | Description |
+| --- | --- | --- |
+| B̂ | ℝ^{63×63} | Parameterized edge weight matrix |
+| Σ_eff | ℝ^{118} | Vector of effective SEs (post-7-layer) |
+| Λ_prior | dict[context → ℝ^{63×63}] | 33 context-matched precision matrices |
+| P_inclusion | ℝ^{118} | Structural inclusion probabilities |
+| prior_audit_trail | 118 × PriorSpec | Complete prior documentation |
+| AV_scores | dict[edge_id → float] | Alignment validity (chain+direct edges only) |
+| τ²_estimates | ℝ^{118} | Per-edge heterogeneity variance |
+| synergy_records | 15 × SynergyRecord | Pairwise interaction data |
+
+---
+
+### 4. Subsystem Inventory
+
+| Order | Subsystem ID | Name | Input State | Output State | Type |
+| --- | --- | --- | --- | --- | --- |
+| 1 | ALG-B1 | IVW Pooling & Aggregation | GraphObject + evidence_registry | PooledEdge[] | COMPOSITE |
+| 2 | ALG-B2 | Seven-Layer Heterogeneity Pipeline | PooledEdge[] + evidence records | HeterogeneityAdjustedEdge[] | COMPOSITE (7 layers) |
+| 3 | ALG-B3 | Prior Selection Framework | HeterogeneityAdjustedEdge[] | PriorSpec[] | COMPOSITE (5 prior types) |
+| 4 | ALG-B4 | Structural Inclusion Probability | HeterogeneityAdjustedEdge[] | InclusionProbEdge[] | ATOMIC |
+| 5 | ALG-B5 | Heterogeneity Priors | PooledEdge[] (outcome type) | τ² prior distributions | ATOMIC |
+| 6 | ALG-B6 | Chain-vs-Direct Validation | All parameterized edges | AV_scores, Z-tests | ATOMIC |
+| 7 | ALG-B7 | Context-Matched Prior Assembly | All B1-B6 outputs + synergy_registry | FrozenModelState | COMPOSITE |
+
+---
+
+### 5. Subsystem Detail
+
+#### B1 — IVW Pooling & Aggregation
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B1 |
+| Type | COMPOSITE |
+| Purpose | For each edge, pool contributing evidence records via inverse-variance weighting with DerSimonian-Laird heterogeneity estimation |
+
+##### Sub-step B1a — Evidence Retrieval (per-edge)
+- Purpose: Pull all evidence records targeting this edge
+- Input: edge_id + evidence_registry
+- Output: k records × {β_i, SE_i, design, year, scope...}
+- Logic: Filter evidence_registry by target_edge_id
+- Apply diminishing returns: w_base × 1/(1+0.3·ln(k))
+- Apply precision caps:
+  - Cross-sectional: cap at 30% of best RCT precision
+  - Animal: cap at 10% of best human RCT precision
+
+##### Sub-step B1b — Aggregation Decision Tree
+- Purpose: Select aggregation method based on evidence count and heterogeneity
+- Decision tree:
+  - k = 0 → BLOCKED
+  - k = 1 → DIRECT (passthrough)
+  - k ≥ 2, ≥2 have SE:
+    - I² < 50% → IVW_FIXED
+    - 50% ≤ I² < 75% AND stratifiable → STRATIFIED
+    - 50% ≤ I² < 75% AND not strat. → IVW_RANDOM
+    - I² ≥ 75% AND stratifiable → STRATIFIED
+    - I² ≥ 75% AND not stratifiable → SINGLE_BEST
+  - Sign conflict among high-quality → BLOCKED
+
+##### Sub-step B1c — IVW Computation
+- Purpose: Compute pooled estimate and heterogeneity
+- Formulas:
+  - μ_e = Σ(β_i/σ²_i) / Σ(1/σ²_i) (IVW mean)
+  - SE_within = 1 / √(Σ(1/σ²_i)) (pooled SE)
+  - Q = Σ w_i(β_i − μ_e)² (Cochran's Q)
+  - τ² = max(0, (Q−(k−1)) / (Σw−Σw²/Σw)) (DL estimator)
+  - I² = max(0, (Q−(k−1))/Q) (inconsistency)
+  - SE_random = √(1/Σ(1/(σ²_i + τ²))) (random-effects)
+
+#### B2 — Seven-Layer Heterogeneity Pipeline
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B2 |
+| Type | COMPOSITE (7 sequential layers) |
+| Purpose | Compound 7 orthogonal uncertainty sources into SE_eff per edge |
 
 This is the central methodological contribution of the framework.
+
 Master formula:
+```text
 SE_eff = √[(SE_pooled × m_claim × m_GRADE × m_temporal)² + σ²_structural + τ²·𝟙[not_in_base]]
-         ─────────────────────────────────────────────────────────────────────────────────────
-                                      max(w_scope, 0.3) × w_fresh
+     ─────────────────────────────────────────────────────────────────────────────────────
+                  max(w_scope, 0.3) × w_fresh
+```
 
 Seven layers (each a sub-step):
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L1 — Study Design (per-record) │ │ Mechanism: Claim-level SE multipliers │ │ Range: 1.0× – 6.0× │ │ Values: │ │ Large RCT (n>200): 1.0× │ │ Small RCT (n<100): 1.0–1.5× │ │ Well-adjusted cohort: 1.5–2.0× │ │ Unadjusted longitudinal: 2.0–2.5× │ │ Cross-sectional adjusted: 2.5–3.0× │ │ Cross-sectional unadjusted: 3.0–4.0× │ │ Animal in vivo: 3.0–5.0× │ │ In vitro / mechanistic: 5.0–6.0× │ │ Status: AUTHOR-CONSTRUCTED priors │ │ Calibration: Anglemyer (2014) ROR=1.08; van Zwet, │ │ Schwab & Senn (2021) 13% median power │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L2 — Transportability (per-record) │ │ Mechanism: 5-dimension scope weight, SE ÷ max(w_scope, 0.3) │ │ Five dimensions: │ │ (1) Population match (8 levels, 1.0× → 3.3×) │ │ (2) Design match │ │ (3) Outcome alignment (8 levels, 1.0× → 1.8×) │ │ (4) Cancer type match │ │ (5) Measurement compatibility │ │ w_scope = geometric mean of 5 dimension weights │ │ Floor: max(w_scope, 0.3) prevents infinite inflation │ │ Range: 1.0× – 3.33× (= 1/0.3) │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L3 — Statistical Heterogeneity (per-edge) │ │ Mechanism: τ² additive (DerSimonian-Laird) │ │ Double-counting guard: τ² added ONLY when not already │ │ in base SE (𝟙[not_in_base]) │ │ Standard methodology; not author-constructed │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L4 — Scale Compatibility (per-record) │ │ Mechanism: Compatibility gate + conversion SE │ │ Three categories: │ │ COMPARABLE: same scale → no penalty │ │ CONVERTIBLE: different scale, formula exists → +10% SE/conv│ │ EXCLUDED: incompatible scale → record excluded │ │ Key conversions: │ │ OR→SMD: d = ln(OR)·√3/π (Chinn, 2000) │ │ HR→OR, r→d: d = 2r/√(1−r²) │ │ Unstd β→SMD: when SD_x, SD_y available │ │ Each conversion adds SE via delta method │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L5 — Evidence Quality (per-record) │ │ Mechanism: GRADE-inspired SE inflation │ │ Range: 1.0× – 2.0× │ │ Status: AUTHOR-CONSTRUCTED operationalization │ │ (GRADE framework rejects quantification; │ │ these multipliers are novel to this framework) │ │ Grades: │ │ GRADE High: 1.0× GRADE Moderate: 1.15× │ │ GRADE Low: 1.3× GRADE Very Low: 2.0× │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L6 — Temporal Mismatch (per-record) │ │ Mechanism: Kernel-adjusted SE correction │ │ Range: 1.0× – 1.6× │ │ When study assessed at timepoint t_study but model targets │ │ timepoint t_model, SE inflated proportional to temporal │ │ distance adjusted by the relevant intervention kernel │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ LAYER L7 — Evidence Freshness (per-record) │ │ Mechanism: 1.5%/year decay from publication year │ │ Floor: 0.70 (oldest studies retain ≥70% weight) │ │ Formula: w_fresh = max(0.70, 1 − 0.015 × (2025 − pub_year))│ │ Calibration: Poynard et al. (2002) — 45-year half-life of │ │ medical truth → ln(2)/45 ≈ 1.54%/yr │ └─────────────────────────────────────────────────────────────┘
-Structural variance (additive, per-edge): σ²_structural composed of up to 9 components: unmeasured confounding, measurement error, selection bias, model misspecification, treatment heterogeneity, temporal instability, construct validity, population bias, publication bias. Author-elicited; informed by QBA literature (Greenland 2005; VanderWeele & Arah 2011; Lash, Fox & Fink 2009). Does NOT decrease with more studies of the same quality. In v2.0, σ²_structural is ANNOTATION-INFORMED per-edge: EX-P4-MA reads limitation_unmeasured_confounder annotations from study_annotations_v1 and adjusts upward from the 0.25 base (ceiling 0.50). ALG-B2 reads edges_v1.sigma_sq_structural (default 0.25 if NULL).
-Claim-level attenuation (before SE inflation):
-Identification Status
-Attenuation Factor
-Beta Prior
-Identified (RCT)
-1.00
-—
-Partially identified
-0.85
-Beta(17,3)
-Plausible
-0.70
-Beta(14,6)
-Unidentified
-0.50
-Beta(10,10)
 
-B3 — Prior Selection Framework
-Field
-Value
-ID
-ALG-B3
-Type
-COMPOSITE (5 prior types)
-Purpose
-Select and parameterize the Bayesian prior for each edge via deterministic decision tree
+##### Layer L1 — Study Design (per-record)
+- Mechanism: Claim-level SE multipliers
+- Range: 1.0× – 6.0×
+- Values:
+  - Large RCT (n>200): 1.0×
+  - Small RCT (n<100): 1.0–1.5×
+  - Well-adjusted cohort: 1.5–2.0×
+  - Unadjusted longitudinal: 2.0–2.5×
+  - Cross-sectional adjusted: 2.5–3.0×
+  - Cross-sectional unadjusted: 3.0–4.0×
+  - Animal in vivo: 3.0–5.0×
+  - In vitro / mechanistic: 5.0–6.0×
+- Status: AUTHOR-CONSTRUCTED priors
+- Calibration: Anglemyer (2014) ROR=1.08; van Zwet, Schwab & Senn (2021) 13% median power
+
+##### Layer L2 — Transportability (per-record)
+- Mechanism: 5-dimension scope weight, SE ÷ max(w_scope, 0.3)
+- Five dimensions:
+  - (1) Population match (8 levels, 1.0× → 3.3×)
+  - (2) Design match
+  - (3) Outcome alignment (8 levels, 1.0× → 1.8×)
+  - (4) Cancer type match
+  - (5) Measurement compatibility
+- w_scope = geometric mean of 5 dimension weights
+- Floor: max(w_scope, 0.3) prevents infinite inflation
+- Range: 1.0× – 3.33× (= 1/0.3)
+
+##### Layer L3 — Statistical Heterogeneity (per-edge)
+- Mechanism: τ² additive (DerSimonian-Laird)
+- Double-counting guard: τ² added ONLY when not already in base SE (𝟙[not_in_base])
+- Standard methodology; not author-constructed
+
+##### Layer L4 — Scale Compatibility (per-record)
+- Mechanism: Compatibility gate + conversion SE
+- Three categories:
+  - COMPARABLE: same scale → no penalty
+  - CONVERTIBLE: different scale, formula exists → +10% SE/conv
+  - EXCLUDED: incompatible scale → record excluded
+- Key conversions:
+  - OR→SMD: d = ln(OR)·√3/π (Chinn, 2000)
+  - HR→OR, r→d: d = 2r/√(1−r²)
+  - Unstd β→SMD: when SD_x, SD_y available
+- Each conversion adds SE via delta method
+
+##### Layer L5 — Evidence Quality (per-record)
+- Mechanism: GRADE-inspired SE inflation
+- Range: 1.0× – 2.0×
+- Status: AUTHOR-CONSTRUCTED operationalization
+- (GRADE framework rejects quantification; these multipliers are novel to this framework)
+- Grades:
+  - GRADE High: 1.0×
+  - GRADE Moderate: 1.15×
+  - GRADE Low: 1.3×
+  - GRADE Very Low: 2.0×
+
+##### Layer L6 — Temporal Mismatch (per-record)
+- Mechanism: Kernel-adjusted SE correction
+- Range: 1.0× – 1.6×
+- When study assessed at timepoint t_study but model targets timepoint t_model, SE inflated proportional to temporal distance adjusted by the relevant intervention kernel
+
+##### Layer L7 — Evidence Freshness (per-record)
+- Mechanism: 1.5%/year decay from publication year
+- Floor: 0.70 (oldest studies retain ≥70% weight)
+- Formula: w_fresh = max(0.70, 1 − 0.015 × (2025 − pub_year))
+- Calibration: Poynard et al. (2002) — 45-year half-life of medical truth → ln(2)/45 ≈ 1.54%/yr
+
+Structural variance (additive, per-edge): σ²_structural composed of up to 9 components: unmeasured confounding, measurement error, selection bias, model misspecification, treatment heterogeneity, temporal instability, construct validity, population bias, publication bias. Author-elicited; informed by QBA literature (Greenland 2005; VanderWeele & Arah 2011; Lash, Fox & Fink 2009). Does NOT decrease with more studies of the same quality. In v2.0, σ²_structural is ANNOTATION-INFORMED per-edge: EX-P4-MA reads limitation_unmeasured_confounder annotations from study_annotations_v1 and adjusts upward from the 0.25 base (ceiling 0.50). ALG-B2 reads edges_v1.sigma_sq_structural (default 0.25 if NULL).
+
+Claim-level attenuation (before SE inflation):
+
+| Identification Status | Attenuation Factor | Beta Prior |
+| --- | --- | --- |
+| Identified (RCT) | 1.00 | — |
+| Partially identified | 0.85 | Beta(17,3) |
+| Plausible | 0.70 | Beta(14,6) |
+| Unidentified | 0.50 | Beta(10,10) |
+
+#### B3 — Prior Selection Framework
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B3 |
+| Type | COMPOSITE (5 prior types) |
+| Purpose | Select and parameterize the Bayesian prior for each edge via deterministic decision tree |
 
 Decision tree:
+```text
 PriorType(e) = {
-  RobustMAP           if k ≥ 5, best_design ≥ prospective
-  Commensurate        if k ∈ [2,4]
-  PowerPrior          if k = 1
-  MechanisticSynth    if k = 0, has_chain
+  RobustMAP              if k ≥ 5, best_design ≥ prospective
+  Commensurate           if k ∈ [2,4]
+  PowerPrior             if k = 1
+  MechanisticSynth       if k = 0, has_chain
   StructuralPlaceholder  if k = 0, no_chain
 }
+```
 
 Sub-steps (one per prior type):
-┌─────────────────────────────────────────────────────────────┐ │ B3a — Robust MAP (Schmidli et al., 2014) │ │ Condition: k ≥ 5, best_design ≥ prospective │ │ Formula: p(β) = w·MAP(β|hist) + (1−w)·N(0, 10²) │ │ w = min(0.8, 0.5 + 0.06k) │ │ The vague component N(0,10²) ensures automatic downweighting│ │ under prior-data conflict │ │ Output: {type=RobustMAP, w, MAP_mean, MAP_var, vague_var} │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B3b — Commensurate (Hobbs et al., 2011) │ │ Condition: k ∈ [2,4] │ │ Formula: β ~ N(β_hist, σ²_hist / τ) │ │ τ = Π_d w_d^{p_d} (5 dimension match scores, │ │ same as L2 transportability) │ │ Output: {type=Commensurate, β_hist, σ²_hist, τ, dims} │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B3c — Power Prior (Ibrahim & Chen, 2000) │ │ Condition: k = 1 │ │ Formula: p(β|D₀) ∝ L(β|D₀)^{a₀} × π₀(β) │ │ Discount a₀ (AUTHOR-CONSTRUCTED): │ │ 0.80 RCT-same │ 0.50 RCT-diff │ 0.40 cohort │ │ 0.30 observ. │ 0.15 animal │ 0.05 mechanistic │ │ Calibration: Hackam & Redelmeier 2006 (~37% overall); │ │ Kola & Landis 2004 (CNS ~8%) │ │ Output: {type=PowerPrior, a₀, D₀, π₀} │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B3d — Mechanistic Synthesis (k=0 with chain) │ │ Condition: k = 0, intermediate edges all measured │ │ Formula: β_implied = Π_i β_i │ │ SE_implied = |β_impl| × √(Σ(SE_i/β_i)²) [delta] │ │ Enters as Power Prior with a₀ = 0.05 (95% discount) │ │ Output: {type=MechanisticSynth, β_impl, SE_impl, chain_edges}│ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B3e — Structural Placeholder (k=0, no chain) │ │ Condition: k = 0, no intermediate chain available │ │ Formula: β ~ N(0, σ²_placeholder) │ │ σ²_placeholder set wide (e.g., 10²) to express ignorance │ │ These edges contribute near-zero information │ │ Output: {type=StructuralPlaceholder, σ²} │ └─────────────────────────────────────────────────────────────┘
-B4 — Structural Inclusion Probability
-Field
-Value
-ID
-ALG-B4
-Type
-ATOMIC
-Purpose
-Compute calibrated probability each edge represents a real biological mechanism
+
+##### B3a — Robust MAP (Schmidli et al., 2014)
+- Condition: k ≥ 5, best_design ≥ prospective
+- Formula: p(β) = w·MAP(β|hist) + (1−w)·N(0, 10²)
+- w = min(0.8, 0.5 + 0.06k)
+- The vague component N(0,10²) ensures automatic downweighting under prior-data conflict
+- Output: {type=RobustMAP, w, MAP_mean, MAP_var, vague_var}
+
+##### B3b — Commensurate (Hobbs et al., 2011)
+- Condition: k ∈ [2,4]
+- Formula: β ~ N(β_hist, σ²_hist / τ)
+- τ = Π_d w_d^{p_d} (5 dimension match scores, same as L2 transportability)
+- Output: {type=Commensurate, β_hist, σ²_hist, τ, dims}
+
+##### B3c — Power Prior (Ibrahim & Chen, 2000)
+- Condition: k = 1
+- Formula: p(β|D₀) ∝ L(β|D₀)^{a₀} × π₀(β)
+- Discount a₀ (AUTHOR-CONSTRUCTED):
+  - 0.80 RCT-same
+  - 0.50 RCT-diff
+  - 0.40 cohort
+  - 0.30 observ.
+  - 0.15 animal
+  - 0.05 mechanistic
+- Calibration: Hackam & Redelmeier 2006 (~37% overall); Kola & Landis 2004 (CNS ~8%)
+- Output: {type=PowerPrior, a₀, D₀, π₀}
+
+##### B3d — Mechanistic Synthesis (k=0 with chain)
+- Condition: k = 0, intermediate edges all measured
+- Formula: β_implied = Π_i β_i
+- SE_implied = |β_impl| × √(Σ(SE_i/β_i)²) [delta]
+- Enters as Power Prior with a₀ = 0.05 (95% discount)
+- Output: {type=MechanisticSynth, β_impl, SE_impl, chain_edges}
+
+##### B3e — Structural Placeholder (k=0, no chain)
+- Condition: k = 0, no intermediate chain available
+- Formula: β ~ N(0, σ²_placeholder)
+- σ²_placeholder set wide (e.g., 10²) to express ignorance
+- These edges contribute near-zero information
+- Output: {type=StructuralPlaceholder, σ²}
+
+#### B4 — Structural Inclusion Probability
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B4 |
+| Type | ATOMIC |
+| Purpose | Compute calibrated probability each edge represents a real biological mechanism |
 
 Formula: P_inclusion(e) = 1 / (1 + exp(−(−0.5 + 1.2·ln(k+1) + 0.4·Z + 0.6·𝟙[RCT])))
+
 Calibration targets (AUTHOR-CONSTRUCTED): (i) k=0, Z=0, no RCT → P ≈ 0.38 (ii) k=3, moderate Z → P ≈ 0.80 (iii) RCT bonus → ~15 pp (iv) k≥5, Z>3, RCT → P ≈ 0.99
+
 Sensitivity analysis (for P < 0.85):
-Force ON (P=1.0): re-run MC, check top rank
-Force OFF (P=0): re-run MC, check top rank
-If top rank changes: flag decision-critical structural uncertainty
-B5 — Heterogeneity Priors
-Field
-Value
-ID
-ALG-B5
-Type
-ATOMIC
-Purpose
-Assign empirical τ² prior distributions from Turner et al. (2012)
+- Force ON (P=1.0): re-run MC, check top rank
+- Force OFF (P=0): re-run MC, check top rank
+- If top rank changes: flag decision-critical structural uncertainty
+
+#### B5 — Heterogeneity Priors
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B5 |
+| Type | ATOMIC |
+| Purpose | Assign empirical τ² prior distributions from Turner et al. (2012) |
 
 Priors (from 14,886 meta-analyses):
-Subjective outcomes (self-reported cognition): τ² ~ LogNormal(−2.13, 1.58²), median 0.12 [NOTE: σ CORRECTED from 1.18 to 1.58 per audit]
-Semi-objective outcomes (neuropsychological tests): τ² ~ LogNormal(−2.56, 1.07²), median 0.08
-Biomarker outcomes: τ² ~ LogNormal(−2.56, 1.07²), median 0.08 (same as semi-objective)
-B6 — Chain-versus-Direct Validation
-Field
-Value
-ID
-ALG-B6
-Type
-ATOMIC
-Purpose
-For edges with both pathway-mediated (chain) and direct (RCT) evidence, test internal consistency
+- Subjective outcomes (self-reported cognition): τ² ~ LogNormal(−2.13, 1.58²), median 0.12 [NOTE: σ CORRECTED from 1.18 to 1.58 per audit]
+- Semi-objective outcomes (neuropsychological tests): τ² ~ LogNormal(−2.56, 1.07²), median 0.08
+- Biomarker outcomes: τ² ~ LogNormal(−2.56, 1.07²), median 0.08 (same as semi-objective)
+
+#### B6 — Chain-versus-Direct Validation
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B6 |
+| Type | ATOMIC |
+| Purpose | For edges with both pathway-mediated (chain) and direct (RCT) evidence, test internal consistency |
 
 Test statistic: Z = |β_chain − β_direct| / √(σ²_chain + σ²_direct)
+
 Chain variance (delta method): SE_chain = |β_chain| × √(Σ_i (SE_{e_i}/β_{e_i})²)
+
 Triage (4-tier):
-Z
-Action
-SE multiplier
-< 1.5
-Pass
-1.0×
-1.5–2.0
-Mild discrepancy
-1.2×
-2.0–3.0
-Moderate; audit trigger
-1.5×
-≥ 3.0
-Substantial; exclude or 2.0×
-2.0×
+
+| Z | Action | SE multiplier |
+| --- | --- | --- |
+| < 1.5 | Pass | 1.0× |
+| 1.5–2.0 | Mild discrepancy | 1.2× |
+| 2.0–3.0 | Moderate; audit trigger | 1.5× |
+| ≥ 3.0 | Substantial; exclude or 2.0× | 2.0× |
 
 Alignment Validity: AV(e) = 1 − min(Z/3.0, 1.0)
+
 Directionality-aware hypothesis generation:
-β_chain > β_direct → inflated mediation / double-counting
-β_chain < β_direct → missing parallel pathways (discovery signal)
-B7 — Context-Matched Prior Assembly
-Field
-Value
-ID
-ALG-B7
-Type
-COMPOSITE
-Purpose
-Compile all B1-B6 outputs into the FrozenModelState with 33 context-matched precision matrices
+- β_chain > β_direct → inflated mediation / double-counting
+- β_chain < β_direct → missing parallel pathways (discovery signal)
+
+#### B7 — Context-Matched Prior Assembly
+
+| Field | Value |
+| --- | --- |
+| ID | ALG-B7 |
+| Type | COMPOSITE |
+| Purpose | Compile all B1-B6 outputs into the FrozenModelState with 33 context-matched precision matrices |
 
 Sub-steps:
-┌─────────────────────────────────────────────────────────────┐ │ B7a — Populate B̂ matrix │ │ Fill B̂[source, target] = μ_e for each parameterized edge │ │ Non-linear edges: store Hill params alongside B̂ entry │ │ Edges with aggregation_method = BLOCKED: set to 0 │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B7b — Context-matched prior compilation │ │ 33 cancer-type × treatment-phase specifications │ │ 4-level fallback: │ │ exact match → cancer-type → general cancer → N(0,1) │ │ For each context: Λ_prior = (I − B̂)ᵀ D⁻¹ (I − B̂) │ │ with context-specific μ_prior per node │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B7c — Package synergy records │ │ Load synergy_registry (15 pairwise records) │ │ Pass through to FrozenModelState for ALG-D consumption │ └─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐ │ B7d — Assemble FrozenModelState │ │ Combine: B̂ + Σ_eff + Λ_prior(×33) + P_inclusion + │ │ prior_audit + AV_scores + τ² + synergy │ │ This object crosses THE CUT BOUNDARY │ │ It is FROZEN: never modified by runtime patient data │ └─────────────────────────────────────────────────────────────┘
-───────────────────────────────────────────────────────────────────────────
-6. BOUNDARY TABLES
-Direction
-Table
-Columns Used
-Purpose
-READS
-evidence_registry.csv (446+)
-edge_id, β, SE, design, year, scope, quality...
-Raw evidence
-READS
-synergy_registry.csv (15)
-pair, JPO, CCS, source_trial
-Interaction records
-READS
-claim_attenuation_policy (4)
-identification_status → factor, Beta_params
-β attenuation
-READS
-evidence_freshness_policy
-pub_year → w_fresh
-L7 decay weights
-READS
-context_matched_priors (33)
-cancer_type, phase → per-node μ, σ
-Prior loading
-WRITES
-prior_audit_trail
-edge_id, prior_type, params, rationale
-Documentation
-WRITES
-chain_direct_validation
-edge_id, Z, AV, triage_action
-Validation log
 
-───────────────────────────────────────────────────────────────────────────
-7. GATES & CHECKPOINTS
-Gate ID
-Position
-Condition
-Pass
-Fail
-B-G1
-After B1
-All edges have aggregation method assigned; no NaN in μ_e for non-BLOCKED edges
-→ B2
-Review evidence records
-B-G2
-After B2
-SE_eff > 0 for all edges; no infinite values; L1-L7 contributions logged
-→ B3
-Debug layer computation
-B-G3
-After B3
-Every edge has a prior type assigned; audit trail complete
-→ B4
-Review prior selection tree
-B-G4
-After B4
-P_inclusion ∈ [0,1] for all edges; sensitivity analysis run for P < 0.85
-→ B5
-Calibration error
-B-G5
-After B6
-AV scores computed for all chain+direct edges; triage actions applied
-→ B7
-Chain-direct mismatch
-B-G6
-After B7
-FrozenModelState complete; all 33 Λ_prior positive-definite; SHA-256 hash
-→ ALG-C
-Assembly failure
+##### B7a — Populate B̂ matrix
+- Fill B̂[source, target] = μ_e for each parameterized edge
+- Non-linear edges: store Hill params alongside B̂ entry
+- Edges with aggregation_method = BLOCKED: set to 0
 
-───────────────────────────────────────────────────────────────────────────
-8. CHAIN-LEVEL ASSUMPTIONS
-#
-Assumption
-Impact if Violated
-Binding #
-1
-IVW weighting is appropriate (assumes common effect or random effects)
-If effect heterogeneity is systematic (not random), IVW gives wrong pooled estimate
-—
-2
-7 layers are orthogonal (multiplicative compounding valid)
-If layers correlate, SE_eff is over- or under-estimated
-—
-3
-Structural variance components are correctly elicited
-Wrong σ²_structural → wrong SE_eff → wrong uncertainty bands
-— (author-constructed)
-4
-Attenuation factors correctly discount confounded estimates
-Too aggressive → real effects suppressed; too lenient → bias persists
-— (author-constructed)
-5
-Logistic P_inclusion correctly calibrated
-Wrong inclusion probs → over/under-counting edge existence
-— (novel, needs validation)
-6
-Turner et al. (2012) priors appropriate for CRCI literature
-If CRCI heterogeneity differs from general medical, τ² priors are miscalibrated
-—
-7
-Context-matched priors from 33 specifications cover clinical practice
-Missing contexts fall back to general cancer, which may be too vague
-—
-8
-Claim-level attenuation factors (0.85/0.70/0.50) are reasonable
-These are author-constructed; sensitivity analysis shows stable rankings for >85% of patients
-Assumption 1 (effect homogeneity)
+##### B7b — Context-matched prior compilation
+- 33 cancer-type × treatment-phase specifications
+- 4-level fallback:
+  - exact match → cancer-type → general cancer → N(0,1)
+- For each context: Λ_prior = (I − B̂)ᵀ D⁻¹ (I − B̂) with context-specific μ_prior per node
+
+##### B7c — Package synergy records
+- Load synergy_registry (15 pairwise records)
+- Pass through to FrozenModelState for ALG-D consumption
+
+##### B7d — Assemble FrozenModelState
+- Combine: B̂ + Σ_eff + Λ_prior(×33) + P_inclusion + prior_audit + AV_scores + τ² + synergy
+- This object crosses THE CUT BOUNDARY
+- It is FROZEN: never modified by runtime patient data
+
+---
+
+### 6. Boundary Tables
+
+| Direction | Table | Columns Used | Purpose |
+| --- | --- | --- | --- |
+| READS | evidence_registry.csv (446+) | edge_id, β, SE, design, year, scope, quality... | Raw evidence |
+| READS | synergy_registry.csv (15) | pair, JPO, CCS, source_trial | Interaction records |
+| READS | claim_attenuation_policy (4) | identification_status → factor, Beta_params | β attenuation |
+| READS | evidence_freshness_policy | pub_year → w_fresh | L7 decay weights |
+| READS | context_matched_priors (33) | cancer_type, phase → per-node μ, σ | Prior loading |
+| WRITES | prior_audit_trail | edge_id, prior_type, params, rationale | Documentation |
+| WRITES | chain_direct_validation | edge_id, Z, AV, triage_action | Validation log |
+
+---
+
+### 7. Gates & Checkpoints
+
+| Gate ID | Position | Condition | Pass | Fail |
+| --- | --- | --- | --- | --- |
+| B-G1 | After B1 | All edges have aggregation method assigned; no NaN in μ_e for non-BLOCKED edges | → B2 | Review evidence records |
+| B-G2 | After B2 | SE_eff > 0 for all edges; no infinite values; L1-L7 contributions logged | → B3 | Debug layer computation |
+| B-G3 | After B3 | Every edge has a prior type assigned; audit trail complete | → B4 | Review prior selection tree |
+| B-G4 | After B4 | P_inclusion ∈ [0,1] for all edges; sensitivity analysis run for P < 0.85 | → B5 | Calibration error |
+| B-G5 | After B6 | AV scores computed for all chain+direct edges; triage actions applied | → B7 | Chain-direct mismatch |
+| B-G6 | After B7 | FrozenModelState complete; all 33 Λ_prior positive-definite; SHA-256 hash | → ALG-C | Assembly failure |
+
+---
+
+### 8. Chain-Level Assumptions
+
+| # | Assumption | Impact if Violated | Binding # |
+| --- | --- | --- | --- |
+| 1 | IVW weighting is appropriate (assumes common effect or random effects) | If effect heterogeneity is systematic (not random), IVW gives wrong pooled estimate | — |
+| 2 | 7 layers are orthogonal (multiplicative compounding valid) | If layers correlate, SE_eff is over- or under-estimated | — |
+| 3 | Structural variance components are correctly elicited | Wrong σ²_structural → wrong SE_eff → wrong uncertainty bands | — (author-constructed) |
+| 4 | Attenuation factors correctly discount confounded estimates | Too aggressive → real effects suppressed; too lenient → bias persists | — (author-constructed) |
+| 5 | Logistic P_inclusion correctly calibrated | Wrong inclusion probs → over/under-counting edge existence | — (novel, needs validation) |
+| 6 | Turner et al. (2012) priors appropriate for CRCI literature | If CRCI heterogeneity differs from general medical, τ² priors are miscalibrated | — |
+| 7 | Context-matched priors from 33 specifications cover clinical practice | Missing contexts fall back to general cancer, which may be too vague | — |
+| 8 | Claim-level attenuation factors (0.85/0.70/0.50) are reasonable | These are author-constructed; sensitivity analysis shows stable rankings for >85% of patients | Assumption 1 (effect homogeneity) |
 
 ═══════════════════════════════════════════════════════════════════════════
 

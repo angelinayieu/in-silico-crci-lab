@@ -1,0 +1,54 @@
+{
+  "doi": "10.1016/j.lfs.2013.08.011",
+  "pmid": null,
+  "title": "A randomized trial of cognitive rehabilitation in cancer survivors",
+  "authors": "Cherrier MM, Anderson K, David D, Higano CS, Gray H, Church A, Willis SL",
+  "journal": "Life Sciences",
+  "year": 2013,
+  "volume": 93,
+  "pages": "617-622",
+  "workstream_hints": ["intervention_rct", "cognitive_rehabilitation", "working_memory", "attention"],
+  "target_edges": [
+    "ER_COGACTIVITY_WORKMEM",
+    "ER_COGACTIVITY_ATTN",
+    "ER_COGACTIVITY_COGCOMPLAINTS",
+    "ER_COGACTIVITY_EPIMEM"
+  ],
+  "target_instruments": ["INST_FACT_COG", "INST_DSST", "INST_HVLT_R"],
+  "priority": "high",
+  "paper_type": "RCT",
+  "extraction_mode": "DEEP",
+  "cancer_types": ["breast", "bladder", "prostate", "colon", "uterine"],
+  "treatment_phase": "post_treatment",
+  "intervention": {
+    "type": "cognitive_rehabilitation",
+    "format": "group",
+    "duration_weeks": 7,
+    "sessions": 7,
+    "session_duration_hours": 1,
+    "homework_min_per_week": 45,
+    "adherence_rate": 0.72,
+    "components": ["method_of_loci", "chunking", "repetition", "calendar_aids", "mindfulness"]
+  },
+  "sample": {
+    "n_total": 28,
+    "n_treatment": 12,
+    "n_control": 16,
+    "mean_age": 58.9,
+    "pct_female": 92.9,
+    "years_post_treatment_median": 3,
+    "control_type": "wait_list"
+  },
+  "risk_of_bias": {
+    "randomization": "adequate",
+    "allocation_concealment": "unclear",
+    "blinding_participants": "none",
+    "blinding_assessors": "partial",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "overall": "moderate",
+    "expectancy_bias_risk": "high_for_subjective_outcomes"
+  },
+  "manual_extraction_notes": "Edge evidence pre-filled to data/manual_uploads/structured/edge_evidence_template.csv. Cohen d computed from means+SEs via SE*sqrt(n)=SD formula. Effect sizes: WM d=0.79, Attn d=0.59, CogComplaints d=0.53 (neg), EpiMem d=0.25 (trend). Downweight FACT-Cog 0.7x due to wait-list expectancy bias.",
+  "source": "manual_upload"
+}

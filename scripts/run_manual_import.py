@@ -115,15 +115,27 @@ def main() -> int:
         if args.type in ("csv", "all"):
             csv_dir = upload_dir / "structured"
             if csv_dir.exists():
-                csvs_found = list(csv_dir.glob("*.csv"))
-                print(f"\nFound {len(csvs_found)} CSV files in {csv_dir}")
+                # rglob supports per-paper subfolders: structured/[doi-slug]/*.csv
+                csvs_found = list(csv_dir.rglob("*.csv"))
+                print(f"\nFound {len(csvs_found)} CSV files in {csv_dir} (recursive)")
                 for csv_file in csvs_found:
-                    print(f"  {csv_file.name}")
+                    print(f"  {csv_file.relative_to(csv_dir)}")
 
                 if not args.validate_only and csvs_found:
-                    results = import_structured_csv(session, csv_dir)
-                    print(f"  Imported {len(results)} structured CSVs")
-                    total_imported += len(results)
+                    for csv_file in csvs_found:
+                        results = import_structured_csv(
+                            session, csv_file, validate_only=args.validate_only
+                        )
+                        imported = results.csvs_imported if hasattr(results, "csvs_imported") else 0
+                        if results.errors:
+                            for err in results.errors:
+                                print(f"  ERROR [{csv_file.name}]: {err}")
+                        elif results.warnings:
+                            for w in results.warnings:
+                                print(f"  WARN [{csv_file.name}]: {w}")
+                        else:
+                            print(f"  OK [{csv_file.name}]: processed {imported} rows")
+                        total_imported += imported
             else:
                 print(f"\nNo structured directory: {csv_dir}")
 

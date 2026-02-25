@@ -1,0 +1,69 @@
+{
+  "doi": "10.1002/pon.4370",
+  "title": "Effect of aerobic exercise on cancer-associated cognitive impairment: A proof-of-concept RCT",
+  "authors": ["Campbell KL", "Kam JWY", "Neil-Sztramko SE", "Liu Ambrose T", "Handy TC", "Lim H", "Hayden S", "Hsu L", "Kirkham AA", "Gotay CC", "McKenzie DC", "Boyd LA"],
+  "year": 2017,
+  "journal": "Psycho-Oncology",
+  "pmid": null,
+  "clinical_trials_id": "NCT01296893",
+  "study_design": "RCT",
+  "study_subtype": "proof_of_concept_pilot",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "intervention_type": "aerobic_exercise",
+  "intervention_description": "24-week aerobic exercise: 150 min/wk MVPA, 2x supervised 45-min gym sessions + 2x home sessions (30-min). Intensity 60-80% HRR. Delayed-exercise usual-lifestyle control.",
+  "n_total": 19,
+  "n_treatment": 10,
+  "n_control": 9,
+  "n_fmri_analysed": 14,
+  "age_range": "40-65",
+  "menopausal_status": "postmenopausal",
+  "time_since_treatment_mean_months": 11.2,
+  "extraction_mode": "DEEP",
+  "targeted_edges": [
+    "ER_ACTIVITY_PROC_SPEED",
+    "ER_ACTIVITY_VERBAL_FLUENCY",
+    "ER_ACTIVITY_EPIMEM",
+    "ER_ACTIVITY_COG_COMPLAINTS"
+  ],
+  "significant_findings": [
+    "TMT-A: adj diff -14.2s p=0.01 partial_eta_sq=0.35 (processing speed SIGNIFICANT)",
+    "VO2peak: adj diff +3.6 ml/kg/min p<0.01 partial_eta_sq=0.43 (fitness confirmed)"
+  ],
+  "null_findings": [
+    "FACT-Cog PCI p=0.44 (subjective cognitive complaints, null)",
+    "HVLT Total Recall p=0.52 (episodic memory, null)",
+    "Animal fluency p=0.15 (verbal fluency, trend only)",
+    "FAS p=0.56 (phonemic fluency, null)",
+    "TMT-B p=0.29 (executive flexibility, null)",
+    "FACT-F fatigue p=0.18 (clinically meaningful +6.3 but not significant)"
+  ],
+  "fmri_findings": {
+    "significant_group_x_time": true,
+    "regions": ["right_medial_frontal_gyrus", "right_anterior_cingulate", "left_superior_frontal_gyrus"],
+    "interpretation": "EX showed less brain activation (greater efficiency) in conflict monitoring regions; consistent with neural efficiency hypothesis"
+  },
+  "adherence_supervised": 0.88,
+  "adherence_home": 0.87,
+  "achieved_intensity_pct_hrr": 0.745,
+  "risk_of_bias": {
+    "randomization": "low",
+    "allocation_concealment": "low",
+    "blinding_participants": "not_possible",
+    "blinding_outcome_assessors": "low",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "other_bias": "small_sample_underpowered",
+    "overall": "low_to_moderate"
+  },
+  "expectancy_bias_risk": "low_for_objective_outcomes_moderate_for_subjective",
+  "limitations": [
+    "Small sample size (n=19): underpowered for most outcomes except TMT-A",
+    "Only postmenopausal breast cancer on aromatase inhibitor — narrow generalizability",
+    "No assessment of sleep (potential confounder)",
+    "3-year post-treatment window may include heterogeneous cognitive trajectories",
+    "No biomarker collection (BDNF, IL-6)"
+  ],
+  "completeness_pct": 85,
+  "extraction_notes": "FIRST aerobic exercise RCT with cognitive primary outcomes in breast cancer survivors. TMT-A is strongest evidence. fMRI data in subset only (n=14). FACT-F TOI 113.0 (out of 160) not 52 — using trial-specific reporting of FACT-F total score which differs from standard FACT-F subscale. Verify FACT-F scoring."
+}

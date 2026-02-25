@@ -4,48 +4,114 @@ You are building the CRCI Bayesian Causal Model system: a scientifically
 rigorous evidence-to-recommendation pipeline. Every formula must be exact.
 Every gate must be enforced. Every module must connect to the next.
 
+## 📚 START HERE: Your Documentation Hub
+
+**Adding a new paper?** → Read **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** first.
+
+**New to this project? Read these in order:**
+
+1. **[docs/00_navigation/IMPLEMENTATION_GUIDE.md](docs/00_navigation/IMPLEMENTATION_GUIDE.md)** ← **START HERE**
+   - Complete roadmap with all context organized
+   - What you're building, how to build it, quality gates
+   - ~900 lines, but it's your single source of truth
+   
+2. **[docs/00_navigation/QUICK_REFERENCE.md](docs/00_navigation/QUICK_REFERENCE.md)**
+   - One-page cheat sheet for common tasks
+   - Fast lookup for formulas, rules, files, commands
+   
+3. **[docs/00_navigation/VISUAL_ROADMAP.md](docs/00_navigation/VISUAL_ROADMAP.md)**
+   - Flowcharts and diagrams
+   - See the system structure visually
+   - Progress tracking template
+
+**Then execute:** [docs/04_implementation/PROMPT_SEQUENCE.md](docs/04_implementation/PROMPT_SEQUENCE.md) — 42 prompts in order
+
 ## Repository Documentation
 
-All specifications and implementation guides are in `docs/`:
+All docs are organized in `docs/` subfolders. Registries are in `registries/`.
 
+### docs/00_navigation/ — Entry Points
 ```
-docs/
-├── IMPLEMENTATION_BLUEPRINT_v1.1.md     — Architecture, phases, directory tree
-├── FILE_CONTEXT_MANIFEST.md             — Per-file spec lines, formulas, tables, gates
-├── PROMPT_SEQUENCE.md                   — 42 ordered prompts (your build sequence)
-├── CODE_QUALITY_ENFORCEMENT.md          — 12 rules + verification prompts + red flags
-├── TABLE_FILL_ORDER.md                  — When each table gets populated, by what, dependencies
-├── INTERFACE_SCHEMA_LOCK.md             — Field-level definitions for ALL intermediate states
-├── PARAMETER_PROVENANCE_AND_CURATION.md — GREEN/YELLOW/RED classification, G0 gate
-├── SYS_EXTRACTION_ADDENDUM.md           — Full-spectrum extraction: AG11 + 6 compilers
-├── AUTOMATED_RETRIEVAL_PLAN.md          — Source adapters, query gen, acquisition loop, manual input
-├── HETEROGENEOUS_PAPER_TREATMENT_PROTOCOL.md — Multi-yield extraction, precision cascade, completeness tracking
-├── CONVERSION_VALIDITY_AND_HARDENING.md      — Conversion matrix, verification escalation, shared-control, freshness policies
-├── PAPER_TYPE_ROUTING_AND_ACQUISITION.md     — 27 study_subtypes, MA multi-product, double-counting, LLM guardrails
-├── PAPER_INTELLIGENCE_MAXIMIZATION.md        — 22 content dimensions, study_annotations_v1, annotation lifecycle
-├── SYS_EXTRACTION_COMPLETE.md           — Extraction spec (2,764 lines)
-├── SYS_ALGORITHM_COMPLETE.md            — Algorithm spec (4,418 lines)
-├── SYS_RUNTIME_COMPLETE.md              — Runtime spec (752 lines)
-├── SYS_PRESENTATION_COMPLETE.md         — Presentation spec (541 lines)
-├── SYS_EXTRACTION_ADDENDUM.md           — Full-spectrum extraction extensions (agents, compilers, TB)
-├── AUTOMATED_RETRIEVAL_PLAN.md          — Automated paper retrieval system (adapters, queries, APS)
-├── 05_TABLE_SCHEMAS.md                  — Full column definitions for all 56 tables
-├── 06_FK_WIRING_MAP.md                  — Foreign key relationships
-└── 11_CONTROLLED_VOCABULARIES.md        — All enum values
+IMPLEMENTATION_GUIDE.md              — ★ Your main roadmap (START HERE)
+QUICK_REFERENCE.md                   — One-page cheat sheet
+VISUAL_ROADMAP.md                    — Diagrams and flowcharts
+INDEX.md                             — Full documentation catalog
+QUICK_START.md                       — Fast startup guide
+```
+
+### docs/01_v2_master/ — Authoritative v2.0 Specs (govern over all older docs)
+```
+CRCI_Master_Spec_v2.0.md             — ★ AUTHORITATIVE behavioral spec (supersedes SYS_* docs)
+CRCI_Engineering_Appendix_v2.0.md    — Module manifest, schemas, test specs
+CRCI_Implementation_Playbook_v2.0.md — CLI scripts, API adapters, rate limits
+CRCI_Checklists_Templates_v2.0.md    — Manual CSV templates + operational checklists
+```
+
+### docs/02_system_specs/ — System Specs (older, still referenced)
+```
+SYS_EXTRACTION_COMPLETE.md           — Extraction spec (2,764 lines)
+SYS_EXTRACTION_ADDENDUM.md           — Full-spectrum extraction extensions
+SYS_ALGORITHM_COMPLETE.md            — Algorithm spec (4,418 lines)
+SYS_RUNTIME_COMPLETE.md              — Runtime spec (752 lines)
+SYS_PRESENTATION_COMPLETE.md         — Presentation spec (541 lines)
+IMPLEMENTATION_BLUEPRINT_v1.1.md     — Architecture, v1 scope, phases
+```
+
+### docs/03_database/ — Database Schemas
+```
+05_TABLE_SCHEMAS.md                  — Full column definitions for all 56 tables
+06_FK_WIRING_MAP.md                  — Foreign key relationships
+11_CONTROLLED_VOCABULARIES.md        — All enum values
+```
+
+### docs/04_implementation/ — Build Order & Quality
+```
+PROMPT_SEQUENCE.md                   — 42 ordered prompts (your build sequence)
+FILE_CONTEXT_MANIFEST.md             — Per-file spec lines, formulas, tables, gates
+CODE_QUALITY_ENFORCEMENT.md          — 12 rules + verification prompts
+```
+
+### docs/05_data_management/ — Data & Retrieval
+```
+PARAMETER_PROVENANCE_AND_CURATION.md — GREEN/YELLOW/RED classification
+CONVERSION_VALIDITY_AND_HARDENING.md — Conversion matrix, verification
+AUTOMATED_RETRIEVAL_PLAN.md          — Paper retrieval system (v2)
+```
+
+### docs/06_orchestration/ — Operations
+```
+CLAUDE_CODE_ORCHESTRATION.md         — Multi-session orchestration instructions
+```
+
+### registries/ — Class A Knowledge (Human-Authored, Fill First)
+```
+EDGE_REGISTRY.csv                    — All causal/associational edges (133 rows)
+NODE_REGISTRY.csv                    — All DAG nodes
+INSTRUMENT_REGISTRY.csv              — All assessment instruments
+MEASURE_REGISTRY.csv                 — Measure definitions
+PATHWAY_REGISTRY.csv                 — Biological pathways
+```
+
+### docs NOT YET CREATED (referenced in code — create when needed)
+```
+TABLE_FILL_ORDER.md                  — When each table gets populated
+INTERFACE_SCHEMA_LOCK.md             — Field-level definitions for intermediate states
 ```
 
 ## How You Build This System
 
-Follow `docs/PROMPT_SEQUENCE.md` — it contains 42 prompts across 7 phases.
-Execute them ONE AT A TIME in order. Never skip ahead. Never batch across
-phases. The sequence is dependency-ordered: each prompt's output is the
-next prompt's input.
+1. **Read [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** (15 minutes)
+2. **Open [PROMPT_SEQUENCE.md](PROMPT_SEQUENCE.md)**
+3. **Execute prompts ONE AT A TIME in order**
+   - Never skip ahead
+   - Never batch across phases
+   - The sequence is dependency-ordered
 
 ## For Every Single File You Build, Follow This Cycle
 
 ### 1. READ (before writing any code)
 
-a. Read the file's entry in `docs/FILE_CONTEXT_MANIFEST.md`
+a. Read the file's entry in `docs/04_implementation/FILE_CONTEXT_MANIFEST.md`
 b. Read the EXACT spec lines the manifest references
    (e.g., "SYS_EX lines 1230-1320" → read only those 90 lines)
 c. Read ALL existing code files that produce this file's inputs
@@ -57,13 +123,13 @@ e. Re-read these anchor files to maintain naming consistency:
    - `shared/models/enums.py`
    - `shared/models/intermediate_states.py`
    (Skip this step during Phase 0 when these don't exist yet)
-f. Read the 12 enforcement rules in `docs/CODE_QUALITY_ENFORCEMENT.md` Section 1
+f. Read the 12 enforcement rules in `docs/04_implementation/CODE_QUALITY_ENFORCEMENT.md` Section 1
 g. For any file that reads or writes database tables, consult
-   `docs/TABLE_FILL_ORDER.md` to verify the table is populated
+   `docs/03_database/TABLE_FILL_ORDER.md` to verify the table is populated (⚠ not yet created)
    at this stage and its dependencies exist
 h. For any file that produces or consumes an intermediate state
    (TypedNumericValue, HarmonizedClaim, CalibratedRecord, etc.),
-   consult `docs/INTERFACE_SCHEMA_LOCK.md` for exact field definitions.
+   consult `docs/04_implementation/INTERFACE_SCHEMA_LOCK.md` for exact field definitions. (⚠ not yet created)
    Your output types MUST match these schemas.
 
 ### 2. PLAN (think before coding)
@@ -176,7 +242,7 @@ Add a verification stamp as comments at the top of the file:
 
 After completing ALL prompts in a phase (not after each prompt — after
 each phase), run the corresponding verification from
-`docs/CODE_QUALITY_ENFORCEMENT.md` Section 2:
+`docs/04_implementation/CODE_QUALITY_ENFORCEMENT.md` Section 2:
 
 - After Phase 0 → run V0 (schema + model consistency)
 - After Phase 1 → run V1 (extraction wiring)

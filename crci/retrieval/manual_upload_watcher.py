@@ -188,26 +188,26 @@ def import_structured_csv(
 
 def _get_required_columns(template_name: str) -> set[str]:
     """Get required columns for a template."""
+    # Column names follow CRCI_Checklists_Templates_v2.0.md §T1 (the authoritative spec)
     required = {
         "edge_evidence_template": {
-            "study_doi", "edge_id", "beta", "se", "sample_size",
+            "doi", "edge_id", "beta_raw", "se_raw", "sample_size",
         },
         "instrument_evidence_template": {
-            "study_doi", "instrument_id", "cronbachs_alpha", "sample_size",
+            "doi", "instrument_id", "reliability_value", "sample_size",
         },
         "population_norms_template": {
-            "study_doi", "instrument_id", "population_mean", "population_sd",
-            "sample_size",
+            "doi", "instrument_id", "mean", "sd", "sample_size",
         },
         "context_priors_template": {
-            "study_doi", "cancer_type", "treatment_phase", "node_id",
-            "mean_z", "sd", "sample_size",
+            "doi", "node_id", "cancer_type", "treatment_phase",
+            "prior_mean_z", "prior_sd_z",
         },
         "temporal_evidence_template": {
-            "study_doi", "action_id", "timepoint_weeks", "effect", "se",
+            "doi", "edge_id", "timepoint_weeks", "value", "se",
         },
         "correlation_template": {
-            "study_doi", "node_a", "node_b", "correlation", "sample_size",
+            "doi", "biomarker_id_1", "biomarker_id_2", "correlation_r", "sample_size",
         },
     }
     return required.get(template_name, set())
@@ -281,7 +281,8 @@ def run_manual_import(
 
     if import_type in ("csv", "all"):
         if _STRUCTURED_DIR.exists():
-            for csv_path in sorted(_STRUCTURED_DIR.glob("*.csv")):
+            # rglob supports per-paper subfolders: structured/[doi-slug]/*.csv
+            for csv_path in sorted(_STRUCTURED_DIR.rglob("*.csv")):
                 csv_result = import_structured_csv(
                     session, csv_path, validate_only=validate_only
                 )
