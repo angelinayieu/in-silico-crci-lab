@@ -220,6 +220,91 @@ CONFOUNDER_COVERAGE_DOWNGRADE_THRESHOLD: float = 0.30  # < 30% → downgrade
 SE_FROM_CI_Z_MULTIPLIER: float = 1.96
 
 # ═══════════════════════════════════════════════════════════════
+#  SE DERIVATION CASCADE (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)
+# ═══════════════════════════════════════════════════════════════
+
+# Inflation factors per SE derivation level
+SE_CASCADE_INFLATION_L1: float = 1.00     # SE reported directly
+SE_CASCADE_INFLATION_L2A: float = 1.00    # 95% CI → SE
+SE_CASCADE_INFLATION_L2B: float = 1.00    # 99% CI → SE
+SE_CASCADE_INFLATION_L2C: float = 1.00    # 90% CI → SE
+SE_CASCADE_INFLATION_L3A: float = 1.05    # Exact p-value + effect → SE
+SE_CASCADE_INFLATION_L3B: float = 1.10    # Bounded p (e.g. p<0.05) → SE
+SE_CASCADE_INFLATION_L4A: float = 1.15    # N per group + d → SE
+SE_CASCADE_INFLATION_L4B: float = 1.20    # Total N only + d (assume n₁=n₂=N/2) → SE
+SE_CASCADE_INFLATION_L5_T1: float = 1.15  # SD borrowed, Tier 1 (same population)
+SE_CASCADE_INFLATION_L5_T2: float = 1.30  # SD borrowed, Tier 2 (similar population)
+SE_CASCADE_INFLATION_L5_T3: float = 1.50  # SD borrowed, Tier 3 (general population)
+
+# CI divisors for different confidence levels (z-multiplier × 2)
+SE_CI_DIVISOR_95: float = 3.92   # 2 × 1.96
+SE_CI_DIVISOR_99: float = 5.152  # 2 × 2.576
+SE_CI_DIVISOR_90: float = 3.290  # 2 × 1.645
+
+# ═══════════════════════════════════════════════════════════════
+#  CONVERSION VALIDITY MATRIX (CONVERSION_VALIDITY_AND_HARDENING.md Module 1)
+# ═══════════════════════════════════════════════════════════════
+
+# Hasselblad & Hedges OR→d conversion factor: √3/π ≈ 0.5513
+CONVERSION_OR_TO_D_FACTOR: float = 0.5513288954217921
+
+# SE inflation for missing fields (fallback paths)
+CONVERSION_SE_INFLATION_MISSING_GROUP_N: float = 1.10   # d from d, using total N/2
+CONVERSION_SE_INFLATION_MISSING_R_PREPOST: float = 1.30  # paired t with default r=0.5
+CONVERSION_SE_INFLATION_ETA_APPROX: float = 1.20         # η² total used as partial approx
+CONVERSION_SE_INFLATION_CHI2_APPROX: float = 1.20        # χ² without cell counts
+CONVERSION_SE_INFLATION_SPEARMAN: float = 1.06           # Spearman ρ treated as Pearson r
+
+# Default pre-post correlation for paired designs (when unknown)
+CONVERSION_DEFAULT_R_PREPOST: float = 0.50
+
+# Change score ↔ endpoint conversion SE inflation (when ρ unknown, Module 4.3)
+CS_UNKNOWN_RHO_SE_INFLATION: float = 1.20
+CS_DEFAULT_RHO: float = 0.50
+CS_MAJORITY_FRACTION: float = 2.0 / 3.0  # ≥2/3 for majority rule
+
+# ═══════════════════════════════════════════════════════════════
+#  FAMILY-SPECIFIC FRESHNESS (CONVERSION_VALIDITY_AND_HARDENING.md Module 5)
+# ═══════════════════════════════════════════════════════════════
+
+# {family: (decay_per_year, floor)}
+FRESHNESS_FAMILY_POLICIES: dict[str, tuple[float, float]] = {
+    "psychometrics": (0.000, 1.00),
+    "normative_data": (0.005, 0.90),
+    "biological_correlations": (0.005, 0.90),
+    "edge_intervention": (0.015, 0.70),
+    "edge_mechanism": (0.010, 0.80),
+    "intervention_kernels": (0.020, 0.70),
+    "context_priors": (0.010, 0.80),
+    "meta_analysis_pooled": (0.015, 0.70),
+    "recovery_curves": (0.010, 0.80),
+}
+
+# Supersession penalty for psychometrics/MAs when newer better-matched record exists
+FRESHNESS_SUPERSESSION_PENALTY: float = 0.70
+FRESHNESS_SUPERSESSION_MIN_N_RATIO: float = 0.50  # newer N ≥ older N × 0.50
+
+# ═══════════════════════════════════════════════════════════════
+#  VERIFICATION ESCALATION (CONVERSION_VALIDITY_AND_HARDENING.md Module 2)
+# ═══════════════════════════════════════════════════════════════
+
+# E1: Majority IVW weight threshold
+ESCALATION_E1_WEIGHT_THRESHOLD: float = 0.50
+
+# E2: Minimum studies for pooling protection
+ESCALATION_E2_MIN_K: int = 3
+
+# E4: Maximum k for sole-cancer-match escalation
+ESCALATION_E4_MAX_K: int = 5
+
+# E5: SE derivation level threshold (L4a and above → soft SE)
+ESCALATION_E5_SE_LEVEL_THRESHOLD: str = "L4a"
+ESCALATION_E5_WEIGHT_THRESHOLD: float = 0.30
+
+# Unverified inflation applied to escalated records until verified
+ESCALATION_UNVERIFIED_SE_INFLATION: float = 1.20
+
+# ═══════════════════════════════════════════════════════════════
 #  RECONCILIATION CONFIDENCE (EX-P1-REC)
 # ═══════════════════════════════════════════════════════════════
 
@@ -234,6 +319,25 @@ REC_JACCARD_MERGE_THRESHOLD: float = 0.80
 
 # AT-06: Speculative evidence confidence ceiling
 ATB_SPECULATIVE_CONFIDENCE_CEILING: float = 0.50
+
+# ═══════════════════════════════════════════════════════════════
+#  ANNOTATION PROMOTION THRESHOLDS (EX-PROM, §A.3)
+# ═══════════════════════════════════════════════════════════════
+# min_confidence thresholds by impact tier
+# High-impact (affects sigma^2_structural directly): requires human review
+PROM_CONFIDENCE_HIGH_IMPACT: float = 0.70
+# Medium-high (DAG expansion, confounder structure): moderate threshold
+PROM_CONFIDENCE_MEDIUM_HIGH: float = 0.65
+# Medium (SE inflation, temporal, dose, effect modification)
+PROM_CONFIDENCE_MEDIUM: float = 0.60
+# Medium-low (scope, adherence, replication, cross-validation)
+PROM_CONFIDENCE_MEDIUM_LOW: float = 0.55
+# Low (research gap, adverse event, theory, clinical significance)
+PROM_CONFIDENCE_LOW: float = 0.50
+
+# min_cross_agent_n thresholds
+PROM_CROSS_AGENT_HIGH_IMPACT: int = 2   # High-impact categories
+PROM_CROSS_AGENT_DEFAULT: int = 1       # All other categories
 
 # ═══════════════════════════════════════════════════════════════
 #  TRUST BOUNDARY PLAUSIBILITY (EX-TB, §2.5)
@@ -759,6 +863,30 @@ FULLTEXT_SOURCE_PRIORITY: list[str] = [
 # Acquisition loop
 ACQUISITION_LOOP_HOURS: int = 6
 AUTHOR_GAP_BOOST_MULTIPLIER: float = 1.5
+
+# v2.0: Abstract screening (MS §9.2.1)
+ABSTRACT_SCREENING_MIN_KEYWORDS: int = 2
+ABSTRACT_SCREENING_CANCER_KEYWORDS: list[str] = [
+    "cancer", "tumor", "tumour", "oncology", "carcinoma", "malignancy",
+    "neoplasm", "chemotherapy", "radiation", "survivor",
+]
+ABSTRACT_SCREENING_COGNITIVE_KEYWORDS: list[str] = [
+    "cognit", "memory", "attention", "executive function", "processing speed",
+    "brain fog", "chemo brain", "chemobrain", "neuropsychol", "neurocognit",
+]
+
+# v2.0: Saturation detection (MS §9.7)
+SATURATION_NOVELTY_THRESHOLD: float = 0.10
+SATURATION_MIN_CYCLES: int = 3
+SATURATION_MAX_CYCLES: int = 20
+
+# v2.0: Content-driven hops (MS §9.4)
+HOP_MAX_DEPTH: int = 2
+HOP_CITATION_APS_BOOST: float = 0.15
+
+# v2.0: ID cross-resolution
+ID_RESOLVER_CROSSREF_TIMEOUT_S: int = 10
+ID_RESOLVER_PUBMED_TIMEOUT_S: int = 10
 
 # Workstream priority (higher = searched first)
 WORKSTREAM_PRIORITY: list[str] = [

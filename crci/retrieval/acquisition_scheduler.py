@@ -1,17 +1,22 @@
 # VERIFIED: flow matches AUTOMATED_RETRIEVAL_PLAN.md Part 6, Steps 1-7
 # VERIFIED: imports — query_generator, search_coordinator, aps_scorer, fulltext_retriever
+# VERIFIED: v2.0 — abstract_screener, id_resolver, saturation_detector, hop_discoverer
 # VERIFIED: budget-aware, workstream-configurable
 # VERIFIED: modes: single_run, continuous (loop), dry_run
 """
 Component: SYS_EXTRACTION.EX-ACQ.AcquisitionScheduler
 Spec: AUTOMATED_RETRIEVAL_PLAN.md Part 6 (Steps 1-7), Part 9 (Budget)
-Purpose: Runs the full acquisition cycle:
+      Master Spec v2.0 §9.2-§9.7 (screening, hops, saturation)
+Purpose: Runs the full acquisition cycle (v2.0 enhanced):
          1. query_generator.generate_all()
          2. search_coordinator.search(queries)
+         2b. id_resolver.resolve_candidate_ids() (v2.0)
+         2c. abstract_screener.screen_batch() (v2.0)
          3. aps_scorer.score(candidates)
          4. fulltext_retriever.retrieve(scored, budget)
-         5. Feed retrieved PDFs to extraction pipeline
-         6. Report results
+         5. hop_discoverer.run_hop_discovery() (v2.0)
+         6. saturation_detector.check_saturation() (v2.0)
+         7. Report results
 Reads: Class A tables (via query_generator), APIs (via adapters)
 Writes: acquisition_queue_v1, retrieval_cache/, extraction pipeline
 """
@@ -26,9 +31,11 @@ from sqlalchemy.orm import Session
 
 from crci.shared import config
 from crci.retrieval import query_generator
-from crci.retrieval.search_coordinator import SearchCoordinator
+from crci.retrieval.abstract_screener import screen_batch as screen_abstracts
 from crci.retrieval.aps_scorer import score_candidates
 from crci.retrieval.fulltext_retriever import FulltextRetriever
+from crci.retrieval.hop_discoverer import run_hop_discovery
+from crci.retrieval.id_resolver import resolve_candidate_ids
 from crci.retrieval.models import (
     APSQueryRequest,
     APSScoredCandidate,
@@ -36,6 +43,13 @@ from crci.retrieval.models import (
     RetrievalResult,
     RetrievalStatus,
 )
+from crci.retrieval.saturation_detector import (
+    check_saturation,
+    compute_novelty_ratio,
+    flag_saturated_entries,
+    update_cycle_count,
+)
+from crci.retrieval.search_coordinator import SearchCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +60,15 @@ class AcquisitionReport:
 
     queries_generated: int = 0
     candidates_found: int = 0
+    candidates_after_screening: int = 0
     candidates_dispatched: int = 0
     candidates_deferred: int = 0
     fulltext_retrieved: int = 0
     abstract_only: int = 0
     retrieval_failed: int = 0
+    hop_candidates_queued: int = 0
+    novelty_ratio: float = 0.0
+    saturated: bool = False
     workstreams_searched: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -60,14 +78,22 @@ def run_acquisition_cycle(
     workstreams: list[str] | None = None,
     max_papers: int = 50,
     dry_run: bool = False,
+    cycle_number: int = 1,
 ) -> AcquisitionReport:
-    """Run a single acquisition cycle.
+    """Run a single acquisition cycle (v2.0 enhanced).
+
+    v2.0 additions:
+    - Step 2b: ID cross-resolution for improved dedup
+    - Step 2c: Abstract screening to filter irrelevant candidates
+    - Step 5: Content-driven hop discovery from extracted papers
+    - Step 6: Saturation detection for loop termination
 
     Args:
         session: SQLAlchemy session.
         workstreams: Which workstreams to search. None = all.
         max_papers: Maximum papers to retrieve per cycle.
         dry_run: If True, generate queries and score but don't retrieve.
+        cycle_number: Current cycle number (for saturation tracking).
 
     Returns:
         AcquisitionReport with cycle statistics.
@@ -112,6 +138,30 @@ def run_acquisition_cycle(
     if dry_run:
         logger.info("DRY RUN: stopping after search (no scoring/retrieval)")
         return report
+
+    # Step 2b (v2.0): Cross-resolve DOI ↔ PMID for better dedup
+    logger.info("Step 2b: Cross-resolving candidate identifiers")
+    try:
+        candidates = resolve_candidate_ids(candidates)
+    except Exception as exc:
+        logger.warning("ID resolution failed (continuing without): %s", exc)
+        report.errors.append(f"ID resolution warning: {exc}")
+
+    # Step 2c (v2.0): Abstract screening — filter irrelevant candidates
+    logger.info("Step 2c: Screening %d candidate abstracts", len(candidates))
+    try:
+        screened = screen_abstracts(candidates)
+        candidates = [cand for cand, _ in screened]
+        report.candidates_after_screening = len(candidates)
+        logger.info(
+            "Abstract screening: %d → %d candidates passed",
+            report.candidates_found,
+            report.candidates_after_screening,
+        )
+    except Exception as exc:
+        logger.warning("Abstract screening failed (continuing without): %s", exc)
+        report.errors.append(f"Abstract screening warning: {exc}")
+        report.candidates_after_screening = len(candidates)
 
     # Respect daily candidate budget
     cand_budget = config.RETRIEVAL_MAX_CANDIDATES_SCORED_PER_DAY
@@ -174,6 +224,39 @@ def run_acquisition_cycle(
         report.retrieval_failed,
     )
 
+    # Step 5 (v2.0): Content-driven hop discovery
+    logger.info("Step 5: Running content-driven hop discovery")
+    try:
+        hop_count = run_hop_discovery(session)
+        report.hop_candidates_queued = hop_count
+    except Exception as exc:
+        logger.warning("Hop discovery failed (non-fatal): %s", exc)
+        report.errors.append(f"Hop discovery warning: {exc}")
+
+    # Step 6 (v2.0): Saturation detection
+    logger.info("Step 6: Checking acquisition saturation")
+    try:
+        cycle_dois = [c.doi for c in candidates if c.doi]
+        cycle_pmids = [c.pmid for c in candidates if c.pmid]
+        novelty = compute_novelty_ratio(session, cycle_dois, cycle_pmids)
+        report.novelty_ratio = novelty
+
+        sat_report = check_saturation(session, cycle_number, novelty)
+        report.saturated = sat_report.saturated
+
+        update_cycle_count(session, cycle_number)
+        flag_saturated_entries(session)
+
+        if sat_report.saturated:
+            logger.warning(
+                "SAT-G1: Acquisition loop is SATURATED (%s). "
+                "Consider halting.",
+                sat_report.recommendation,
+            )
+    except Exception as exc:
+        logger.warning("Saturation check failed (non-fatal): %s", exc)
+        report.errors.append(f"Saturation check warning: {exc}")
+
     return report
 
 
@@ -182,14 +265,18 @@ def run_continuous(
     workstreams: list[str] | None = None,
     max_papers_per_cycle: int = 50,
     max_cycles: int | None = None,
+    respect_saturation: bool = True,
 ) -> list[AcquisitionReport]:
     """Run acquisition in continuous mode (loop with sleep).
+
+    v2.0: Respects saturation detection — halts loop when SAT-G1 fires.
 
     Args:
         session: SQLAlchemy session.
         workstreams: Which workstreams to search.
         max_papers_per_cycle: Max papers per cycle.
-        max_cycles: Max number of cycles (None = unlimited).
+        max_cycles: Max number of cycles (None = unlimited, subject to saturation).
+        respect_saturation: If True, halt loop when saturation is detected.
 
     Returns:
         List of AcquisitionReport per cycle.
@@ -205,15 +292,29 @@ def run_continuous(
             session,
             workstreams=workstreams,
             max_papers=max_papers_per_cycle,
+            cycle_number=cycle,
         )
         reports.append(report)
 
         logger.info(
-            "Cycle %d complete: %d retrieved, %d errors",
+            "Cycle %d complete: %d retrieved, %d hops queued, "
+            "novelty=%.3f, %d errors",
             cycle,
             report.fulltext_retrieved,
+            report.hop_candidates_queued,
+            report.novelty_ratio,
             len(report.errors),
         )
+
+        # v2.0: Check saturation-based termination
+        if respect_saturation and report.saturated:
+            logger.warning(
+                "Acquisition loop halted by SAT-G1 after %d cycles "
+                "(novelty_ratio=%.3f)",
+                cycle,
+                report.novelty_ratio,
+            )
+            break
 
         if max_cycles is not None and cycle >= max_cycles:
             break
