@@ -1,1 +1,1 @@
-study_doi,cancer_type,treatment_phase,node_id,mean_z,sd,sample_size,instrument_id,provenance_ref
+doi,node_id,cancer_type,treatment_phase,prior_mean_z,prior_sd_z,source_type,n_contributing,notes

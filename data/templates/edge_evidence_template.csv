@@ -1,1 +1,1 @@
-study_doi,edge_id,beta,se,ci_lower,ci_upper,p_value,sample_size,study_design,population,timepoint_weeks,is_adjusted,provenance_ref
+doi,edge_id,beta_raw,se_raw,effect_type_original,effect_size_type,sample_size,study_design,cancer_type,treatment_phase,instrument_id,confidence_note

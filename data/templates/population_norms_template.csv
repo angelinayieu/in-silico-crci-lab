@@ -1,1 +1,1 @@
-study_doi,instrument_id,population_mean,population_sd,sample_size,population_type,age_range,provenance_ref
+doi,node_id,instrument_id,mean,sd,sample_size,cancer_type,treatment_phase,age_range
