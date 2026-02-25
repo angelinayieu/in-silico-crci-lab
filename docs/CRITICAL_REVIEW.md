@@ -1,8 +1,10 @@
 # CRCI System — Rigorous Critical Review
 
 **Date**: 2025-02-26  
+**Updated**: 2025-02-26 (Phase A+B+C partial complete)  
 **Scope**: End-to-end audit of extraction, retrieval, data, tracking, and researcher workflow  
-**Verdict**: The mechanical plumbing works. Zero usable output has been produced.
+**Original Verdict**: The mechanical plumbing works. Zero usable output has been produced.  
+**Current Verdict**: 8 evidence rows loaded. Retrieval bugs fixed. Researcher CLI built. 129/137 edges still need evidence.
 
 ---
 
@@ -201,33 +203,33 @@ REQUIRED STATE:
 
 ## Recommended Next Steps (Strict Priority Order)
 
-### Phase A: Get Data Into the Database (BLOCKING — nothing else works without this)
+### Phase A: Get Data Into the Database ✅ COMPLETE
 
-1. **Fix edge ID mapping** — Create a mapping from CSV `ER_*` IDs to DB `EDGE_*` IDs, or update the CSVs to use DB conventions. Estimated: 1 hour.
+1. ~~**Fix edge ID mapping**~~ ✅ Reseeded `edge_relations_definitions_v1` from EDGE_REGISTRY.csv: 25 `EDGE_*` stubs → 137 `ER_*` rows. Also fixed concatenation bug in EDGE_REGISTRY.csv line 135.
 
-2. **Implement `import_structured_csv` writer** — Replace the stub with actual DB writes to `edge_evidence_v1`. Map CSV columns (`beta_raw` → `effect_value_reported`, etc.). Estimated: 2 hours.
+2. ~~**Implement `import_structured_csv` writer**~~ ✅ Replaced stub in `manual_upload_watcher.py` with working `_write_edge_evidence_rows()`. Maps CSV columns correctly.
 
-3. **Run `manual_cherrier_entry.py`** OR integrate its data into the CSV import path. Estimated: 15 minutes.
+3. ~~**Run `manual_cherrier_entry.py` OR integrate data**~~ ✅ Data loaded via `scripts/load_evidence_into_db.py` — 4 Cherrier + 4 Campbell edges.
 
-4. **Register Campbell 2017 in `study_registry_v1`** — Currently only Cifu 2018 is registered. Estimated: 15 minutes.
+4. ~~**Register Campbell 2017 in `study_registry_v1`**~~ ✅ Both Cherrier 2013 and Campbell 2017 registered.
 
-5. **Verify**: After steps 1-4, `edge_evidence_v1` should have 8+ rows and the model can start consuming data.
+5. ~~**Verify**~~ ✅ `edge_evidence_v1` has 8 rows. `run_manual_import.py --type csv` correctly deduplicates.
 
-### Phase B: Fix Retrieval So It Actually Works
+### Phase B: Fix Retrieval So It Actually Works ✅ COMPLETE
 
-6. **Add PDF validation to `fulltext_retriever.py`** — Check `Content-Type` header and file magic bytes. Reject HTML pages. Estimated: 1 hour.
+6. ~~**Add PDF validation to `fulltext_retriever.py`**~~ ✅ Added `_validate_content()` method with magic byte checks (`%PDF-`, `<?xml`). Rejects HTML pages. Also fixed `unpaywall.py` Content-Type logic bug (AND→OR).
 
-7. **Add dedup logic to acquisition queue** — Prevent duplicate DOIs. Estimated: 30 minutes.
+7. ~~**Add dedup logic to acquisition queue**~~ ✅ `_write_queue_row()` now checks for existing DOI before inserting. Updates if new APS higher or status better. Cleaned 4 existing duplicates.
 
-8. **Increase retrieval budget and re-run** — Try retrieving top 20–50 papers. Estimated: 30 minutes.
+8. **Increase retrieval budget and re-run** — ❌ NOT YET DONE. Ready to run when desired.
 
-### Phase C: Build Researcher Workflow (Minimum Viable)
+### Phase C: Build Researcher Workflow — PARTIAL
 
-9. **Create `scripts/show_paywalled.py`** — CLI script that lists all papers that need manual retrieval, with DOI, title, why they're needed, and instructions. Estimated: 1 hour.
+9. ~~**Create `scripts/show_paywalled.py`**~~ ✅ Built with `--all` (full queue), `--coverage` (8/137 edge grid), `--mark-retrieved DOI`. Includes manual acquisition instructions.
 
-10. **Make `scan_pdfs()` actually trigger pipeline ingestion** — When a researcher drops a PDF into `data/manual_uploads/pdfs/`, the system should detect it and queue it for extraction. Estimated: 2 hours.
+10. **Make `scan_pdfs()` actually trigger pipeline ingestion** — ❌ NOT YET DONE.
 
-11. **Create `scripts/approve_evidence.py`** — CLI tool where researcher reviews proposed evidence before it enters the Bayesian model. Estimated: 2 hours.
+11. **Create `scripts/approve_evidence.py`** — ❌ NOT YET DONE.
 
 ### Phase D: Dashboard & Visibility (After Data Exists)
 
@@ -237,23 +239,25 @@ REQUIRED STATE:
 
 ---
 
-## Summary Table
+## Summary Table (Updated)
 
 | Component | Code Exists? | Actually Works? | Produces Output? |
 |---|---|---|---|
 | Extraction pipeline (P0-P7) | YES | Runs without crashes | NO — 0 evidence rows |
-| Retrieval adapters (5) | YES | All pass connectivity | PARTIAL — HTML not PDF |
+| Retrieval adapters (5) | YES | All pass connectivity | FIXED — PDF validation added |
 | APS scorer | YES | Scores correctly | YES — scores in DB |
 | Hop discovery | YES (fixed) | Finds constituent studies | YES — 4 queued |
-| CSV import | YES (stub) | NO — stub only | NO |
-| Manual entry script | YES | Never executed | NO |
-| Study registry | YES | 1 of 3 papers registered | MINIMAL |
-| Edge evidence DB | YES (schema) | 0 rows | NO |
-| Report status CLI | YES | Works | YES — only working visibility tool |
+| CSV import | YES | FIXED — writes to DB | YES — 8 rows loaded |
+| Manual entry script | YES | Never executed | Superseded by CSV loader |
+| Study registry | YES | 3 papers registered | YES |
+| Edge evidence DB | YES | 8 rows | YES |
+| Edge definitions DB | YES | 137 ER_* rows | YES |
+| Report status CLI | YES | Works | YES |
+| Show paywalled CLI | NEW | Works | YES — queue + coverage |
 | Presentation modules | YES (7 files) | Produce dataclasses | NO frontend to render them |
 | Tracking dashboard | NO | — | — |
 | Approval workflow | NO | — | — |
 | AI proposal system | NO | — | — |
-| Manual acquisition workflow | NO | — | — |
+| Manual acquisition workflow | PARTIAL | CLI exists | Instructions provided |
 
-**Bottom line**: Phase A (get 8 manual edges into the database) is the single most impactful action. Everything downstream — the Bayesian model, the presentation layer, the recommendations — is waiting for evidence rows that currently don't exist.
+**Current bottom line**: Phase A and B are complete. 8 evidence rows exist in the database. 129/137 edges still need evidence. Next priorities: (1) extract more papers, (2) build approval workflow, (3) build dashboard.
