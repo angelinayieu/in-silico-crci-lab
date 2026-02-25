@@ -2,7 +2,7 @@
 # VERIFIED: imports — all modules exist
 # VERIFIED: backward wiring — reads PooledEstimate from meta_analyzer.py
 # VERIFIED: forward wiring — writes PriorSpec for edge_writer.py
-# VERIFIED: no hardcoded formula parameters
+# VERIFIED: no hardcoded formula parameters — all from shared/config.py (PRIOR_* constants)
 # VERIFIED: 4-level fallback matches spec SYS_ALG line 3876
 """
 Component: SYS_EXTRACTION.EX-P4.P4-PS
@@ -23,7 +23,22 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from crci.shared.config import (
+    PRIOR_FALLBACK_SE_MULTIPLIER_CANCER_TYPE,
+    PRIOR_FALLBACK_SE_MULTIPLIER_EXACT,
+    PRIOR_FALLBACK_SE_MULTIPLIER_GENERAL,
+    PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
+    PRIOR_K_THRESHOLD_COMMENSURATE_HIGH,
+    PRIOR_K_THRESHOLD_COMMENSURATE_LOW,
+    PRIOR_K_THRESHOLD_POWER,
+    PRIOR_K_THRESHOLD_ROBUST_MAP,
     PRIOR_MEAN_DEFAULT,
+    PRIOR_MECHANISTIC_SYNTH_DISCOUNT,
+    PRIOR_MIN_RCTS_FOR_ROBUST_MAP,
+    PRIOR_POWER_DISCOUNT,
+    PRIOR_ROBUST_MAP_VAGUE_VAR,
+    PRIOR_ROBUST_MAP_W_BASE,
+    PRIOR_ROBUST_MAP_W_CAP,
+    PRIOR_ROBUST_MAP_W_PER_K,
     PRIOR_SD_DEFAULT,
 )
 from crci.shared.models.enums import (
@@ -44,42 +59,8 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Prior Selection Constants (from spec, referenced in config)
+#  Prior Selection Constants — all imported from shared/config.py
 # ═══════════════════════════════════════════════════════════════
-
-# Decision tree thresholds — spec SYS_EX lines 1268-1272
-_K_THRESHOLD_ROBUST_MAP: int = 5
-_K_THRESHOLD_COMMENSURATE_LOW: int = 2
-_K_THRESHOLD_COMMENSURATE_HIGH: int = 4
-_K_THRESHOLD_POWER: int = 1
-_MIN_RCTS_FOR_ROBUST_MAP: int = 2
-
-# RobustMAP formula: w = min(0.8, 0.5 + 0.06k)
-# Spec SYS_ALG lines 1346 (B3a)
-_ROBUST_MAP_W_BASE: float = 0.5
-_ROBUST_MAP_W_PER_K: float = 0.06
-_ROBUST_MAP_W_CAP: float = 0.8
-_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10^2)
-
-# Power prior discount factors — spec SYS_ALG lines 1348 (B3c)
-# Design → a_0 discount
-_POWER_PRIOR_DISCOUNT: dict[str, float] = {
-    "RCT_same": 0.80,
-    "RCT_diff": 0.50,
-    "cohort": 0.40,
-    "observational": 0.30,
-    "animal": 0.15,
-    "mechanistic": 0.05,
-}
-
-# Mechanistic synthesis discount — spec SYS_ALG lines 1349 (B3d)
-_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
-
-# 4-level fallback SE multipliers — spec SYS_ALG line 3876
-_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
-_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
-_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
-_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -170,7 +151,7 @@ def _resolve_fallback_prior(
                 "prior_id=%s, cancer=%s, phase=%s",
                 edge_id, prior_id, cancer_type, treatment_phase,
             )
-            return mean, sd * _FALLBACK_SE_MULTIPLIER_EXACT, 1, (
+            return mean, sd * PRIOR_FALLBACK_SE_MULTIPLIER_EXACT, 1, (
                 f"exact_match:prior_id={prior_id}"
             )
 
@@ -193,7 +174,7 @@ def _resolve_fallback_prior(
                 "prior_id=%s, cancer=%s",
                 edge_id, prior_id, cancer_type,
             )
-            return mean, sd * _FALLBACK_SE_MULTIPLIER_CANCER_TYPE, 2, (
+            return mean, sd * PRIOR_FALLBACK_SE_MULTIPLIER_CANCER_TYPE, 2, (
                 f"cancer_type_match:prior_id={prior_id}"
             )
 
@@ -214,7 +195,7 @@ def _resolve_fallback_prior(
             "prior_id=%s",
             edge_id, prior_id,
         )
-        return mean, sd * _FALLBACK_SE_MULTIPLIER_GENERAL, 3, (
+        return mean, sd * PRIOR_FALLBACK_SE_MULTIPLIER_GENERAL, 3, (
             f"general_cancer_match:prior_id={prior_id}"
         )
 
@@ -226,7 +207,7 @@ def _resolve_fallback_prior(
     )
     return (
         PRIOR_MEAN_DEFAULT,
-        PRIOR_SD_DEFAULT * _FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
+        PRIOR_SD_DEFAULT * PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
         4,
         "uninformative:no_matching_prior",
     )
@@ -391,9 +372,9 @@ def select_prior(
     # Spec SYS_ALG line 1338: k >= 5, best_design >= prospective -> RobustMAP
     # NOTE: SYS_EX says ">= 2 RCTs", SYS_ALG says "best_design >= prospective"
     # Implementing SYS_EX (the extraction spec) as primary: k >= 5 AND >= 2 RCTs
-    if k >= _K_THRESHOLD_ROBUST_MAP and edge_context.n_rcts >= _MIN_RCTS_FOR_ROBUST_MAP:
+    if k >= PRIOR_K_THRESHOLD_ROBUST_MAP and edge_context.n_rcts >= PRIOR_MIN_RCTS_FOR_ROBUST_MAP:
         # Formula B3a: w = min(0.8, 0.5 + 0.06k)
-        w = min(_ROBUST_MAP_W_CAP, _ROBUST_MAP_W_BASE + _ROBUST_MAP_W_PER_K * k)
+        w = min(PRIOR_ROBUST_MAP_W_CAP, PRIOR_ROBUST_MAP_W_BASE + PRIOR_ROBUST_MAP_W_PER_K * k)
         prior_sd = fallback_sd  # SD from fallback with multiplier applied
         prior_mean = pooled_estimate.beta_pooled  # MAP centered on pooled
 
@@ -406,7 +387,7 @@ def select_prior(
             dist_family="robust_map_mixture",
             provenance=(
                 f"RobustMAP: w={w:.3f}, MAP_mean={prior_mean:.4f}, "
-                f"vague_var={_ROBUST_MAP_VAGUE_VAR}, "
+                f"vague_var={PRIOR_ROBUST_MAP_VAGUE_VAR}, "
                 f"fallback_level={fallback_level}, {provenance}"
             ),
         )
@@ -421,8 +402,8 @@ def select_prior(
             best_design=edge_context.best_design,
             has_chain_evidence=edge_context.has_chain_evidence,
             rationale=(
-                f"k={k} >= {_K_THRESHOLD_ROBUST_MAP}, "
-                f"n_rcts={edge_context.n_rcts} >= {_MIN_RCTS_FOR_ROBUST_MAP}: "
+                f"k={k} >= {PRIOR_K_THRESHOLD_ROBUST_MAP}, "
+                f"n_rcts={edge_context.n_rcts} >= {PRIOR_MIN_RCTS_FOR_ROBUST_MAP}: "
                 f"RobustMAP with w={w:.3f}"
             ),
             prior_mean=prior_mean,
@@ -432,7 +413,7 @@ def select_prior(
 
     # ─── Branch 2: Commensurate (k = 2-4) ───────────────────────
     # Spec SYS_EX line 1269: k = 2-4 -> Commensurate (power-discounted)
-    if _K_THRESHOLD_COMMENSURATE_LOW <= k <= _K_THRESHOLD_COMMENSURATE_HIGH:
+    if PRIOR_K_THRESHOLD_COMMENSURATE_LOW <= k <= PRIOR_K_THRESHOLD_COMMENSURATE_HIGH:
         prior_mean = pooled_estimate.beta_pooled
         prior_sd = fallback_sd  # SD from fallback with multiplier applied
 
@@ -460,8 +441,8 @@ def select_prior(
             best_design=edge_context.best_design,
             has_chain_evidence=edge_context.has_chain_evidence,
             rationale=(
-                f"k={k} in [{_K_THRESHOLD_COMMENSURATE_LOW}, "
-                f"{_K_THRESHOLD_COMMENSURATE_HIGH}]: Commensurate prior"
+                f"k={k} in [{PRIOR_K_THRESHOLD_COMMENSURATE_LOW}, "
+                f"{PRIOR_K_THRESHOLD_COMMENSURATE_HIGH}]: Commensurate prior"
             ),
             prior_mean=prior_mean,
             prior_sd=prior_sd,
@@ -470,16 +451,16 @@ def select_prior(
 
     # ─── Branch 3: Power Prior (k = 1) ──────────────────────────
     # Spec SYS_EX line 1270: k = 1 -> Power (single-study prior)
-    if k == _K_THRESHOLD_POWER:
+    if k == PRIOR_K_THRESHOLD_POWER:
         design_category = _classify_design_for_power_prior(edge_context.best_design)
-        a_0 = _POWER_PRIOR_DISCOUNT.get(design_category, _POWER_PRIOR_DISCOUNT["observational"])
+        a_0 = PRIOR_POWER_DISCOUNT.get(design_category, PRIOR_POWER_DISCOUNT["observational"])
         prior_mean = pooled_estimate.beta_pooled
         # Power prior: effective SD inflated by discount
         # SE_power = SE / sqrt(a_0), reflecting reduced borrowing
         if a_0 > 0.0:
             prior_sd = pooled_estimate.se_pooled / math.sqrt(a_0)
         else:
-            prior_sd = PRIOR_SD_DEFAULT * _FALLBACK_SE_MULTIPLIER_UNINFORMATIVE
+            prior_sd = PRIOR_SD_DEFAULT * PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE
 
         prior_spec = PriorSpec(
             edge_relation_id=edge_id,
@@ -530,7 +511,7 @@ def select_prior(
                 sd=prior_sd,
                 dist_family="normal",
                 provenance=(
-                    f"MechanisticSynthesis: a_0={_MECHANISTIC_SYNTH_DISCOUNT:.2f}, "
+                    f"MechanisticSynthesis: a_0={PRIOR_MECHANISTIC_SYNTH_DISCOUNT:.2f}, "
                     f"chain_edges={chain_edges}, "
                     f"fallback_level={fallback_level}, {provenance}"
                 ),
@@ -547,7 +528,7 @@ def select_prior(
                 has_chain_evidence=True,
                 rationale=(
                     f"k=0 with chain evidence via edges {chain_edges}: "
-                    f"MechanisticSynthesis with a_0={_MECHANISTIC_SYNTH_DISCOUNT:.2f}"
+                    f"MechanisticSynthesis with a_0={PRIOR_MECHANISTIC_SYNTH_DISCOUNT:.2f}"
                 ),
                 prior_mean=prior_mean,
                 prior_sd=prior_sd,
@@ -577,7 +558,7 @@ def select_prior(
         prior_type=PriorTypePaper.STRUCTURAL_PLACEHOLDER.value,
         prior_source=PriorSource.UNINFORMATIVE.value,
         fallback_level=4,  # Always uninformative level for placeholder
-        se_multiplier=_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
+        se_multiplier=PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
         k=k,
         n_rcts=edge_context.n_rcts,
         best_design=edge_context.best_design,
@@ -602,11 +583,11 @@ def _get_fallback_se_multiplier(fallback_level: int) -> float:
       Level 4: Uninformative -> 2.0x
     """
     return {
-        1: _FALLBACK_SE_MULTIPLIER_EXACT,
-        2: _FALLBACK_SE_MULTIPLIER_CANCER_TYPE,
-        3: _FALLBACK_SE_MULTIPLIER_GENERAL,
-        4: _FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
-    }.get(fallback_level, _FALLBACK_SE_MULTIPLIER_UNINFORMATIVE)
+        1: PRIOR_FALLBACK_SE_MULTIPLIER_EXACT,
+        2: PRIOR_FALLBACK_SE_MULTIPLIER_CANCER_TYPE,
+        3: PRIOR_FALLBACK_SE_MULTIPLIER_GENERAL,
+        4: PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE,
+    }.get(fallback_level, PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE)
 
 
 # ═══════════════════════════════════════════════════════════════

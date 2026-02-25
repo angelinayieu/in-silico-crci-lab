@@ -2,7 +2,7 @@
 # VERIFIED: imports — all modules exist (shared.config, shared.models)
 # VERIFIED: backward wiring — reads RoutedNumeric from conversion_router.py
 # VERIFIED: forward wiring — writes ScaledNumeric for orientation_aligner.py
-# VERIFIED: no hardcoded formula parameters — all from config
+# VERIFIED: no hardcoded formula parameters — all from config (including SE_CI_DIVISOR_95)
 # VERIFIED: Module 1 R4 — every conversion logs source_type, target_type, formula,
 #           fields_present, fields_missing, se_inflation_applied
 """
@@ -35,6 +35,7 @@ from crci.shared.config import (
     CONVERSION_SE_INFLATION_MISSING_GROUP_N,
     CONVERSION_SE_INFLATION_MISSING_R_PREPOST,
     CONVERSION_SE_INFLATION_SPEARMAN,
+    SE_CI_DIVISOR_95,
 )
 from crci.shared.models.enums import ConversionBiasRisk
 
@@ -602,7 +603,7 @@ def convert_or_to_log(
     """OR → ln(OR).
 
     SE from cell counts: SE = √(1/a + 1/b + 1/c + 1/d)
-    SE from CI: SE = (ln(CI_u) − ln(CI_l)) / 3.92
+    SE from CI: SE = (ln(CI_u) − ln(CI_l)) / SE_CI_DIVISOR_95
     """
     if odds_ratio <= 0:
         return ConversionResult(
@@ -632,8 +633,8 @@ def convert_or_to_log(
 
     if se is None and ci_lower is not None and ci_upper is not None:
         if ci_lower > 0 and ci_upper > 0:
-            # Formula M1-LOG-OR-CI: SE = (ln(CI_u) − ln(CI_l)) / 3.92
-            se = (math.log(ci_upper) - math.log(ci_lower)) / 3.92
+            # Formula M1-LOG-OR-CI: SE = (ln(CI_u) − ln(CI_l)) / SE_CI_DIVISOR_95
+            se = (math.log(ci_upper) - math.log(ci_lower)) / SE_CI_DIVISOR_95
             fields_present.extend(["ci_lower", "ci_upper"])
         else:
             fields_missing.append("ci (contains non-positive)")
@@ -660,7 +661,7 @@ def convert_hr_to_log(
 ) -> ConversionResult:
     """HR → ln(HR).
 
-    SE = (ln(CI_u) − ln(CI_l)) / 3.92
+    SE = (ln(CI_u) − ln(CI_l)) / SE_CI_DIVISOR_95
     """
     if hazard_ratio <= 0:
         return ConversionResult(
@@ -680,8 +681,8 @@ def convert_hr_to_log(
     fields_missing = []
 
     if ci_lower is not None and ci_upper is not None and ci_lower > 0 and ci_upper > 0:
-        # Formula M1-LOG-HR-CI: SE = (ln(CI_u) − ln(CI_l)) / 3.92
-        se = (math.log(ci_upper) - math.log(ci_lower)) / 3.92
+        # Formula M1-LOG-HR-CI: SE = (ln(CI_u) − ln(CI_l)) / SE_CI_DIVISOR_95
+        se = (math.log(ci_upper) - math.log(ci_lower)) / SE_CI_DIVISOR_95
         fields_present.extend(["ci_lower", "ci_upper"])
     else:
         fields_missing.extend(["ci_lower", "ci_upper"])
@@ -705,7 +706,7 @@ def convert_rr_to_log(
 ) -> ConversionResult:
     """RR → ln(RR).
 
-    SE = (ln(CI_u) − ln(CI_l)) / 3.92
+    SE = (ln(CI_u) − ln(CI_l)) / SE_CI_DIVISOR_95
     """
     if risk_ratio <= 0:
         return ConversionResult(
@@ -725,7 +726,7 @@ def convert_rr_to_log(
     fields_missing = []
 
     if ci_lower is not None and ci_upper is not None and ci_lower > 0 and ci_upper > 0:
-        se = (math.log(ci_upper) - math.log(ci_lower)) / 3.92
+        se = (math.log(ci_upper) - math.log(ci_lower)) / SE_CI_DIVISOR_95
         fields_present.extend(["ci_lower", "ci_upper"])
     else:
         fields_missing.extend(["ci_lower", "ci_upper"])

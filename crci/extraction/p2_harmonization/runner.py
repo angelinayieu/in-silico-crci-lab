@@ -57,12 +57,31 @@ def run_p2_harmonization(
 
     # ── P2-S1: Plausibility ──
     logger.info("P2-S1: Running plausibility checks")
-    from crci.extraction.p2_harmonization.plausibility_checker import check_plausibility
+    from crci.extraction.p2_harmonization.plausibility_checker import (
+        check_plausibility,
+    )
+    from crci.shared.models.intermediate_states import GateViolation
 
-    plausibility_results = check_plausibility(claims, session=session)
-    context["p2_plausibility"] = plausibility_results
+    passed_claims: list[Any] = []
+    rejected_claims: list[Any] = []
+    for claim in claims:
+        span_id = getattr(claim, "span_id", str(id(claim)))
+        is_corr = getattr(claim, "is_correlation", False)
+        try:
+            validated = check_plausibility(
+                span_id=span_id,
+                value=claim,
+                is_correlation=is_corr,
+            )
+            passed_claims.append(validated)
+        except GateViolation as exc:
+            logger.warning("P2-S1: plausibility REJECT span_id=%s: %s", span_id, exc)
+            rejected_claims.append(claim)
 
-    passed_claims = plausibility_results.get("passed", claims)
+    context["p2_plausibility"] = {
+        "passed": passed_claims,
+        "rejected": rejected_claims,
+    }
     logger.info(
         "P2-S1 complete: %d/%d passed plausibility",
         len(passed_claims), len(claims),
@@ -108,18 +127,53 @@ def run_p2_harmonization(
     # ── P2-S4: Orientation Alignment ──
     logger.info("P2-S4: Aligning orientation")
     from crci.extraction.p2_harmonization.orientation_aligner import align_orientation
+    from crci.shared.models.enums import Orientation
 
-    oriented = align_orientation(harmonized.get("harmonized", []), session=session)
-    context["p2_oriented"] = oriented
-    logger.info("P2-S4 complete: %d aligned", len(oriented.get("aligned", [])))
+    aligned_list: list[Any] = []
+    for scaled_item in harmonized_list:
+        dag_orient = getattr(scaled_item, "dag_orientation", Orientation.NEUTRAL)
+        if isinstance(dag_orient, str):
+            dag_orient = Orientation(dag_orient) if dag_orient else Orientation.NEUTRAL
+        reported_positive = getattr(scaled_item, "reported_direction_positive", True)
+        orient_conf = getattr(scaled_item, "orientation_confidence", 1.0)
+        try:
+            aligned = align_orientation(
+                scaled=scaled_item,
+                dag_orientation=dag_orient,
+                reported_direction_positive=reported_positive,
+                orientation_confidence=orient_conf,
+            )
+            aligned_list.append(aligned)
+        except GateViolation as exc:
+            logger.warning(
+                "P2-S4: orientation REJECT span_id=%s: %s",
+                getattr(scaled_item, "span_id", "?"), exc,
+            )
+
+    context["p2_oriented"] = {"aligned": aligned_list}
+    logger.info("P2-S4 complete: %d aligned", len(aligned_list))
 
     # ── P2-S5: Identification Scoring ──
     logger.info("P2-S5: Scoring identification status")
     from crci.extraction.p2_harmonization.identification_scorer import score_identification
 
-    identified = score_identification(oriented.get("aligned", []), session=session)
-    context["p2_identified"] = identified
-    logger.info("P2-S5 complete: %d scored", len(identified.get("scored", [])))
+    scored_list: list[Any] = []
+    for aligned_item in aligned_list:
+        study_design = getattr(aligned_item, "study_design", "OTHER")
+        adj_strategy = getattr(aligned_item, "adjustment_strategy", None)
+        confounders_addr = getattr(aligned_item, "known_confounders_addressed", 0)
+        total_confounders = getattr(aligned_item, "total_known_confounders", 0)
+        id_result = score_identification(
+            scaled=aligned_item,
+            study_design=study_design,
+            adjustment_strategy=adj_strategy,
+            known_confounders_addressed=confounders_addr,
+            total_known_confounders=total_confounders,
+        )
+        scored_list.append(id_result)
+
+    context["p2_identified"] = {"scored": scored_list}
+    logger.info("P2-S5 complete: %d scored", len(scored_list))
 
     # ── P2-FA: Parameter Family Assignment (Module 5.1) ──
     logger.info("P2-FA: Assigning parameter families")
@@ -127,7 +181,7 @@ def run_p2_harmonization(
         assign_parameter_family,
     )
 
-    scored_records = identified.get("scored", [])
+    scored_records = scored_list
     paper_subtype = context.get("classified_paper", {}).get("paper_subtype")
     subtype_str = (
         paper_subtype.value if hasattr(paper_subtype, "value") else paper_subtype

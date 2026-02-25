@@ -350,12 +350,18 @@ def _merge_cluster(
 
         # Compute mean agent confidence from evidence_strength ordinals
         # Map evidence_strength to a [0,1] float for the formula
-        strength_to_conf = {"strong": 0.9, "moderate": 0.7, "weak": 0.4, "speculative": 0.2}
         conf_values = [
-            strength_to_conf.get((m.evidence_strength or "").lower(), 0.5)
+            config.REC_STRENGTH_TO_CONFIDENCE.get(
+                (m.evidence_strength or "").lower(),
+                config.REC_STRENGTH_TO_CONFIDENCE_DEFAULT,
+            )
             for m in group_members
         ]
-        mean_agent_conf = sum(conf_values) / len(conf_values) if conf_values else 0.5
+        mean_agent_conf = (
+            sum(conf_values) / len(conf_values)
+            if conf_values
+            else config.REC_STRENGTH_TO_CONFIDENCE_DEFAULT
+        )
 
         # Check if any member has unresolved conflict
         has_conflict = any(m.annotation_id in conflicted_ids for m in group_members)

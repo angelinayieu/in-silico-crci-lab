@@ -143,6 +143,44 @@ CONFLICT_INFLATION_MAX_MULT: float = 2.0
 MISSINGNESS_INFLATION_VAR_ADD: float = 0.25
 
 # ═══════════════════════════════════════════════════════════════
+#  PRIOR SELECTION — EX-P4-PS (SYS_EX lines 1264-1275, SYS_ALG lines 1326-1350)
+# ═══════════════════════════════════════════════════════════════
+
+# Decision tree thresholds — spec SYS_EX lines 1268-1272
+PRIOR_K_THRESHOLD_ROBUST_MAP: int = 5
+PRIOR_K_THRESHOLD_COMMENSURATE_LOW: int = 2
+PRIOR_K_THRESHOLD_COMMENSURATE_HIGH: int = 4
+PRIOR_K_THRESHOLD_POWER: int = 1
+PRIOR_MIN_RCTS_FOR_ROBUST_MAP: int = 2
+
+# RobustMAP formula: w = min(0.8, 0.5 + 0.06k)
+# Spec SYS_ALG lines 1346 (B3a)
+PRIOR_ROBUST_MAP_W_BASE: float = 0.5
+PRIOR_ROBUST_MAP_W_PER_K: float = 0.06
+PRIOR_ROBUST_MAP_W_CAP: float = 0.8
+PRIOR_ROBUST_MAP_VAGUE_VAR: float = 100.0  # N(0, 10^2)
+
+# Power prior discount factors — spec SYS_ALG lines 1348 (B3c)
+# Design → a_0 discount
+PRIOR_POWER_DISCOUNT: dict[str, float] = {
+    "RCT_same": 0.80,
+    "RCT_diff": 0.50,
+    "cohort": 0.40,
+    "observational": 0.30,
+    "animal": 0.15,
+    "mechanistic": 0.05,
+}
+
+# Mechanistic synthesis discount — spec SYS_ALG lines 1349 (B3d)
+PRIOR_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
+
+# 4-level fallback SE multipliers — spec SYS_ALG line 3876
+PRIOR_FALLBACK_SE_MULTIPLIER_EXACT: float = 1.0
+PRIOR_FALLBACK_SE_MULTIPLIER_CANCER_TYPE: float = 1.2
+PRIOR_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
+PRIOR_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
+
+# ═══════════════════════════════════════════════════════════════
 #  HARMONIZATION — EX-P2 (§2.5)
 # ═══════════════════════════════════════════════════════════════
 
@@ -269,6 +307,15 @@ REC_CONFIDENCE_BASE: float = 0.3
 REC_CONFIDENCE_SUPPORT_N_WEIGHT: float = 0.15
 REC_CONFIDENCE_MEAN_CONF_WEIGHT: float = 0.2
 REC_CONFIDENCE_CONFLICT_CAP: float = 0.50
+
+# REC-d: evidence_strength → confidence float mapping for formula REC-d
+REC_STRENGTH_TO_CONFIDENCE: dict[str, float] = {
+    "strong": 0.9,
+    "moderate": 0.7,
+    "weak": 0.4,
+    "speculative": 0.2,
+}
+REC_STRENGTH_TO_CONFIDENCE_DEFAULT: float = 0.5
 
 # REC-b: Jaccard similarity threshold for merge candidates
 REC_JACCARD_MERGE_THRESHOLD: float = 0.80
