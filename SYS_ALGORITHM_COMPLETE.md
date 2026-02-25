@@ -1,277 +1,159 @@
-═══════════════════════════════════════════════════════════════════════════ SYSTEM CARD: SYS_ALGORITHM ═══════════════════════════════════════════════════════════════════════════ Version: 1.1-CORRECTED (post-citation-audit) Source: CRCI_v1.1_CORRECTED.md (§2.0–§2.22, §3, §4.5) Date: 2026-02-22
-1. IDENTITY
-Field
-Value
-System ID
-SYS_ALGORITHM
-Name
-CRCI Bayesian Causal Simulation Engine
-Purpose
-Transform literature-derived causal graph parameters and patient-specific clinical observations into ranked, personalized intervention recommendations with calibrated uncertainty, temporal trajectory predictions, and research priority identification
-Scope
-Everything from populated registries (output of SYS_EXTRACTION) through clinical/research output. Excludes evidence extraction, PDF processing, UI rendering.
+# SYS_ALGORITHM_COMPLETE
+
+## Part 1: System Card (SYS_ALGORITHM)
+
+**Version:** 1.1-CORRECTED (post-citation-audit)
+**Source:** CRCI_v1.1_CORRECTED.md (§2.0–§2.22, §3, §4.5)
+**Date:** 2026-02-22
+
+### 1. Identity
+
+| Field | Value |
+| --- | --- |
+| System ID | SYS_ALGORITHM |
+| Name | CRCI Bayesian Causal Simulation Engine |
+| Purpose | Transform literature-derived causal graph parameters and patient-specific clinical observations into ranked, personalized intervention recommendations with calibrated uncertainty, temporal trajectory predictions, and research priority identification |
+| Scope | Everything from populated registries (output of SYS_EXTRACTION) through clinical/research output. Excludes evidence extraction, PDF processing, UI rendering. |
 
 What this system IS: A computational engine that takes a frozen parameterized causal graph + live patient data and produces actionable clinical predictions.
 What this system is NOT: It does not extract evidence from papers (that's SYS_EXTRACTION), it does not learn edge weights from individual patients (v2.0 feature), and it does not render visualizations (that's SYS_RUNTIME).
-───────────────────────────────────────────────────────────────────────────
-2. MACRO CHAIN
+
+---
+
+### 2. Macro Chain
 The end-to-end transformation, showing all 6 chains with boundary tables between them.
+
+```text
 FROM SYS_EXTRACTION                                              TO SYS_RUNTIME
 ═══════════════════                                              ═══════════════
 
  10 CSV Registries     ┌───────────┐                             Clinical Output
  (evidence_registry,   │  CHAIN A  │   Parameterized             Package
-  node_registry,       │  GRAPH    │   Graph Object              (rankings,
-  edge_registry,  ────▶│  ASSEMBLY │──────────────┐              trajectories,
-  instrument_reg,      │           │              │              stability,
-  modifier_reg,        │ BUILD-TIME│              │              research
-  synergy_reg,         └───────────┘              │              priorities)
-  recovery_reg,                                   ▼                    ▲
-  correlation_reg,               ┌───────────────────────┐            │
-  feedback_reg,                  │       CHAIN B          │            │
-  kernel_reg)                    │  EDGE PARAMETERIZATION │            │
-                                 │                        │            │
-                                 │      BUILD-TIME        │            │
-                                 └───────────┬────────────┘            │
-                                             │                         │
-                                   Frozen Model State                  │
-                                   {B̂, Σ_eff, Λ_prior,               │
-                                    P_inclusion, priors}               │
-                                             │                         │
-                     Patient  ┌──────────────▼──────────┐              │
-                     Observations            │                         │
-                     (y_k)   │       CHAIN C            │              │
-                   ─────────▶│  PATIENT STATE           │              │
-                             │  INFERENCE               │              │
-                             │       RUNTIME            │              │
-                             └──────────────┬───────────┘              │
-                                            │                          │
-                                  Posterior θ̂, Σ_post,                │
-                                  Active Pathway Map                   │
-                                            │                          │
-                              ┌─────────────▼───────────┐              │
-                              │        CHAIN D           │              │
-                              │  INTERVENTION            │              │
-                              │  SIMULATION              │              │
-                              │        RUNTIME           │              │
-                              └─────────────┬────────────┘              │
-                                            │                          │
-                                  Ranked Interventions,                │
-                                  Bundle Effects,                      │
-                                  Dose Recommendations                 │
-                                            │                          │
-                              ┌─────────────▼───────────┐              │
-                              │        CHAIN E           │              │
-                              │  TEMPORAL                │              │
-                              │  PREDICTION              │              │
-                              │        RUNTIME           │              │
-                              └─────────────┬────────────┘              │
-                                            │                          │
-                                  Trajectory Curves,                   │
-                                  ITE at horizons,                     │
-                                  ARR/RRR/NNT                          │
-                                            │                          │
-                              ┌─────────────▼───────────┐              │
-                              │        CHAIN F           │              │
-                              │  OUTPUT &                │──────────────┘
-                              │  ANALYTICS               │
-                              │        RUNTIME           │
-                              └─────────────────────────┘
+   node_registry,       │  GRAPH    │   Graph Object              (rankings,
+   edge_registry,  ────▶│  ASSEMBLY │──────────────┐              trajectories,
+   instrument_reg,      │           │              │              stability,
+   modifier_reg,        │ BUILD-TIME│              │              research
+   synergy_reg,         └───────────┘              │              priorities)
+   recovery_reg,                                   ▼                    ▲
+   correlation_reg,               ┌───────────────────────┐            │
+   feedback_reg,                  │       CHAIN B          │            │
+   kernel_reg)                    │  EDGE PARAMETERIZATION │            │
+                                                 │                        │            │
+                                                 │      BUILD-TIME        │            │
+                                                 └───────────┬────────────┘            │
+                                                                   │                         │
+                                                    Frozen Model State                  │
+                                                    {B̂, Σ_eff, Λ_prior,               │
+                                                      P_inclusion, priors}               │
+                                                                   │                         │
+                               Patient  ┌──────────────▼──────────┐              │
+                               Observations            │                         │
+                               (y_k)   │       CHAIN C            │              │
+                            ─────────▶│  PATIENT STATE           │              │
+                                           │  INFERENCE               │              │
+                                           │       RUNTIME            │              │
+                                           └──────────────┬───────────┘              │
+                                                                  │                          │
+                                                   Posterior θ̂, Σ_post,                │
+                                                   Active Pathway Map                   │
+                                                                  │                          │
+                                             ┌─────────────▼───────────┐              │
+                                             │        CHAIN D           │              │
+                                             │  INTERVENTION            │              │
+                                             │  SIMULATION              │              │
+                                             │        RUNTIME           │              │
+                                             └─────────────┬────────────┘              │
+                                                                  │                          │
+                                                   Ranked Interventions,                │
+                                                   Bundle Effects,                      │
+                                                   Dose Recommendations                 │
+                                                                  │                          │
+                                             ┌─────────────▼───────────┐              │
+                                             │        CHAIN E           │              │
+                                             │  TEMPORAL                │              │
+                                             │  PREDICTION              │              │
+                                             │        RUNTIME           │              │
+                                             └─────────────┬────────────┘              │
+                                                                  │                          │
+                                                   Trajectory Curves,                   │
+                                                   ITE at horizons,                     │
+                                                   ARR/RRR/NNT                          │
+                                                                  │                          │
+                                             ┌─────────────▼───────────┐              │
+                                             │        CHAIN F           │              │
+                                             │  OUTPUT &                │──────────────┘
+                                             │  ANALYTICS               │
+                                             │        RUNTIME           │
+                                             └─────────────────────────┘
+```
 
 Critical architectural boundary: THE CUT Chains A+B are BUILD-TIME. Chains C–F are RUNTIME. The cut-model constraint (Liu, Bayarri & Berger, 2009) ensures:
-Edge parameters β flow DOWN from build-time → runtime (via Λ_prior)
-Patient observations y flow ONLY within runtime
-Patient data NEVER updates edge beliefs (prevents feedback contamination)
- ══════════════════════════════════════════
-  ║          THE CUT BOUNDARY             ║
-  ║  β fixed below │ θ inferred above     ║
-  ║  BUILD-TIME     │ RUNTIME              ║
-  ══════════════════════════════════════════
+- Edge parameters β flow DOWN from build-time → runtime (via Λ_prior)
+- Patient observations y flow ONLY within runtime
+- Patient data NEVER updates edge beliefs (prevents feedback contamination)
 
-───────────────────────────────────────────────────────────────────────────
-3. CHAIN INVENTORY
-Order
-Chain ID
-Name
-Phase
-Timing
-Input State
-Output State
-Subsystem Count
-A
-ALG-A
-Graph Assembly
-PHASE_A
-Build-time (one-time)
-10 CSV registries
-Graph skeleton (V, E, B_skeleton, D, Λ_structure)
-5
-B
-ALG-B
-Edge Parameterization
-PHASE_B
-Build-time (per-update)
-Graph skeleton + evidence_registry
-Frozen model state (B̂, Σ_eff, Λ_prior, P_inclusion)
-7
-C
-ALG-C
-Patient State Inference
-PHASE_C
-Runtime (per-patient)
-Frozen model + patient observations y_k
-Posterior θ̂, Σ_post, active pathway map
-4
-D
-ALG-D
-Intervention Simulation
-PHASE_D
-Runtime (per-patient)
-Posterior θ̂ + frozen model + intervention registry
-Ranked interventions, bundles, doses
-6
-E
-ALG-E
-Temporal Prediction
-PHASE_E
-Runtime (per-patient)
-Chain D outputs + recovery_registry + kernel_registry
-Trajectory curves, ITE, clinical metrics
-4
-F
-ALG-F
-Output & Analytics
-PHASE_F
-Runtime (per-patient)
-All Chain C–E outputs
-Clinical/Research/Population output packages
-5
+```text
+══════════════════════════════════════════
+║          THE CUT BOUNDARY             ║
+║  β fixed below │ θ inferred above     ║
+║  BUILD-TIME     │ RUNTIME              ║
+══════════════════════════════════════════
+```
+
+---
+
+### 3. Chain Inventory
+
+| Order | Chain ID | Name | Phase | Timing | Input State | Output State | Subsystem Count |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A | ALG-A | Graph Assembly | PHASE_A | Build-time (one-time) | 10 CSV registries | Graph skeleton (V, E, B_skeleton, D, Λ_structure) | 5 |
+| B | ALG-B | Edge Parameterization | PHASE_B | Build-time (per-update) | Graph skeleton + evidence_registry | Frozen model state (B̂, Σ_eff, Λ_prior, P_inclusion) | 7 |
+| C | ALG-C | Patient State Inference | PHASE_C | Runtime (per-patient) | Frozen model + patient observations y_k | Posterior θ̂, Σ_post, active pathway map | 4 |
+| D | ALG-D | Intervention Simulation | PHASE_D | Runtime (per-patient) | Posterior θ̂ + frozen model + intervention registry | Ranked interventions, bundles, doses | 6 |
+| E | ALG-E | Temporal Prediction | PHASE_E | Runtime (per-patient) | Chain D outputs + recovery_registry + kernel_registry | Trajectory curves, ITE, clinical metrics | 4 |
+| F | ALG-F | Output & Analytics | PHASE_F | Runtime (per-patient) | All Chain C–E outputs | Clinical/Research/Population output packages | 5 |
 
 Total subsystems: ~31
-───────────────────────────────────────────────────────────────────────────
 
-───────────────────────────────────────────────────────────────────────────
-NOTE: Chain overviews (sections 4-9 of the original system card) are
-SUPERSEDED by the canonical Tier 2 Chain Cards below. The overviews
-were summary-depth (~50 lines each). The chain cards below are
-canonical-depth (400-600 lines each) with full sub-step boxes,
-intermediate state schemas, and specific parameter values.
-───────────────────────────────────────────────────────────────────────────
+> NOTE: Chain overviews (sections 4-9 of the original system card) are SUPERSEDED by the canonical Tier 2 Chain Cards below. The overviews were summary-depth (~50 lines each). The chain cards below are canonical-depth (400-600 lines each) with full sub-step boxes, intermediate state schemas, and specific parameter values.
 
-10. TABLE INVENTORY
+---
+
+### 10. Table Inventory
 All tables owned by SYS_ALGORITHM, grouped by role.
-Source Registries (human-curated, fixed at build-time)
-Table
-Rows
-Role
-Read By Chains
-Mutability
-node_registry.csv
-63
-Structural scaffold
-A, C
-Fixed
-edge_registry.csv
-118
-Derived edge parameters
-A, B
-Computed — NEVER manually edit
-evidence_registry.csv
-446+
-Raw study extractions
-B
-Human-edited only
-instrument_registry.csv
-23
-Measurement specs
-A, C
-Fixed
-modifier_registry.csv
-109
-Effect modifier rules
-C
-Fixed
-synergy_registry.csv
-15
-Pairwise interactions
-D
-Fixed
-recovery_registry.csv
-7
-Natural trajectory params
-E
-Fixed
-correlation_registry.csv
-8
-Correlated mediator pairs
-A
-Fixed
-feedback_loop_registry.csv
-5
-Loop members + gains
-A
-Fixed
-intervention_kernel_registry.csv
-9
-Onset/build/steady/decay
-E
-Fixed
 
-Derived / Intermediate (computed by pipeline)
-Table
-Produced By
-Consumed By
-Content
-prior_audit_trail
-B3
-F5
-Prior type + parameters per edge
-chain_direct_validation
-B6
-F5
-Z-scores, AV scores, discrepancy flags
-patient_posterior_log
-C3
-D1, E1, F1
-Per-patient θ̂, Σ_post snapshots
-simulation_results_log
-D1-D6
-E3, F1-F5
-Per-draw outcomes for audit
-trajectory_predictions
-E1-E4
-F1
-Monthly trajectory + CrI per scenario
+#### Source Registries (human-curated, fixed at build-time)
+| Table | Rows | Role | Read By Chains | Mutability |
+| --- | --- | --- | --- | --- |
+| node_registry.csv | 63 | Structural scaffold | A, C | Fixed |
+| edge_registry.csv | 118 | Derived edge parameters | A, B | Computed — NEVER manually edit |
+| evidence_registry.csv | 446+ | Raw study extractions | B | Human-edited only |
+| instrument_registry.csv | 23 | Measurement specs | A, C | Fixed |
+| modifier_registry.csv | 109 | Effect modifier rules | C | Fixed |
+| synergy_registry.csv | 15 | Pairwise interactions | D | Fixed |
+| recovery_registry.csv | 7 | Natural trajectory params | E | Fixed |
+| correlation_registry.csv | 8 | Correlated mediator pairs | A | Fixed |
+| feedback_loop_registry.csv | 5 | Loop members + gains | A | Fixed |
+| intervention_kernel_registry.csv | 9 | Onset/build/steady/decay | E | Fixed |
 
-Configuration / Policy (editable but not evidence)
-Table
-Rows
-Content
-Read By
-context_matched_priors
-33
-Cancer-type × treatment-phase → μ, σ per node
-C1
-claim_attenuation_policy
-4
-Identification status → attenuation factor
-B2
-evidence_freshness_policy
-—
-Year → w_fresh
-B2
-dose_response_registry
-9
-Per-intervention Emax, EC₅₀, h
-D2
-ACC_table
-5
-Treatment context → aging acceleration coefficient
-E3
-severity_thresholds
-6
-Six-tier severity classification boundaries
-F1
+#### Derived / Intermediate (computed by pipeline)
+| Table | Produced By | Consumed By | Content |
+| --- | --- | --- | --- |
+| prior_audit_trail | B3 | F5 | Prior type + parameters per edge |
+| chain_direct_validation | B6 | F5 | Z-scores, AV scores, discrepancy flags |
+| patient_posterior_log | C3 | D1, E1, F1 | Per-patient θ̂, Σ_post snapshots |
+| simulation_results_log | D1-D6 | E3, F1-F5 | Per-draw outcomes for audit |
+| trajectory_predictions | E1-E4 | F1 | Monthly trajectory + CrI per scenario |
+
+#### Configuration / Policy (editable but not evidence)
+| Table | Rows | Content | Read By |
+| --- | --- | --- | --- |
+| context_matched_priors | 33 | Cancer-type × treatment-phase → μ, σ per node | C1 |
+| claim_attenuation_policy | 4 | Identification status → attenuation factor | B2 |
+| evidence_freshness_policy | — | Year → w_fresh | B2 |
+| dose_response_registry | 9 | Per-intervention Emax, EC₅₀, h | D2 |
+| ACC_table | 5 | Treatment context → aging acceleration coefficient | E3 |
+| severity_thresholds | 6 | Six-tier severity classification boundaries | F1 |
 
 ───────────────────────────────────────────────────────────────────────────
 11. CROSS-CUTTING CONCERNS
