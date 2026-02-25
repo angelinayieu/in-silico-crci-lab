@@ -362,6 +362,57 @@ D3_MAX_BUNDLE_SIZE: int = 4
 D3_EXHAUSTIVE_SEARCH_MAX_CANDIDATES: int = 8
 
 # ═══════════════════════════════════════════════════════════════
+#  D4: SAFE SCORE RANKING (§2.16.2 — spec lines 2374-2424)
+# ═══════════════════════════════════════════════════════════════
+
+# D4a Formula D-3: SAFE_A(a) = MSS_cog(a) − λ × MSS_burden(a)
+# λ = 0.3 (burden penalty weight, AUTHOR-CONSTRUCTED, spec line 2390)
+# REVIEW: config.SAFE_MODE_A_DEFAULT_LAMBDA (0.5) exists from a different spec section;
+#   D4a chain card explicitly says 0.3. Using 0.3 per spec line 2390.
+D4_BURDEN_PENALTY_WEIGHT: float = 0.3
+
+# D4b Formula D-4: SAFE_B(a) = SAFE_A(a) + α × ln(P_adhere(a))
+# α = 0.5 (adherence adjustment weight, spec line 2402)
+D4_ADHERENCE_ADJUSTMENT_WEIGHT: float = 0.5
+
+# D4b Formula D-5: logit(P_adhere) = intercept − β_burden·Burden − β_dur·Duration
+# Coefficients from 6-trial author estimate (spec line 2404)
+D4_ADHERENCE_INTERCEPT: float = 1.8
+D4_ADHERENCE_BURDEN_COEFF: float = 0.42
+D4_ADHERENCE_DURATION_COEFF: float = 0.03
+
+# D4b: Bundle adherence — P_adhere(B) = Π_a P_adhere(a) × (1 − δ(|B|−1))
+# δ = 0.05 per additional member (spec line 2406)
+D4_BUNDLE_ADHERENCE_REDUCTION: float = 0.05
+
+# D4b: P_adhere < 0.30 → WARNING flag (spec line 2409)
+D4_ADHERENCE_WARNING_THRESHOLD: float = 0.30
+
+# D4: 95% CrI from 2.5th/97.5th percentiles (spec line 2394)
+D4_CRI_LOWER_QUANTILE: float = 0.025
+D4_CRI_UPPER_QUANTILE: float = 0.975
+
+# D4c: Top N edges by discovery_score reported in Chain F (spec line 2423)
+D4_TOP_DISCOVERY_COUNT: int = 5
+
+# ═══════════════════════════════════════════════════════════════
+#  D5: DOSE OPTIMIZATION (§2.16.3 — spec lines 2426-2472)
+# ═══════════════════════════════════════════════════════════════
+
+# D5b: Dose conflict ratio threshold (spec line 2459)
+D5_DOSE_CONFLICT_RATIO_THRESHOLD: float = 1.3
+
+# D5a: Grid search resolution (number of dose levels to evaluate)
+D5_DOSE_GRID_STEPS: int = 100
+
+# ═══════════════════════════════════════════════════════════════
+#  D6: CAUSAL LANGUAGE ASSIGNMENT (§2.16.4 — spec lines 2474-2497)
+# ═══════════════════════════════════════════════════════════════
+
+# D6: Chain-vs-direct Z threshold for demotion to model_implied (spec line 2495)
+D6_CHAIN_VS_DIRECT_Z_DEMOTE: float = 3.0
+
+# ═══════════════════════════════════════════════════════════════
 #  P7 COMPILER PARAMETERS (SYS_EXTRACTION_ADDENDUM Part 6)
 # ═══════════════════════════════════════════════════════════════
 

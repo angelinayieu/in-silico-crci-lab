@@ -6,7 +6,7 @@
 - **Last completed slice:** D3-synergy (synergy_bundle.py)
 - **Next slice:** D4-D6 (ranker.py — SAFE Scoring, Ranking, Dose Optimization)
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Latest commit:** TBD — feat: Implement ALG-D3-synergy synergy_bundle.py
+- **Latest commit:** `2b3e83f` — feat: Implement ALG-D3-synergy synergy_bundle.py
 
 ## Completed Slices (this phase)
 
@@ -26,7 +26,7 @@
 | D1 | `chain_d_simulation/mc_sampler.py` | `f74ee6a` | DONE |
 | D2 | `chain_d_simulation/effect_propagation.py` | `0c434ce` | DONE |
 | D3 | `chain_d_simulation/safety_checker.py` | `610c101` | DONE |
-| D3-syn | `chain_d_simulation/synergy_bundle.py` | TBD | DONE |
+| D3-syn | `chain_d_simulation/synergy_bundle.py` | `2b3e83f` | DONE |
 | D4-D6 | `chain_d_simulation/ranker.py` | — | **NEXT** |
 
 ### ALG-E (Chain E: Temporal Prediction) — NOT STARTED
