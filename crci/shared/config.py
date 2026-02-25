@@ -703,6 +703,45 @@ SAFE_STABILITY_THRESHOLD_STABLE: float = 0.80
 SAFE_STABILITY_THRESHOLD_SOFT: float = 0.60
 
 # ═══════════════════════════════════════════════════════════════
+#  RT-G: SCHEDULE OPTIMIZATION (SYS_RT lines 90-258)
+# ═══════════════════════════════════════════════════════════════
+
+# G1: Top-K candidates to expand (spec line 147, default 10)
+RT_G_TOP_K_DEFAULT: int = 10
+
+# G1: Maximum expanded pool size (computational limit, spec line 153)
+RT_G_MAX_POOL_SIZE: int = 100
+
+# G2: Bundle ceiling total effect (spec line 164, Formula G-4)
+RT_G_BUNDLE_CEILING_SD: float = 1.5
+
+# G2: Evidence reliability threshold (Formula G-5, spec line 249)
+RT_G_EVIDENCE_R_EXCLUDED: float = 0.25   # R < 0.25 → excluded
+RT_G_EVIDENCE_R_LIMITED: float = 0.50    # R < 0.50 → limited
+
+# G3: Number of top schedules for detailed output (spec line 219)
+RT_G_TOP_SCHEDULES: int = 5
+
+# G-G2 gate: SAFE_B threshold for confident recommendation (spec line 240)
+RT_G_SAFE_B_MID_THRESHOLD: float = 0.5
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-H: ADAPTIVE QUESTIONING (SYS_RT lines 260-388)
+# ═══════════════════════════════════════════════════════════════
+
+# H-3: Maximum questions per session (spec line 311)
+RT_H_MAX_QUESTIONS: int = 15
+
+# H-3: Information gain stopping threshold (spec line 379)
+RT_H_IG_THRESHOLD: float = 0.01
+
+# H-3: Variance reduction stopping threshold (spec line 331)
+RT_H_VAR_REDUCTION_THRESHOLD: float = 0.05
+
+# H-3: P(rank₁) stability stopping threshold (spec line 328)
+RT_H_STABILITY_STOP_THRESHOLD: float = 0.80
+
+# ═══════════════════════════════════════════════════════════════
 #  SEVERITY TIERS (§2.20)
 # ═══════════════════════════════════════════════════════════════
 
