@@ -62,7 +62,7 @@ def _print_graph_report(graph) -> None:
     print(f"  Pathways:        {graph.n_pathways}")
     print(f"  Feedback loops:  {graph.n_feedback_loops}")
     print(f"  Edgeless nodes:  {len(graph.edgeless_nodes)}")
-    print(f"  Spectral radius: {graph.lambda_structure.spectral_radius:.6f}")
+    print(f"  Spectral radius: {graph.lambda_structure.spectral_radius_B:.6f}")
     print(f"  Condition κ(Λ):  {graph.lambda_structure.condition_number:.2e}")
     print("=" * 70)
 

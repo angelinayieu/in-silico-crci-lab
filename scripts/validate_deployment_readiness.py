@@ -190,11 +190,11 @@ def _check_g0_4() -> tuple[bool, str]:
     except Exception as exc:
         return False, f"Graph assembly failed: {exc}"
 
-    rho = graph.lambda_structure.spectral_radius
-    if rho < config.SPECTRAL_RADIUS_THRESHOLD:
-        return True, f"ρ(B) = {rho:.6f} < {config.SPECTRAL_RADIUS_THRESHOLD} (stable)."
+    rho = graph.lambda_structure.spectral_radius_B
+    if rho < config.MAX_SPECTRAL_RADIUS:
+        return True, f"ρ(B) = {rho:.6f} < {config.MAX_SPECTRAL_RADIUS} (stable)."
     return False, (
-        f"ρ(B) = {rho:.6f} ≥ {config.SPECTRAL_RADIUS_THRESHOLD} (unstable). "
+        f"ρ(B) = {rho:.6f} ≥ {config.MAX_SPECTRAL_RADIUS} (unstable). "
         f"Check edge weights for cycles or excessive magnitudes."
     )
 

@@ -87,18 +87,18 @@ def run_spectral_check() -> bool:
     passed = True
 
     # Check 1: Spectral radius ρ(B) < 1
-    rho = ls.spectral_radius
-    rho_ok = rho < config.SPECTRAL_RADIUS_THRESHOLD
+    rho = ls.spectral_radius_B
+    rho_ok = rho < config.MAX_SPECTRAL_RADIUS
     status = "PASS" if rho_ok else "FAIL"
-    print(f"  [{status}] ρ(B) = {rho:.6f} (threshold: < {config.SPECTRAL_RADIUS_THRESHOLD})")
+    print(f"  [{status}] ρ(B) = {rho:.6f} (threshold: < {config.MAX_SPECTRAL_RADIUS})")
     if not rho_ok:
         passed = False
 
     # Check 2: Condition number κ(Λ) within bounds
     kappa = ls.condition_number
-    kappa_ok = kappa < config.CONDITION_NUMBER_WARN
+    kappa_ok = kappa < config.CONDITION_NUMBER_WARNING
     status = "PASS" if kappa_ok else "WARN"
-    print(f"  [{status}] κ(Λ) = {kappa:.2e} (threshold: < {config.CONDITION_NUMBER_WARN:.0e})")
+    print(f"  [{status}] κ(Λ) = {kappa:.2e} (threshold: < {config.CONDITION_NUMBER_WARNING:.0e})")
 
     # Check 3: Positive definiteness of Λ
     pd_ok = ls.is_positive_definite
