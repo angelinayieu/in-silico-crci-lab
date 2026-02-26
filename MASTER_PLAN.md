@@ -154,8 +154,8 @@ class SpanLabel(BaseModel):
 - `crci/extraction/p1_extraction/agents/ag05_stats_label.py` — propagate field
 
 **Verification:** 
-- [ ] `SpanLabel` model has `grouping_id`
-- [ ] AG05 produces spans with `grouping_id` set
+- [x] `SpanLabel` model has `grouping_id` ✅ (pre-existing)
+- [x] AG05 produces spans with `grouping_id` set ✅ (pre-existing)
 
 ---
 
@@ -172,8 +172,8 @@ class TypedNumericValue(BaseModel):
 ```
 
 **Verification:**
-- [ ] `TypedNumericValue` has `label_type`
-- [ ] `TypedNumericValue` has `edge_relation_id`
+- [x] `TypedNumericValue` has `label_type` ✅ (pre-existing)
+- [x] `TypedNumericValue` has `edge_relation_id` ✅ (pre-existing)
 
 ---
 
@@ -217,10 +217,10 @@ Rules:
 4. Never drop orphans — emit as standalone at minimum  
 
 **Verification:**
-- [ ] `reassemble_groups()` function exists (YES — 484 lines)
-- [ ] Called from TB runner (YES — line ~99)
-- [ ] Produces multi-field records (YES)
-- [ ] Proximity fallback rescues co-located orphans (NEW — implement)
+- [x] `reassemble_groups()` function exists ✅ (484 lines)
+- [x] Called from TB runner ✅ (line ~99)
+- [x] Produces multi-field records ✅
+- [x] Proximity fallback rescues co-located orphans ✅ (commit 3847f0f)
 
 ---
 
@@ -230,9 +230,9 @@ Rules:
 **Why:** Spans need `edge_relation_id` for P2 orientation lookup.
 
 **Check current implementation:**
-- [ ] ConceptEngine called from P1 runner (line ~233)
-- [ ] Produces `grounded_spans` in context
-- [ ] `edge_relation_id` propagates to TypedNumericValue
+- [x] ConceptEngine called from P1 runner ✅ (line ~233)
+- [x] Produces `grounded_spans` in context ✅
+- [x] `edge_relation_id` propagates to TypedNumericValue ✅
 
 **If broken, fix:**
 - Mode 1: Instrument → node + intervention → node → find connecting edge
@@ -271,9 +271,9 @@ def _assign_canonical_scale(label_type: str) -> str:
 ```
 
 **Verification:**
-- [ ] `_infer_effect_type` uses enum-exact strings ✅ (already implemented)
-- [ ] Orientation lookup queries DB (implement)
-- [ ] `canonical_scale` assigned to every harmonized record (implement)
+- [x] `_infer_effect_type` uses enum-exact strings ✅ (pre-existing)
+- [x] Orientation lookup queries DB ✅ (pre-existing via EdgeRelationsDefinition)
+- [x] `canonical_scale` assigned to every harmonized record ✅ (commit e08f210)
 
 ---
 
@@ -300,7 +300,7 @@ Without an explicit normalization step, pooling Cohen's d with log-OR produces n
 - TB already handles log-transformation for ratio measures; P2 must handle Fisher-z for correlations
 
 **Verification:**
-- [ ] `canonical_scale` field exists on harmonized record
+- [x] `canonical_scale` field exists on harmonized record ✅ (commit e08f210)
 - [ ] P4 groups by `(edge_relation_id, canonical_scale)`, not just edge_id
 - [ ] Correlations Fisher-z transformed before pooling
 
@@ -356,10 +356,10 @@ This prevents P4-P7 from running on empty input and producing false "completed" 
 **QA Metric:** `p3_survival_rate` = calibrated_out / layered_in
 
 **Verification:**
-- [ ] Gate raises per-record ✅ (already implemented)
-- [ ] CI→SE fallback attempted before gate (NEW — implement)
-- [ ] Slice-level halt when survival = 0 (NEW — implement)
-- [ ] `p3_survival_rate` in context ✅ (already implemented)
+- [x] Gate raises per-record ✅ (pre-existing)
+- [x] CI→SE fallback attempted before gate ✅ (commit e08f210)
+- [x] Slice-level halt when survival = 0 ✅ (commit e08f210)
+- [x] `p3_survival_rate` in context ✅ (pre-existing)
 
 ---
 
@@ -1842,6 +1842,11 @@ When all slices complete:
 3. **Posteriors are evidence-informed** — not prior-only
 4. **Chain D rankings reflect evidence** — interventions ranked by real data
 5. **F4 risk layer can be implemented** — stable posteriors exist to sample
+6. **All paper types route correctly** — every PaperSubtype has a deterministic mode and product set
+7. **Evidence row blocking enforced** — umbrella/narrative/case/qualitative Never produce evidence rows
+8. **Design-based quality/ID limits enforced** — pilot cap, cross-sectional demotion, NMA demotion
+9. **Forest plot lifecycle works** — placeholder → superseded when primary extracted
+10. **LLM guardrails have code enforcement** — UG/MG/PG rules are checked, not just documented
 
 **Final validation:** Run the full pipeline on 3 papers (Cherrier, Campbell, Cifu)
 and verify end-to-end data flow.
