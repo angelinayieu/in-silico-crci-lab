@@ -10,6 +10,144 @@ categorized decisions with risk levels. Most recent extraction at top.
 
 ---
 
+## EXT-2026-0003 — Northey et al. 2018
+
+### Extraction Metadata
+
+| Field | Value |
+|-------|-------|
+| **Extraction ID** | `EXT-2026-0003` |
+| **Timestamp** | 2026-02-26T12:00:00Z |
+| **Extractor** | Claude (automated) |
+| **Reviewer** | — (pending human review) |
+| **Status** | `EXTRACTED` → awaiting `VERIFIED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Northey JM, et al. (2018) J Sci Med Sport, https://doi.org/10.1016/j.jsams.2018.11.026 |
+| **DOI** | `10.1016/j.jsams.2018.11.026` |
+| **Trial Registration** | — (not reported) |
+| **PDF Location** | `data/manual_uploads/pdfs/` (no PDF available — extracted from full text) |
+| **PDF SHA-256** | *(N/A — extracted from article text)* |
+| **Pages Extracted** | 1-6 (full text) |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | Pilot RCT, 3-arm parallel group (HIIT vs MOD vs CON) |
+| **Sample** | n=17 (HIIT=6, MOD=5, CON=6) |
+| **Population** | Female breast cancer survivors ≤24 months post-diagnosis, aged 50–75 years |
+| **Intervention** | 12-week cycle ergometer: HIIT (30s intervals at ~105% peak power, 7 intervals) or MOD (20min at 55–65% peak power), 3×/week |
+| **Control** | Wait-list (maintain current lifestyle) |
+| **Extraction Mode** | `DEEP` (RCT + cancer + cognitive primary) |
+
+### Edges Added to EDGE_REGISTRY
+
+*4 new edges (registry total: 137 → 141)*
+
+| Edge ID | Source Node | Target Node | Sign | Type | Pathway | Basis |
+|---------|-------------|-------------|------|------|---------|-------|
+| `ER_ACTIVITY_WORKMEM` | NODE_BEH_PHYSICAL_ACTIVITY | NODE_COG_WORK_MEM | positive | causal | PW_M04_NEUROPLASTICITY | RCT d=0.81 NS |
+| `ER_ACTIVITY_EXEC_PLAN` | NODE_BEH_PHYSICAL_ACTIVITY | NODE_COG_EXEC_PLANNING | positive | causal | PW_M04_NEUROPLASTICITY | RCT d=0.75 NS |
+| `ER_ACTIVITY_DECONDITIONING` | NODE_BEH_PHYSICAL_ACTIVITY | NODE_SYM_DECONDITIONING | negative | causal | PW_C2_FATIGUE | RCT d=1.28 p=0.02 |
+| `ER_ACTIVITY_CEREBROVASCULAR` | NODE_BEH_PHYSICAL_ACTIVITY | NODE_PATH_CEREBROVASCULAR | positive | causal | PW_M11_CEREBROVASCULAR | RCT d=0.86 NS |
+
+### Evidence Values Extracted
+
+#### edge_evidence_template.csv (5 rows)
+
+| Row | Edge ID | beta_raw | se_raw | effect_type | n | Source Location | Derivation |
+|-----|---------|----------|--------|-------------|---|-----------------|------------|
+| 1 | ER_ACTIVITY_EPIMEM | 0.76 | 0.598 | cohen_d | 12 | Table 2, p.4, row "Episodic memory" | d reported; SE=√(12/36+d²/24) |
+| 2 | ER_ACTIVITY_EXEC_PLAN | 0.75 | 0.597 | cohen_d | 12 | Table 2, p.4, row "Executive function" | d reported; SE=√(12/36+d²/24) |
+| 3 | ER_ACTIVITY_WORKMEM | 0.81 | 0.601 | cohen_d | 12 | Table 2, p.4, row "Working memory" | d reported; SE=√(12/36+d²/24) |
+| 4 | ER_ACTIVITY_DECONDITIONING | 1.28 | 0.634 | cohen_d | 12 | Table 2, p.4, row "VO2Peak" | d reported; SE=√(12/36+d²/24) |
+| 5 | ER_ACTIVITY_CEREBROVASCULAR | 0.86 | 0.603 | cohen_d | 12 | Table 2, p.4, row "MCA Vmean" | d reported; SE=√(12/36+d²/24) |
+
+**Formula applied:** `SE(d) = √[(n1+n2)/(n1·n2) + d²/(2·(n1+n2))]` where n1=6 (HIIT), n2=6 (CON)
+
+#### population_norms_template.csv (5 rows)
+
+| Row | Node ID | Instrument | Mean | SD | n | Source Location |
+|-----|---------|-----------|------|-----|---|-----------------|
+| 1 | NODE_COG_EPISODIC_MEM | INST_HVLTR | 9.7 | 0.8 | 6 | Table 2, p.4, CON Pre "Episodic memory, words" |
+| 2 | NODE_COG_EXEC_PLANNING | INST_TOL | 56.2 | 12.8 | 6 | Table 2, p.4, CON Pre "Executive function, errors" |
+| 3 | NODE_COG_WORK_MEM | INST_DIGIT_SPAN | 1.4 | 0.1 | 6 | Table 2, p.4, CON Pre "Working memory, acc" |
+| 4 | NODE_SYM_DECONDITIONING | INST_6MWT | 20.9 | 3.1 | 6 | Table 2, p.4, CON Pre "VO2Peak" |
+| 5 | NODE_PATH_CEREBROVASCULAR | INST_MOCA | 52.8 | 10.0 | 6 | Table 2, p.4, CON Pre "MCA Vmean" |
+
+#### context_priors_template.csv (5 rows)
+
+| Row | Node ID | prior_mean_z | prior_sd_z | Source Location | Derivation |
+|-----|---------|-------------|------------|-----------------|------------|
+| 1 | NODE_COG_EPISODIC_MEM | −0.32 | 0.8 | Table 2 + Lim 2013 norms | z = (9.7 − 10.5) / 2.5 |
+| 2 | NODE_COG_EXEC_PLANNING | 0.41 | 0.8 | Table 2 + Maruff 2009 norms | z = (56.2 − 50) / 15 |
+| 3 | NODE_COG_WORK_MEM | 0.0 | 0.8 | Table 2 + CogState norms | At normative level |
+| 4 | NODE_SYM_DECONDITIONING | −0.02 | 0.5 | Table 2 + ACSM norms | z = (20.9 − 21) / 5 |
+| 5 | NODE_BEH_PHYSICAL_ACTIVITY | −0.50 | 0.5 | Inclusion criteria + ACSM | Insufficiently active sample |
+
+### Extraction Decisions
+
+| # | Category | Risk | Decision | Rationale | Spec Reference |
+|---|----------|------|----------|-----------|----------------|
+| D1 | `[INST_MAP]` | **MEDIUM** | CogState ISL-DR mapped to `INST_HVLTR` | CogState battery not in INSTRUMENT_REGISTRY; ISL delayed recall and HVLT-R both measure verbal episodic memory delayed recall. **Action needed:** Add CogState instruments (INST_COGSTATE_ISL_DR, INST_COGSTATE_GML, INST_COGSTATE_ONB). | §T1.instrument_id |
+| D2 | `[INST_MAP]` | **MEDIUM** | CogState Groton Maze mapped to `INST_TOL` | Both assess executive planning/problem solving. Groton Maze uses spatial navigation; Tower of London uses disk arrangement. Different constructs but closest match. **Action needed:** Add `INST_COGSTATE_GML`. | §T1.instrument_id |
+| D3 | `[INST_MAP]` | **MEDIUM** | CogState One-Back mapped to `INST_DIGIT_SPAN` | Both measure working memory. One-Back is visual; Digit Span is auditory/verbal. Modest construct validity mismatch. **Action needed:** Add `INST_COGSTATE_ONB`. | §T1.instrument_id |
+| D4 | `[INST_MAP]` | **HIGH** | VO2peak mapped to `INST_6MWT` | VO2peak (maximal exercise test) is very different from 6MWT (submaximal walk). **Action needed:** Add `INST_VO2PEAK` to registry. | §T1.instrument_id |
+| D5 | `[INST_MAP]` | **HIGH** | TCD MCA Vmean mapped to `INST_MOCA` | Placeholder only — MCA blood flow velocity has nothing to do with MoCA. No cerebrovascular instrument exists. **Action needed:** Add `INST_TCD_MCAV`. | §T1.instrument_id |
+| D6 | `[SIGN_CONV]` | LOW | Positive d = HIIT benefit for all outcomes | Paper defines positive d as favorable to the intervention. Consistent across cognitive (higher=better), cerebrovascular (higher=better), and fitness (higher=better). | SYS_EX §TB-3 |
+| D7 | `[DUPLICATE]` | **MEDIUM** | HIIT vs CON entered; MOD vs CON excluded | Shared control group (n=6 CON). Entering both would double-count CON. HIIT chosen as primary (larger effects, novel contribution of paper). MOD effects documented in confidence_note. | SYS_EX §P3-G2 |
+| D8 | `[DUPLICATE]` | LOW | Verbal learning (ISL learning trials) excluded | ISL learning and ISL delayed recall both map to NODE_COG_EPISODIC_MEM. Delayed recall (d=0.76) is standard episodic memory measure. Learning trials (d=−0.39) excluded to avoid double-counting. | SYS_EX §P3-G2 |
+| D9 | `[DUPLICATE]` | LOW | CRV excluded (MCA Vmean entered) | MCA Vmean and cerebrovascular reactivity both map to NODE_PATH_CEREBROVASCULAR. MCA Vmean (d=0.86) entered as primary resting cerebrovascular measure. CRV (d=0.72) noted in confidence_note. | SYS_EX §P3-G2 |
+| D10 | `[CONSTRUCT]` | **MEDIUM** | NODE_PATH_CEREBROVASCULAR edge created | NODE_PATH_CEREBROVASCULAR was "EDGELESS PLACEHOLDER" in v1 (PW_M11_CEREBROVASCULAR status="edgeless"). This paper provides the first evidence for parameterizing this pathway. Edge may not be processable in v1 pipeline. | PW_M11 |
+| D11 | `[MISSING_DATA]` | LOW | SE(d) derived from formula | Paper reports d but not SE(d). SE computed via standard formula: SE(d)=√[(n1+n2)/(n1·n2)+d²/(2(n1+n2))]. All SEs ~0.59–0.63 reflecting very small sample. | SYS_EX §EX-P1.1 |
+| D12 | `[BIAS_ADJ]` | LOW | Risk of bias: moderate | Wait-list control (no blinding of participants). Outcome assessors blinding unclear. Main concern: n=17 severely underpowered. Randomization and allocation concealment adequate. No adverse events. | SYS_EX §TB-5 |
+
+### Verification Checklist
+
+- [ ] All Cohen's d values verified against Table 2 (p.4)
+- [ ] All SE(d) derivations recalculated from formula
+- [ ] Population norms verified against Table 2 (p.4) — CON Pre columns
+- [ ] Context prior z-scores recalculated against published norms
+- [ ] Instrument mappings reviewed against INSTRUMENT_REGISTRY
+- [ ] Edge signs verified against expected_sign in EDGE_REGISTRY
+- [ ] CogState instruments added to INSTRUMENT_REGISTRY (D1-D3 resolved)
+- [ ] INST_VO2PEAK and INST_TCD_MCAV added to registry (D4-D5 resolved)
+- [ ] Human reviewer sign-off
+
+### Supplementary Context (not entered as evidence)
+
+| Data | Value | Source | Reason Not Entered |
+|------|-------|--------|-------------------|
+| Verbal learning (ISL learning trials) | HIIT vs CON d=−0.39 | Table 2 | Same node as delayed recall; avoid double-count |
+| MOD vs CON episodic memory | d=0.66 | Table 2 | Shared control group with HIIT comparison |
+| MOD vs CON executive function | d=0.20 | Table 2 | Shared control group |
+| MOD vs CON working memory | d=−0.34 | Table 2 | Shared control group |
+| MOD vs CON VO2peak | d=0.72 | Table 2 | Shared control group |
+| MOD vs CON MCA Vmean | d=0.31 | Table 2 | Shared control group |
+| HIIT vs MOD working memory | d=1.41 | Table 2 | Intensity comparison, not PA vs control |
+| CRV (cerebrovascular reactivity) | HIIT vs CON d=0.72 | Table 2 | Same node as MCA Vmean; avoid double-count |
+| MAP (mean arterial pressure) | HIIT vs CON d=−0.17 | Table 2 | Blood pressure; not a DAG node |
+| PET O2 (end-tidal oxygen) | HIIT vs CON d=−0.24 | Table 2 | Respiratory variable; not a DAG node |
+| PET CO2 (end-tidal CO2) | HIIT vs CON d=0.31 | Table 2 | Respiratory variable; not a DAG node |
+| Adherence HIIT | 78.7% | Results p.4 | Process metric |
+| Adherence MOD | 79.4% | Results p.4 | Process metric |
+| Heart rate HIIT vs MOD | 93.9% vs 84.1% HRmax | Results p.4 | Fidelity metric |
+
+### Files Created
+
+| File | Rows | Location |
+|------|------|----------|
+| edge_evidence_template.csv | 5 | `data/manual_uploads/structured/10.1016_j.jsams.2018.11.026/` |
+| population_norms_template.csv | 5 | `data/manual_uploads/structured/10.1016_j.jsams.2018.11.026/` |
+| context_priors_template.csv | 5 | `data/manual_uploads/structured/10.1016_j.jsams.2018.11.026/` |
+| 10.1016_j.jsams.2018.11.026.meta.json | — | `data/manual_uploads/pdfs/` |
+
+---
+
 ## EXT-2026-0002 — Campbell et al. 2017
 
 ### Extraction Metadata

@@ -1,0 +1,6 @@
+doi,node_id,instrument_id,mean,sd,sample_size,cancer_type,treatment_phase,age_range
+10.1016/j.jsams.2018.11.026,NODE_COG_EPISODIC_MEM,INST_HVLTR,9.7,0.8,6,breast,early_recovery,50-75
+10.1016/j.jsams.2018.11.026,NODE_COG_EXEC_PLANNING,INST_TOL,56.2,12.8,6,breast,early_recovery,50-75
+10.1016/j.jsams.2018.11.026,NODE_COG_WORK_MEM,INST_DIGIT_SPAN,1.4,0.1,6,breast,early_recovery,50-75
+10.1016/j.jsams.2018.11.026,NODE_SYM_DECONDITIONING,INST_6MWT,20.9,3.1,6,breast,early_recovery,50-75
+10.1016/j.jsams.2018.11.026,NODE_PATH_CEREBROVASCULAR,INST_MOCA,52.8,10.0,6,breast,early_recovery,50-75

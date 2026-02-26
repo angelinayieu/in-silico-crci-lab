@@ -1,0 +1,37 @@
+{
+  "doi": "10.1016/j.jsams.2018.11.026",
+  "title": "Cognition in breast cancer survivors: A pilot study of interval and continuous exercise",
+  "authors": ["Northey JM", "Pumpa KL", "Quinlan C", "Ikin A", "Toohey K", "Smee DJ", "Rattray B"],
+  "year": 2018,
+  "journal": "Journal of Science and Medicine in Sport",
+  "pmid": null,
+  "study_design": "RCT",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "intervention_type": "physical_activity",
+  "intervention_subtype": "HIIT_vs_MOD_vs_CON",
+  "n_total": 17,
+  "n_treatment_hiit": 6,
+  "n_treatment_mod": 5,
+  "n_control": 6,
+  "extraction_mode": "DEEP",
+  "targeted_edges": [
+    "ER_ACTIVITY_EPIMEM",
+    "ER_ACTIVITY_EXEC_PLAN",
+    "ER_ACTIVITY_WORKMEM",
+    "ER_ACTIVITY_DECONDITIONING",
+    "ER_ACTIVITY_CEREBROVASCULAR"
+  ],
+  "risk_of_bias": {
+    "randomization": "low",
+    "allocation_concealment": "low",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "unclear",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "other": "very_small_sample_n17",
+    "overall": "moderate"
+  },
+  "completeness_pct": 85,
+  "notes": "Three-arm pilot RCT (HIIT n=6, MOD n=5, CON n=6). Female breast cancer survivors <=24mo post-diagnosis aged 50-75. 12-week cycle ergometer intervention. Primary: CogState battery (not in INSTRUMENT_REGISTRY). Secondary: TCD cerebrovascular and VO2peak. Only VO2peak reached significance (p=0.02). HIIT showed moderate-to-large effects on cognition and cerebrovascular function. High adherence (78-79%) with no adverse events. All cognitive effects non-significant due to small sample. HIIT vs CON extracted as primary comparison; MOD vs CON noted but not separately entered (shared control group)."
+}
