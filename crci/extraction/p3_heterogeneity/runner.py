@@ -57,6 +57,14 @@ def run_p3_heterogeneity(
         context["calibrated_records"] = []
         return context
 
+    # Resolve study design from P0 classification as fallback
+    # when AG02 (DesignAgent) fails and records default to "unclassified"
+    classified_paper = context.get("classified_paper", {})
+    p0_study_design = classified_paper.get("study_design", "other")
+    if hasattr(p0_study_design, "value"):
+        p0_study_design = p0_study_design.value
+    p0_study_design = str(p0_study_design) if p0_study_design else "other"
+
     # Debug: log what fields the harmonized records actually have
     if harmonized_records:
         sample = harmonized_records[0]
@@ -93,10 +101,21 @@ def run_p3_heterogeneity(
             logger.debug("P3-ASM: skipping record with no SE")
             continue
         try:
+            # Use P0's study_design as fallback when AG02 fails
+            record_design = getattr(rec, "study_design", "unclassified")
+            if record_design == "unclassified" and p0_study_design != "other":
+                record_design = p0_study_design
+                logger.debug(
+                    "P3-ASM: using P0 study_design '%s' as fallback for "
+                    "record %s (AG02 returned 'unclassified')",
+                    p0_study_design,
+                    getattr(rec, "ler_id", "?"),
+                )
+
             inp = SEEffInput(
                 ler_id=getattr(rec, "ler_id", ""),
                 se_raw=se_raw,
-                study_design=getattr(rec, "study_design", "unclassified"),
+                study_design=record_design,
                 n_total=getattr(rec, "n_total", None),
                 w_scope=layered.w_scope,
                 betas=getattr(rec, "group_betas", None) or [],

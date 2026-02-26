@@ -404,6 +404,64 @@ def _run_single_chain(
 
 
 # ═══════════════════════════════════════════════════════════════
+#  HOP DISCOVERY (post-pipeline for SR/MA papers)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _run_hop_discovery_if_applicable(
+    session: Session, context: dict[str, Any]
+) -> None:
+    """Run hop discovery if the paper is an SR/MA with included studies.
+
+    Called after successful pipeline completion to queue constituent
+    studies from systematic reviews for acquisition.
+
+    Args:
+        session: Active database session.
+        context: Pipeline context with classified_paper and included_study_ids.
+    """
+    classified_paper = context.get("classified_paper", {})
+    paper_subtype = classified_paper.get("paper_subtype", "")
+    if hasattr(paper_subtype, "value"):
+        paper_subtype = paper_subtype.value
+
+    sr_ma_subtypes = {
+        "systematic_review", "meta_analysis",
+        # Fine-grained MA subtypes (future classification support)
+        "pairwise_ma", "nma", "ipdma", "dose_response_ma", "mega_analysis",
+    }
+    if str(paper_subtype) not in sr_ma_subtypes:
+        return
+
+    included_ids = context.get("included_study_ids", [])
+    if not included_ids:
+        logger.info(
+            "Post-pipeline hop discovery: SR/MA paper but no included study IDs. "
+            "hop_discoverer requires included_study_ids_json in study_registry."
+        )
+        return
+
+    try:
+        from crci.retrieval.hop_discoverer import run_hop_discovery
+
+        n_queued = run_hop_discovery(session)
+        logger.info(
+            "Post-pipeline hop discovery: queued %d constituent studies "
+            "for acquisition",
+            n_queued,
+        )
+    except ImportError:
+        logger.warning(
+            "Post-pipeline hop discovery: hop_discoverer module not available"
+        )
+    except Exception as exc:
+        logger.error(
+            "Post-pipeline hop discovery failed: %s (non-fatal, continuing)",
+            exc,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
 #  MAIN PIPELINE ORCHESTRATOR
 # ═══════════════════════════════════════════════════════════════
 
@@ -535,6 +593,11 @@ def _run_pipeline_with_session(
         # ── All chains succeeded ──
         mark_run_completed(session, run)
 
+        # ── Post-pipeline: Hop Discovery for SR/MA papers ──
+        # After successful extraction, trigger hop discovery to queue
+        # constituent studies from SR/MA papers for acquisition.
+        _run_hop_discovery_if_applicable(session, context)
+
     except NotImplementedError as exc:
         # Chain module not built yet — this is expected during incremental build.
         # Mark as partial (not failed) since the infrastructure is correct.
@@ -552,18 +615,37 @@ def _run_pipeline_with_session(
 
     except GateViolation as exc:
         # Pipeline gate violation — this is a hard stop.
+        # IMPORTANT: We commit before re-raising so the session context manager's
+        # rollback doesn't destroy all data written by P0-P5 (study_registry,
+        # annotations, evidence rows, etc.). The run record is preserved with
+        # status="failed" for debugging and the study_registry row survives
+        # for hop discovery and re-extraction.
         error_msg = (
             f"Gate violation {exc.gate_id}: {exc}\n"
             f"Context: {exc.context}"
         )
         mark_run_failed(session, run, error_msg)
+        session.commit()
+        logger.info(
+            "Committed run %s with status=failed before re-raising GateViolation "
+            "(preserving study_registry + evidence data)",
+            run.extraction_run_id,
+        )
         raise
 
     except Exception as exc:
         # Unexpected error — capture full traceback for debugging.
+        # Commit failure record so study_registry + evidence data survives.
         tb = traceback.format_exc()
         error_msg = f"{type(exc).__name__}: {exc}\n{tb}"
         mark_run_failed(session, run, error_msg)
+        session.commit()
+        logger.info(
+            "Committed run %s with status=failed before re-raising %s "
+            "(preserving study_registry + evidence data)",
+            run.extraction_run_id,
+            type(exc).__name__,
+        )
         raise
 
     return run

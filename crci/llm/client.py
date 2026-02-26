@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from typing import Any, TypeVar
 
@@ -214,7 +215,10 @@ class LLMClient:
     def _parse_and_validate(self, raw_text: str, schema: type[T]) -> T:
         """Parse JSON from response text and validate against schema.
 
-        Handles cases where JSON is embedded in markdown code blocks.
+        Handles cases where JSON is embedded in markdown code blocks,
+        even when preamble text precedes the code fence.
+        Includes automatic JSON repair for common LLM output errors
+        (trailing commas, truncated responses, unescaped control chars).
         """
         text = raw_text.strip()
 
@@ -226,13 +230,45 @@ class LLMClient:
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
+        elif "```json" in text or "```\n{" in text:
+            # Handle preamble text before code fence
+            # e.g. "Here are the results:\n```json\n{...}\n```"
+            fence_start = text.find("```json")
+            if fence_start == -1:
+                fence_start = text.find("```\n{")
+            if fence_start >= 0:
+                after_fence = text[fence_start:]
+                lines = after_fence.split("\n")
+                lines = lines[1:]  # Remove ```json line
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                text = "\n".join(lines).strip()
 
         try:
             data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise LLMResponseValidationError(
-                f"Response is not valid JSON: {exc}\nRaw text: {raw_text[:500]}"
-            ) from exc
+        except json.JSONDecodeError as first_exc:
+            # ── JSON Repair: attempt to fix common LLM output errors ──
+            repaired = self._repair_json(text)
+            if repaired is not None:
+                try:
+                    data = json.loads(repaired)
+                    logger.warning(
+                        "JSON repair succeeded (original error: %s). "
+                        "Repaired %d chars → %d chars.",
+                        first_exc,
+                        len(text),
+                        len(repaired),
+                    )
+                except json.JSONDecodeError:
+                    raise LLMResponseValidationError(
+                        f"Response is not valid JSON (repair also failed): "
+                        f"{first_exc}\nRaw text: {raw_text[:500]}"
+                    ) from first_exc
+            else:
+                raise LLMResponseValidationError(
+                    f"Response is not valid JSON: {first_exc}\n"
+                    f"Raw text: {raw_text[:500]}"
+                ) from first_exc
 
         try:
             return schema.model_validate(data)
@@ -240,6 +276,116 @@ class LLMClient:
             raise LLMResponseValidationError(
                 f"Response failed schema validation: {exc}\nData: {data}"
             ) from exc
+
+    @staticmethod
+    def _repair_json(text: str) -> str | None:
+        """Attempt to repair common JSON errors from LLM output.
+
+        Handles:
+        1. Trailing commas before } or ] (most common LLM error)
+        2. Truncated JSON (unclosed brackets/braces) — closes them
+        3. Unescaped newlines inside string values
+        4. Single quotes instead of double quotes (rare)
+
+        Returns:
+            Repaired JSON string, or None if repair is not attempted
+            (e.g., text is empty or not JSON-like).
+        """
+        if not text or (not text.lstrip().startswith("{") and
+                        not text.lstrip().startswith("[")):
+            return None
+
+        repaired = text
+
+        # 1. Remove trailing commas before } or ]
+        #    Matches: ,\s*} or ,\s*]  (with optional whitespace/newlines)
+        repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+
+        # 2. Fix truncated JSON — close unclosed brackets/braces
+        #    This handles the max_tokens cutoff case
+        open_braces = repaired.count("{") - repaired.count("}")
+        open_brackets = repaired.count("[") - repaired.count("]")
+
+        if open_braces > 0 or open_brackets > 0:
+            # Check if we're inside a string (truncated mid-value)
+            # Simple heuristic: if the text ends mid-string, close the string
+            stripped = repaired.rstrip()
+
+            # Count unescaped quotes to see if we're inside a string
+            in_string = False
+            i = 0
+            while i < len(stripped):
+                ch = stripped[i]
+                if ch == "\\" and in_string:
+                    i += 2  # skip escaped char
+                    continue
+                if ch == '"':
+                    in_string = not in_string
+                i += 1
+
+            if in_string:
+                # Close the open string, then add null value if key
+                repaired = stripped + '"'
+                # If the last complete structure was a key, add : null
+                after_close = repaired.rstrip()
+                # Check if this looks like a key (preceded by { or ,)
+                pre = after_close[:-1].rstrip()
+                if pre and pre[-1] in ("{", ","):
+                    repaired = after_close + ": null"
+
+            # Remove any trailing comma before we close structures
+            repaired = repaired.rstrip().rstrip(",")
+
+            # Close brackets/braces in reverse order of opening
+            # Recalculate after potential string fix
+            open_braces = repaired.count("{") - repaired.count("}")
+            open_brackets = repaired.count("[") - repaired.count("]")
+            repaired += "]" * open_brackets + "}" * open_braces
+
+        # 3. Fix unescaped control characters inside strings
+        #    (newlines, tabs that aren't \n or \t)
+        # This is a conservative fix — only inside JSON string values
+        def _fix_control_chars(m: re.Match) -> str:
+            s = m.group(0)
+            # Replace bare newlines/tabs inside strings with escaped versions
+            s = s.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            return s
+
+        # Only apply to content between quotes (rough heuristic)
+        try:
+            json.loads(repaired)
+            return repaired  # Already valid after trailing comma / truncation fix
+        except json.JSONDecodeError:
+            pass
+
+        # 4. Last resort: try to extract the largest valid JSON object
+        #    by finding the outermost { } or [ ]
+        if repaired.lstrip().startswith("{"):
+            brace_depth = 0
+            last_valid_end = -1
+            in_str = False
+            for i, ch in enumerate(repaired):
+                if ch == "\\" and in_str:
+                    continue
+                if ch == '"' and (i == 0 or repaired[i - 1] != "\\"):
+                    in_str = not in_str
+                if not in_str:
+                    if ch == "{":
+                        brace_depth += 1
+                    elif ch == "}":
+                        brace_depth -= 1
+                        if brace_depth == 0:
+                            last_valid_end = i + 1
+                            break
+            if last_valid_end > 0:
+                candidate = repaired[:last_valid_end]
+                try:
+                    json.loads(candidate)
+                    return candidate
+                except json.JSONDecodeError:
+                    pass
+
+        return repaired
 
     @property
     def total_prompt_tokens(self) -> int:

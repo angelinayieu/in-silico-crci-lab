@@ -1,0 +1,15 @@
+{
+  "task_type": "has_effect_size",
+  "proposed_model": "claude-3-5-haiku-20241022",
+  "gold_model": "claude-opus-4-20250514",
+  "n_samples": 5,
+  "proposed_correct": 5,
+  "gold_correct": 5,
+  "proposed_accuracy": 1.0,
+  "gold_accuracy": 1.0,
+  "accuracy_gap": 0.0,
+  "recommendation": "ACCEPT",
+  "rationale": "HAIKU achieves 100.0% accuracy, exceeding 95% threshold. Safe for production use.",
+  "timestamp": "2026-02-25T23:25:52.992729",
+  "sample_errors": []
+}

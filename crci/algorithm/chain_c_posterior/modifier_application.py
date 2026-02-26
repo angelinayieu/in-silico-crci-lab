@@ -28,6 +28,7 @@ import numpy as np
 
 from crci.shared import config
 from crci.shared.models.intermediate_states import GateViolation
+from crci.shared.models.pathway_types import PathwayDef
 
 from ..chain_a_graph.node_loader import NodeMap
 from ..chain_b_evidence.frozen_state import FrozenModelState
@@ -403,56 +404,9 @@ def _compute_modifier_se_inflation(
 #  C4d: Pathway Activation Detection
 # ═══════════════════════════════════════════════════════════════
 
-
-@dataclass(frozen=True)
-class PathwayDef:
-    """Pathway definition from PATHWAY_REGISTRY.csv."""
-
-    pathway_id: str
-    pathway_label: str
-    component_node_ids: list[str]
-    activation_threshold: float
-    is_sensitive: bool
-
-
-def load_pathway_registry(
-    registry_path: str | Path,
-) -> list[PathwayDef]:
-    """Load pathway definitions from PATHWAY_REGISTRY.csv.
-
-    Args:
-        registry_path: Path to PATHWAY_REGISTRY.csv.
-
-    Returns:
-        List of PathwayDef objects.
-    """
-    registry_path = Path(registry_path)
-    if not registry_path.exists():
-        logger.warning("C4d: Pathway registry not found: %s", registry_path)
-        return []
-
-    pathways: list[PathwayDef] = []
-    with open(registry_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row.get("active", "1").strip() != "1":
-                continue
-
-            component_nodes = json.loads(row.get("component_nodes_json", "[]"))
-            threshold = float(row.get("activation_threshold",
-                                      config.C4_PATHWAY_ACTIVATION_THRESHOLD_DEFAULT))
-            is_sensitive = row.get("is_sensitive_pathway", "0").strip() == "1"
-
-            pathways.append(PathwayDef(
-                pathway_id=row["pathway_id"].strip(),
-                pathway_label=row["pathway_label"].strip(),
-                component_node_ids=component_nodes,
-                activation_threshold=threshold,
-                is_sensitive=is_sensitive,
-            ))
-
-    logger.info("C4d: Loaded %d pathway definitions", len(pathways))
-    return pathways
+# PathwayDef imported from crci.shared.models.pathway_types (canonical single source of truth).
+# The load_pathway_registry() function lives in chain_a_graph.graph_object — callers pass
+# the already-loaded GraphObject.pathway_map as the pathways argument to apply_modifiers().
 
 
 def _detect_pathway_activations(
@@ -483,7 +437,7 @@ def _detect_pathway_activations(
     for pw in pathways:
         # Collect node indices for this pathway
         node_indices = []
-        for node_id in pw.component_node_ids:
+        for node_id in pw.component_nodes:
             idx = node_map.node_index.get(node_id)
             if idx is not None:
                 node_indices.append(idx)

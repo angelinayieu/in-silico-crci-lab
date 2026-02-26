@@ -246,7 +246,9 @@ SE_CI_DIVISOR_90: float = 3.290  # 2 × 1.645
 # ═══════════════════════════════════════════════════════════════
 
 # Hasselblad & Hedges OR→d conversion factor: √3/π ≈ 0.5513
-CONVERSION_OR_TO_D_FACTOR: float = 0.5513288954217921
+# Alias of CONVERSION_OR_TO_SMD_FACTOR — same mathematical constant,
+# used by conversion_executor.py ("d" naming convention)
+CONVERSION_OR_TO_D_FACTOR: float = CONVERSION_OR_TO_SMD_FACTOR
 
 # SE inflation for missing fields (fallback paths)
 CONVERSION_SE_INFLATION_MISSING_GROUP_N: float = 1.10   # d from d, using total N/2
@@ -353,7 +355,9 @@ TB_PLAUSIBILITY_I_SQUARED_MAX: float = 100.0  # I² ≤ 100
 
 # Rule NP-11: SE derivation from CI
 # SE = (upper - lower) / (2 × 1.96)
-TB_CI_TO_SE_Z_MULTIPLIER: float = 1.96
+# Alias of SE_FROM_CI_Z_MULTIPLIER — same z-quantile for 95% CIs,
+# used by trust boundary numeric_parser.py ("TB_" naming convention)
+TB_CI_TO_SE_Z_MULTIPLIER: float = SE_FROM_CI_Z_MULTIPLIER
 
 # Rule NP-02/NP-03: CI and p-value consistency thresholds
 TB_P_VALUE_SIGNIFICANCE_THRESHOLD: float = 0.05
@@ -434,6 +438,49 @@ COHERENCE_Z_ALARM: float = 3.0
 COHERENCE_SE_INFLATION_MONITOR: float = 1.1
 COHERENCE_SE_INFLATION_INVESTIGATE: float = 1.3
 COHERENCE_SE_INFLATION_ALARM: float = 2.0
+
+# ═══════════════════════════════════════════════════════════════
+#  PATHWAY EVIDENCE SCORING — ALG-B6.5 (EXTENSION)
+#    Not in original spec — EXTENSION for pathway-level evidence metrics.
+#    ED measures evidence quantity/quality per pathway edge.
+#    DS measures how distinguishable a pathway's evidence pattern is.
+# ═══════════════════════════════════════════════════════════════
+
+# EXTENSION ED-1: ED(P) = Σ_{e ∈ P} k_quality(e) / |edges_in_P|
+#   k_quality(e) = Σ_{s ∈ evidence(e)} w_quality(quality_grade(s))
+#   Quality-tier weights for evidence density (higher = more credit)
+ED_QUALITY_WEIGHT_HIGH: float = 1.0
+ED_QUALITY_WEIGHT_MODERATE: float = 0.75
+ED_QUALITY_WEIGHT_LOW: float = 0.50
+ED_QUALITY_WEIGHT_VERY_LOW: float = 0.25
+
+# Convenience dict for programmatic lookup (mirrors the 4 constants above)
+ED_QUALITY_WEIGHTS: dict[str, float] = {
+    "HIGH": ED_QUALITY_WEIGHT_HIGH,
+    "MODERATE": ED_QUALITY_WEIGHT_MODERATE,
+    "LOW": ED_QUALITY_WEIGHT_LOW,
+    "VERY_LOW": ED_QUALITY_WEIGHT_VERY_LOW,
+}
+
+# EXTENSION ED-2: Minimum ED for a pathway to be "adequately evidenced"
+#   Pathways with ED below this are flagged as evidence-poor.
+#   0.5 ≈ one MODERATE-quality study per every two edges in the pathway.
+MIN_PATHWAY_EVIDENCE_DENSITY: float = 0.5
+
+# EXTENSION DS-1: DS(P) = 1 − max_{Q ≠ P} cosine_sim(ev_vec(P), ev_vec(Q))
+#   Minimum fraction of pathway edges that must have evidence before DS is computed.
+#   Below this, DS defaults to 0.0 (insufficient coverage to distinguish).
+MIN_EDGE_COVERAGE_FOR_DS: float = 0.3
+
+# EXTENSION DS-2: Minimum number of pathways with ED > MIN_PATHWAY_EVIDENCE_DENSITY
+#   before any DS computation is attempted. With fewer, all DS = 0.0.
+MIN_ACTIVE_PATHWAYS_FOR_DS: int = 2
+
+# EXTENSION B-G6.5: Gate — Pathway Evidence Sufficiency
+#   Minimum number of pathways with ED ≥ MIN_PATHWAY_EVIDENCE_DENSITY
+#   to pass gate B-G6.5. Below this → WARNING (not a hard block, since
+#   early-stage data may have sparse pathway evidence).
+GATE_B65_MIN_ADEQUATE_PATHWAYS: int = 1
 
 # ═══════════════════════════════════════════════════════════════
 #  DOSE-RESPONSE (§2.6)
@@ -795,7 +842,8 @@ P4_FALLBACK_SE_MULTIPLIER_GENERAL: float = 1.5
 P4_FALLBACK_SE_MULTIPLIER_UNINFORMATIVE: float = 2.0
 
 # Mechanistic synthesis discount a₀ (95% discount)
-P4_MECHANISTIC_SYNTH_DISCOUNT: float = 0.05
+# REMOVED: was duplicate of B3_MECHANISTIC_SYNTH_A0 (never imported anywhere).
+# Use B3_MECHANISTIC_SYNTH_A0 instead.
 
 # ═══════════════════════════════════════════════════════════════
 #  OPTIMIZATION (§2.16.3) — SAFE score
@@ -1172,45 +1220,3 @@ EVSI_HYPOTHETICAL_N: int = 50           # hypothetical new study sample size
 EVSI_HIGH_HETEROGENEITY_I2: float = 0.75  # I² threshold for gap flagging
 EVSI_HETEROGENEITY_WEIGHT: float = 1.0    # heuristic upweight for high-I² edges (max 2× at I²=1.0)
 EVIDENCE_GAP_TOP_K: int = 10           # top acquisition targets
-
-
-@dataclass(frozen=True)
-class CRCIConfig:
-    """Immutable configuration object aggregating all constants.
-
-    Use this when you need to pass configuration as a single object
-    rather than importing individual constants.
-    """
-
-    # Structural uncertainty
-    sigma_sq_structural_default: float = SIGMA_SQ_STRUCTURAL_DEFAULT
-    sigma_sq_structural_ceiling: float = SIGMA_SQ_STRUCTURAL_CEILING
-    p_inclusion_adj_cap: float = P_INCLUSION_ADJ_CAP
-    p_inclusion_min: float = P_INCLUSION_MIN
-
-    # Freshness
-    freshness_decay_rate: float = FRESHNESS_DECAY_RATE
-    freshness_floor: float = FRESHNESS_FLOOR
-    freshness_reference_year: int = FRESHNESS_REFERENCE_YEAR
-
-    # Temporal
-    temporal_decay_rate: float = TEMPORAL_DECAY_RATE
-    temporal_exclusion_days: int = TEMPORAL_EXCLUSION_DAYS
-
-    # MC
-    mc_draws: int = MC_DRAWS
-    mc_default_seed: int = MC_DEFAULT_SEED
-
-    # Scope
-    scope_weights: dict[str, float] = field(default_factory=lambda: dict(SCOPE_WEIGHTS))
-    scope_floor: float = SCOPE_FLOOR
-
-    # Bayesian update
-    prior_mean_default: float = PRIOR_MEAN_DEFAULT
-    prior_sd_default: float = PRIOR_SD_DEFAULT
-    min_sigma_floor: float = MIN_SIGMA_FLOOR
-    max_sigma_cap: float = MAX_SIGMA_CAP
-
-    # Simulation
-    default_horizon_days: int = DEFAULT_HORIZON_DAYS
-    default_time_step_unit: str = DEFAULT_TIME_STEP_UNIT

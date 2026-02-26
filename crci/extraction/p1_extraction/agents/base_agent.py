@@ -23,7 +23,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
-from crci.llm.client import LLMClient
+from crci.llm.client import LLMClient, LLMResponseValidationError
 from crci.shared.models.intermediate_states import (
     PaperMap,
     RawAnnotationEmission,
@@ -72,6 +72,9 @@ class BaseAgent(ABC):
       - _build_prompt(focused_text, paper_map) -> str
       - _parse_response(response, paper_map) -> AgentOutput
     """
+
+    # Max parse-failure retries before giving up
+    PARSE_RETRY_LIMIT = 2
 
     def __init__(self, llm_client: LLMClient) -> None:
         self._llm_client = llm_client
@@ -173,12 +176,53 @@ class BaseAgent(ABC):
         # Build prompt
         prompt = self._build_prompt(focused_text, paper_map)
 
-        # Call LLM
-        response = self._llm_client.call(
-            prompt=prompt,
-            response_schema=self.response_schema,
-            system_prompt=self._get_system_prompt(),
-        )
+        # Call LLM with retry on parse failure
+        last_exc: Exception | None = None
+        response = None
+        for attempt in range(1, self.PARSE_RETRY_LIMIT + 1):
+            try:
+                response = self._llm_client.call(
+                    prompt=prompt,
+                    response_schema=self.response_schema,
+                    system_prompt=self._get_system_prompt(),
+                )
+                break  # Success
+            except LLMResponseValidationError as exc:
+                last_exc = exc
+                logger.warning(
+                    "%s: LLM parse/validation failure on attempt %d/%d "
+                    "for paper_id=%s: %s",
+                    self.agent_id,
+                    attempt,
+                    self.PARSE_RETRY_LIMIT,
+                    paper_map.paper_id,
+                    str(exc)[:200],
+                )
+                if attempt < self.PARSE_RETRY_LIMIT:
+                    logger.info(
+                        "%s: retrying LLM call (attempt %d)...",
+                        self.agent_id,
+                        attempt + 1,
+                    )
+
+        if response is None:
+            # All retries exhausted — return empty output with error status
+            elapsed_ms = (time.monotonic() - start_time) * 1000
+            logger.error(
+                "%s: all %d parse attempts failed for paper_id=%s. "
+                "Last error: %s",
+                self.agent_id,
+                self.PARSE_RETRY_LIMIT,
+                paper_map.paper_id,
+                str(last_exc)[:300] if last_exc else "unknown",
+            )
+            return AgentOutput(
+                agent_id=self.agent_id,
+                paper_id=paper_map.paper_id,
+                completion_status="error_parse_failure",
+                elapsed_ms=elapsed_ms,
+                metadata={"error": str(last_exc)[:500] if last_exc else "unknown"},
+            )
 
         # Parse to AgentOutput
         output = self._parse_response(response, paper_map)

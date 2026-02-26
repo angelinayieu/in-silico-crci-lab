@@ -224,10 +224,12 @@ def run_p4_aggregation(
             compilation_inputs=compilation_inputs,
             session=session,
         )
+        context["compiled_edges"] = compiled_edges  # P5/P6 read this
         context["edges_written"] = len(compiled_edges)
         logger.info("P4-WRT: %d edges written to edges_v1", len(compiled_edges))
     else:
         logger.warning("P4-WRT: no compilation inputs available, skipping edge write")
+        context["compiled_edges"] = []
         context["edges_written"] = 0
 
     return context

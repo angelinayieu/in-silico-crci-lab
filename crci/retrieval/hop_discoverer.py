@@ -20,9 +20,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
 
 from crci.shared import config
@@ -66,9 +65,12 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
             and_(
                 StudyRegistry.included_study_ids_json.isnot(None),
                 StudyRegistry.study_subtype.in_([
+                    # PaperSubtype enum values (canonical)
+                    "meta_analysis",
+                    "systematic_review",
+                    # Legacy/fine-grained subtypes (for future classification)
                     "pairwise_ma", "nma", "ipdma",
                     "dose_response_ma", "mega_analysis",
-                    "systematic_review",  # SRs also have included study lists
                 ]),
             )
         )
@@ -107,12 +109,24 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
             if not isinstance(entry, dict):
                 continue
 
-            doi = entry.get("doi", "")
-            pmid = entry.get("pmid", "")
-            title = entry.get("title", "")
+            doi = entry.get("doi") or ""
+            pmid = entry.get("pmid") or ""
+            title = entry.get("title") or ""
+            first_author = entry.get("first_author") or ""
+            year = entry.get("year")
 
+            # Build search query for entries without DOI/PMID
+            search_query = None
             if not doi and not pmid:
-                continue
+                # Construct search query from author + year
+                if first_author and year:
+                    search_query = f"{first_author} {year}"
+                elif first_author:
+                    search_query = first_author
+                elif title:
+                    search_query = title
+                else:
+                    continue  # Skip if no identifiable info
 
             # Gate HOP-G2: skip known papers
             if doi and doi.lower() in all_known_dois:
@@ -121,14 +135,23 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
                 continue
 
             # Queue the hop candidate
+            # Note: If no DOI/PMID, use search_query in candidate_title
+            # for the acquisition system to search by author+year
+            display_title = title or search_query
             queue_entry = AcquisitionQueue(
                 queue_id=f"HOP_{uuid.uuid4().hex[:12]}",
                 candidate_doi=doi or None,
                 candidate_pmid=pmid or None,
-                candidate_title=title or None,
-                target_edge_ids_json=json.dumps(target_edges) if target_edges else None,
+                candidate_title=display_title,
+                # Pass Python objects for JSONB columns (no json.dumps — SQLAlchemy handles serialization)
+                target_edge_ids_json=target_edges if target_edges else None,
                 aps_score=config.HOP_CITATION_APS_BOOST,  # Formula HOP-1: base boost
-                aps_components_json=json.dumps({"citation_hop_boost": config.HOP_CITATION_APS_BOOST}),
+                aps_components_json={
+                    "citation_hop_boost": config.HOP_CITATION_APS_BOOST,
+                    "search_query": search_query,
+                    "first_author": first_author,
+                    "year": year,
+                },
                 status="queued",
                 retrieval_status="PENDING",
                 hop_source_study_id=study_id,
@@ -246,10 +269,11 @@ def discover_hops_from_annotations(session: Session) -> int:
                 candidate_pmid=pmid or None,
                 candidate_title=title or None,
                 aps_score=config.HOP_CITATION_APS_BOOST,
-                aps_components_json=json.dumps({
+                # Pass Python dict for JSONB column (no json.dumps)
+                aps_components_json={
                     "citation_hop_boost": config.HOP_CITATION_APS_BOOST,
                     "annotation_category": ann.category,
-                }),
+                },
                 status="queued",
                 retrieval_status="PENDING",
                 hop_source_study_id=ann.study_id,
@@ -342,20 +366,39 @@ def _get_ma_edge_ids(session: Session, study_id: str) -> list[str]:
 def _get_study_hop_depth(session: Session, study_id: str) -> int:
     """Get the hop depth for a study (0 if directly acquired, >0 if hop-derived).
 
-    Checks if this study was itself a hop candidate.
+    Checks if this study was itself a hop candidate by matching on
+    DOI or PMID.
     """
-    # Check if this study was queued via hop
+    # Get the study's identifiers
+    id_stmt = (
+        select(StudyRegistry.doi, StudyRegistry.pmid)
+        .where(StudyRegistry.study_id == study_id)
+    )
+    id_row = session.execute(id_stmt).first()
+    if id_row is None:
+        return 0
+
+    study_doi, study_pmid = id_row
+
+    # Build match conditions: DOI or PMID
+    match_conditions = []
+    if study_doi:
+        match_conditions.append(
+            AcquisitionQueue.candidate_doi == study_doi
+        )
+    if study_pmid:
+        match_conditions.append(
+            AcquisitionQueue.candidate_pmid == study_pmid
+        )
+    if not match_conditions:
+        return 0
+
     stmt = (
         select(AcquisitionQueue.hop_depth)
         .where(
             and_(
                 AcquisitionQueue.hop_source_study_id.isnot(None),
-                AcquisitionQueue.candidate_doi == (
-                    select(StudyRegistry.doi)
-                    .where(StudyRegistry.study_id == study_id)
-                    .correlate_except(StudyRegistry)
-                    .scalar_subquery()
-                ),
+                or_(*match_conditions),
             )
         )
         .limit(1)

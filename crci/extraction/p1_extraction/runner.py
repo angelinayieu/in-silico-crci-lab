@@ -110,6 +110,52 @@ def run_p1_extraction(
             ma_plan.is_network_ma,
             ma_plan.is_dose_response_ma,
         )
+
+        # ── P1-ISL: Extract Included Study List for SR/MA ──
+        # Mandatory for hop discovery (BUG-004 fix): Use LLM to extract
+        # DOIs/PMIDs of included/constituent studies, then write to
+        # study_registry_v1.included_study_ids_json for hop_discoverer.
+        logger.info("P1-ISL: Extracting included study list for SR/MA paper")
+        try:
+            from crci.extraction.p1_extraction.included_study_extractor import (
+                extract_included_studies,
+            )
+
+            included_ids = extract_included_studies(
+                llm_client=llm_client,
+                canonical_text=canonical_text,
+                paper_id=paper_id,
+                title=ingested.get("metadata", {}).get("title"),
+            )
+            if included_ids:
+                import json as _json
+                # Update study_registry_v1 row with included study IDs
+                from crci.shared.models.tables import StudyRegistry as _SR
+                study_row = session.query(_SR).filter(_SR.study_id == paper_id).first()
+                if study_row:
+                    study_row.included_study_ids_json = _json.dumps(included_ids)
+                    study_row.included_k = len(included_ids)
+                    session.flush()
+                    logger.info(
+                        "P1-ISL: Wrote %d included study IDs to study_registry "
+                        "(sample: %s)",
+                        len(included_ids),
+                        included_ids[:3],
+                    )
+                context["included_study_ids"] = included_ids
+            else:
+                logger.info("P1-ISL: No included study IDs extracted")
+                context["included_study_ids"] = []
+        except ImportError:
+            logger.warning(
+                "P1-ISL: included_study_extractor module not found — "
+                "included study extraction skipped. "
+                "This means hop discovery won't work for this SR/MA paper."
+            )
+            context["included_study_ids"] = []
+        except Exception as exc:
+            logger.error("P1-ISL: Failed to extract included studies: %s", exc)
+            context["included_study_ids"] = []
     else:
         context["ma_extraction_plan"] = None
         logger.debug("P1-MAP: not an MA/SR paper, skipping MA plan")

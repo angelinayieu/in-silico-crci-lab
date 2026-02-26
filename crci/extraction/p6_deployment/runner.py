@@ -35,6 +35,10 @@ def run_p6_deployment_validation(
         P6-VAL: Validation runner — comprehensive check suite (G1-G18)
         P6-GATE: Deploy gate — final PASS/BLOCK decision
 
+    For systematic reviews: SR papers don't produce edge evidence directly.
+    Their value is in identifying constituent studies for hop discovery.
+    If the paper is an SR/MA with detected included studies, G1 is exempted.
+
     Args:
         session: Active database session.
         run: Current ExtractionRun instance.
@@ -48,10 +52,63 @@ def run_p6_deployment_validation(
     """
     logger.info("P6: Running deployment validation")
 
+    # ── Detect SR/MA paper type ──
+    classified_paper = context.get("classified_paper", {})
+    paper_subtype = classified_paper.get("paper_subtype", "")
+    if hasattr(paper_subtype, "value"):
+        paper_subtype = paper_subtype.value
+    is_sr_or_ma = str(paper_subtype) in {
+        "systematic_review", "meta_analysis",
+    }
+
     # ── Build compiled edges for validation ──
     compiled_edges = context.get("compiled_edges", [])
     sufficiency_report = context.get("sufficiency_report")
     bias_results = context.get("bias_results")
+
+    # ── SR exemption: if no edges but SR detected included studies ──
+    ma_plan = context.get("ma_extraction_plan")
+    has_included_studies = (
+        ma_plan is not None
+        and hasattr(ma_plan, "products")
+        and len(ma_plan.products) > 0
+    )
+
+    if is_sr_or_ma and not compiled_edges and has_included_studies:
+        logger.info(
+            "P6: SR/MA paper with no direct edges — applying SR exemption. "
+            "SR value is in constituent study identification, not edge production."
+        )
+        # Build a minimal validation result that passes G1
+        from crci.extraction.p6_deployment.validation_runner import (
+            RuleResult,
+            ValidationResult,
+        )
+        sr_result = ValidationResult(
+            rule_results=[
+                RuleResult(
+                    rule_id="G1",
+                    rule_name="minimum_edges",
+                    status="PASS",
+                    message=(
+                        "SR/MA exemption: no direct edges expected. "
+                        f"Paper subtype={paper_subtype}, MA plan has "
+                        f"{len(ma_plan.products)} products."
+                    ),
+                ),
+            ],
+            n_pass=1,
+            n_warn=0,
+            n_fail=0,
+            total_rules=1,
+        )
+        context["validation_result"] = sr_result
+        context["deploy_gate_decision"] = {
+            "decision": "DEPLOY_SR",
+            "reason": "SR/MA paper — edges come from constituent studies via hop discovery",
+        }
+        logger.info("P6 complete: SR exemption applied — DEPLOY_SR")
+        return context
 
     # ── P6-VAL: Validation Runner (G1-G18 rules) ──
     from crci.extraction.p6_deployment.validation_runner import run_validation

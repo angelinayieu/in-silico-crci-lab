@@ -1,6 +1,6 @@
-# VERIFIED: imports — all 5 P2 submodules + parameter_family_assigner
+# VERIFIED: imports — all 5 P2 submodules + parameter_family_assigner + evidence_writer
 # VERIFIED: backward wiring — reads validated claims from TB context
-# VERIFIED: forward wiring — writes harmonized LER rows to context for P3
+# VERIFIED: forward wiring — writes harmonized LER rows to context for P3 AND edge_evidence_v1
 # VERIFIED: gates — P2-G1 (plausibility), P2-G2 (orientation)
 """
 Component: SYS_EXTRACTION.EX-P2.RUNNER
@@ -232,5 +232,21 @@ def run_p2_harmonization(
         len(aligned_list),
         family_counts,
     )
+
+    # ── P2-EW: Persist Evidence to edge_evidence_v1 ──
+    # Write harmonized records to database for downstream queries and
+    # report_status.py visibility. This bridges the in-memory→DB gap.
+    if aligned_list:
+        from crci.extraction.evidence_writer import write_evidence_rows
+
+        study_id = context.get("paper_id", run.extraction_run_id)
+        evidence_count = write_evidence_rows(
+            session=session,
+            run=run,
+            harmonized_records=aligned_list,
+            study_id=study_id,
+        )
+        context["evidence_rows_written"] = evidence_count
+        logger.info("P2-EW: Persisted %d evidence rows to edge_evidence_v1", evidence_count)
 
     return context

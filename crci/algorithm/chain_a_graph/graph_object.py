@@ -26,6 +26,7 @@ import numpy as np
 
 from crci.shared import config
 from crci.shared.models.intermediate_states import GateViolation
+from crci.shared.models.pathway_types import PathwayDef
 
 from .edge_loader import BSkeleton, EdgeDef
 from .instrument_loader import InstrumentMap
@@ -40,19 +41,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════
 
 
-@dataclass(frozen=True)
-class PathwayDef:
-    """Definition of a named causal pathway."""
-
-    pathway_id: str
-    pathway_label: str
-    tier: str  # mechanistic_model_implied, clinical_mediator, etc.
-    entry_node_ids: list[str]
-    exit_node_ids: list[str]
-    intermediate_node_ids: list[str]
-    component_nodes: list[str]
-    edge_ids: list[str]  # edges that belong to this pathway
-    is_complete: bool = True  # False if any constituent edge is missing
+# PathwayDef imported from crci.shared.models.pathway_types (canonical single source of truth)
 
 
 @dataclass(frozen=True)
@@ -193,6 +182,18 @@ def load_pathway_registry(
             # Check completeness: all pathway edges must exist
             is_complete = len(pathway_edge_ids) > 0
 
+            # Parse C4d fields
+            activation_threshold = float(
+                row.get("activation_threshold",
+                        config.C4_PATHWAY_ACTIVATION_THRESHOLD_DEFAULT)
+            )
+            is_sensitive = row.get("is_sensitive_pathway", "0").strip() == "1"
+
+            # Parse B6.5 fields (EXTENSION: pathway evidence scoring)
+            se_multiplier = float(row.get("se_multiplier", 1.0))
+            edge_count_registry = int(row.get("edge_count", 0))
+            status = row.get("status", "connected").strip()
+
             pw = PathwayDef(
                 pathway_id=pathway_id,
                 pathway_label=row.get("pathway_label", pathway_id).strip(),
@@ -203,6 +204,11 @@ def load_pathway_registry(
                 component_nodes=component_nodes,
                 edge_ids=pathway_edge_ids,
                 is_complete=is_complete,
+                activation_threshold=activation_threshold,
+                is_sensitive=is_sensitive,
+                se_multiplier=se_multiplier,
+                edge_count_registry=edge_count_registry,
+                status=status,
             )
             pathways.append(pw)
 
