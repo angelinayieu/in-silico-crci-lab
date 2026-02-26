@@ -83,6 +83,33 @@ _SUBTYPE_TO_MODE: dict[PaperSubtype, ExtractionMode] = {
 
     # Unknown/other -> STANDARD (safe default per spec)
     PaperSubtype.OTHER: ExtractionMode.STANDARD,
+
+    # ─── 16 fine-grained subtypes (R1 routing slices) ─────
+    # DEEP: Fine-grained MA types
+    PaperSubtype.PAIRWISE_MA: ExtractionMode.DEEP,
+    PaperSubtype.NMA: ExtractionMode.DEEP,
+    PaperSubtype.IPDMA: ExtractionMode.DEEP,
+    PaperSubtype.DOSE_RESPONSE_MA: ExtractionMode.DEEP,
+    PaperSubtype.MEGA_ANALYSIS: ExtractionMode.DEEP,
+
+    # DEEP: Fine-grained RCT types
+    PaperSubtype.STANDARD_RCT: ExtractionMode.DEEP,
+    PaperSubtype.FACTORIAL_RCT: ExtractionMode.DEEP,
+    PaperSubtype.CROSSOVER_RCT: ExtractionMode.DEEP,
+
+    # STANDARD: Observational fine-grained
+    PaperSubtype.PILOT_RCT: ExtractionMode.STANDARD,
+    PaperSubtype.PROSPECTIVE_COHORT: ExtractionMode.STANDARD,
+    PaperSubtype.RETROSPECTIVE_COHORT: ExtractionMode.STANDARD,
+
+    # SHALLOW: Review/computational
+    PaperSubtype.SCOPING_REVIEW: ExtractionMode.SHALLOW,
+    PaperSubtype.COMPUTATIONAL_MODEL: ExtractionMode.SHALLOW,
+
+    # MINIMAL: Low-evidence subtypes
+    PaperSubtype.UMBRELLA_REVIEW: ExtractionMode.MINIMAL,
+    PaperSubtype.MECHANISTIC_IN_VITRO: ExtractionMode.MINIMAL,
+    PaperSubtype.METHODS_PAPER: ExtractionMode.MINIMAL,
 }
 
 

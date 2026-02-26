@@ -95,6 +95,39 @@ def run_p3_heterogeneity(
         compute_se_eff,
     )
 
+    # DW#6 fix: Load annotation-derived σ²_structural per edge
+    # Uses shared_annotation_features → annotation_lifecycle → study_annotations_v1
+    _sigma_sq_cache: dict[str, float] = {}
+    try:
+        from crci.extraction.shared_annotation_features import get_structural_variance
+        # Collect all unique edge_relation_ids from the layered records
+        _edge_ids = {
+            getattr(lr.record, "edge_relation_id", None)
+            for lr in layered_records
+        } - {None}
+        for eid in _edge_ids:
+            ann_features = get_structural_variance(session, eid)
+            _sigma_sq_cache[eid] = ann_features.sigma_sq_structural
+            if ann_features.annotation_ids:
+                logger.info(
+                    "P3: σ²_structural for edge %s = %.4f "
+                    "(from %d annotation(s): %s)",
+                    eid, ann_features.sigma_sq_structural,
+                    len(ann_features.annotation_ids),
+                    ann_features.annotation_ids[:3],
+                )
+        if _sigma_sq_cache:
+            logger.info(
+                "P3: Loaded annotation-derived σ²_structural for %d edges",
+                len(_sigma_sq_cache),
+            )
+    except Exception as exc:
+        logger.warning(
+            "P3: Could not load annotation-derived σ²_structural: %s "
+            "— using config default for all edges",
+            exc,
+        )
+
     calibrated_records = []
     p3_gate_failures = []
 
@@ -157,6 +190,10 @@ def run_p3_heterogeneity(
                     getattr(rec, "ler_id", "?"),
                 )
 
+            # DW#6 fix: look up annotation-derived σ²_structural for this edge
+            _rec_eid = getattr(rec, "edge_relation_id", None)
+            _ann_sigma = _sigma_sq_cache.get(_rec_eid) if _rec_eid else None
+
             inp = SEEffInput(
                 ler_id=getattr(rec, "ler_id", ""),
                 se_raw=se_raw,
@@ -172,6 +209,8 @@ def run_p3_heterogeneity(
                 grade_level=getattr(rec, "grade_level", "MODERATE"),
                 days_since_measurement=getattr(rec, "days_since_measurement", 0.0),
                 is_trait=getattr(rec, "is_trait", False),
+                sigma_sq_structural=_ann_sigma,
+                edge_relation_id=_rec_eid,
             )
             se_eff_result = compute_se_eff(inp)
             # Attach SE_eff to the record in the field that downstream

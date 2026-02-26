@@ -220,12 +220,21 @@ def run_p4_aggregation(
         for r in ma_results
     }
 
+    # DW#1 fix: Always call build_compilation_inputs even when prior_specs
+    # is empty — the function creates uninformative fallback priors
+    # (STRUCTURAL_PLACEHOLDER N(0,1)) for edges without matching priors.
+    if not prior_specs:
+        logger.warning(
+            "P4-WRT: prior_specs is empty — build_compilation_inputs will "
+            "use uninformative fallback priors for all %d pooled estimates",
+            len(pooled_estimates),
+        )
     compilation_inputs = build_compilation_inputs(
         pooled_estimates=pooled_estimates,
         prior_specs=prior_specs,
         prior_logs=prior_logs,
         sigma_sq_map=sigma_sq_map,
-    ) if prior_specs else []
+    )
 
     if compilation_inputs:
         compiled_edges = write_all_edges(

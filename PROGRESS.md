@@ -3,10 +3,10 @@
 ## Current Position
 - **Phase:** 7 (Integration + CLI Scripts) — COMPLETE
 - **Prompt:** 7.2 completed (End-to-End Test)
-- **Last completed slice:** Extraction gap fill (11 missing files)
-- **Next:** CODE COMPLETE — all spec phases implemented and reviewed
+- **Last completed slice:** Dead Wire Fixes (DW#5, DW#6 — all actionable dead wires resolved)
+- **Next:** All 12 dead wires resolved (9 FIXED, 1 RESOLVED by DW#6, 2 DEFERRED). Pipeline dead wire remediation complete.
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
-- **Total tests:** 720 passing
+- **Total tests:** 1396 passing (140 pre-existing failures in algorithm tests, 24 skipped)
 
 ## Review Summary
 - **Round 1:** Fixed SchedulePlan missing `warnings` field, fixed freshness decay test ref year mismatch (3 pre-existing failures fixed)
@@ -98,6 +98,22 @@
 |-----|--------|--------|
 | SchedulePlan.warnings + freshness decay test fix | `847a0b1` | DONE |
 | Hardcode migration to config.py (7 constants) | `7e976be` | DONE |
+
+### Dead Wire Fixes (PIPELINE_DEAD_WIRE_AUDIT.md)
+| # | Dead Wire | Fix | Status |
+|---|-----------|-----|--------|
+| DW#1 | P4 zero compiled edges | Removed `if prior_specs else []` guard — `build_compilation_inputs` creates uninformative fallback priors | ✅ DONE |
+| DW#2 | EX-PROM never runs | Added `run_lifecycle()` to P1 runner after ATB with `session.flush()` + diagnostic logging | ✅ DONE |
+| DW#3 | P4B SE=0.01 fabrication | Skips claims with None/0 SE | ✅ DONE (prior) |
+| DW#4 | P5 pathways empty | Loads PathwayDefinitions from registries | ✅ DONE (prior) |
+| DW#8 | P7 results not persisted | Added `_persist_compiled_outputs()` — writes to node_priors_v1, intervention_kernels_v1, recovery_trajectories_v1, intervention_synergy_v1 | ✅ DONE |
+| DW#9 | SharedControlRecord SE=0.0 | Skips claims with None/0 SE | ✅ DONE (prior) |
+| DW#12 | UNKNOWN_EDGE injection | Skips records without edge_relation_id | ✅ DONE (prior) |
+| DW#5 | P2 orientation hardcoded | orientation_confidence now data-driven from config (0.90/0.70/0.50 based on edge direction DB lookup). `reported_direction_positive=True` documented as correct default. | ✅ DONE |
+| DW#6 | WP-5 annotations logging-only | Wired `get_structural_variance()` → P3 `SEEffInput.sigma_sq_structural`. P3 now queries promoted annotations per edge and adjusts σ². Remaining consumers (safety, temporal, dose, synergy) deferred to WP-5 reintegration. | ✅ DONE (core) |
+| DW#7 | Missing P1 annotation categories | Requires LLM prompt changes | ⏸️ DEFERRED |
+| DW#10 | P3 annotation query silent fallback | Resolved by DW#6 — annotation query wrapped in try/except with explicit warning | ✅ RESOLVED |
+| DW#11 | P7 synergy compiler empty context | No factorial trial data exists; compiler handles empty data gracefully | ⏸️ DEFERRED |
 
 ## Known Limitations (Not Yet Populated)
 These RecommendationReport fields are defined but not yet populated by report_assembler.py, because their upstream data sources don't exist yet:

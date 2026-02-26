@@ -54,6 +54,150 @@ from crci.shared.validators import run_class_a_validation
 
 logger = logging.getLogger(__name__)
 
+# ═══════════════════════════════════════════════════════════════
+#  REGISTRY → SEED COLUMN MAPPING (Slice 1: Edge Unification)
+# ═══════════════════════════════════════════════════════════════
+
+REGISTRY_PATH = Path(__file__).resolve().parent.parent.parent / "registries" / "EDGE_REGISTRY.csv"
+
+
+def _map_expected_sign(sign_str: str) -> int:
+    """Map EDGE_REGISTRY expected_sign to DB default_effect_direction.
+
+    Parameters
+    ----------
+    sign_str : str
+        One of "positive", "negative", "context_dependent", or any other value.
+
+    Returns
+    -------
+    int
+        +1 for positive, -1 for negative, 0 for anything else.
+    """
+    sign_lower = sign_str.strip().lower()
+    if sign_lower == "positive":
+        return 1
+    elif sign_lower == "negative":
+        return -1
+    return 0
+
+
+def _registry_row_to_edge_def(row: dict[str, str]) -> dict[str, Any]:
+    """Convert a single EDGE_REGISTRY row to edge_relations seed format.
+
+    Parameters
+    ----------
+    row : dict
+        A row from EDGE_REGISTRY.csv with columns: edge_relation_id,
+        source_node_id, target_node_id, relation_type, mechanism_description,
+        primary_pathway, secondary_pathways_json, expected_sign,
+        functional_form, fallback_form, is_feedback_edge, feedback_loop_id,
+        notes, version, active.
+
+    Returns
+    -------
+    dict
+        Row in the seed-format schema matching EdgeRelationsDefinition columns.
+    """
+    desc = row.get("mechanism_description", "") or ""
+    label = desc[:80] if len(desc) > 80 else desc
+
+    return {
+        "edge_relation_id": row["edge_relation_id"],
+        "module": "A",
+        "edge_family": row.get("primary_pathway", ""),
+        "node_x": row["source_node_id"],
+        "node_y": row["target_node_id"],
+        "relation_label": label,
+        "canonical_statement": desc,
+        "relation_type": row.get("relation_type", "causal"),
+        "default_effect_direction": _map_expected_sign(row.get("expected_sign", "")),
+        "allowed_measure_ids_json": None,
+        "allowed_upstream_instruments_json": None,
+        "default_temporal_family": row.get("functional_form", "linear"),
+        "notes": row.get("notes", ""),
+        "version": int(row.get("version", "1") or "1"),
+        "active": int(row.get("active", "1") or "1"),
+    }
+
+
+def load_edges_from_registry(
+    registry_path: Path | str | None = None,
+) -> list[dict[str, Any]]:
+    """Load edge definitions from EDGE_REGISTRY.csv.
+
+    Converts each registry row to the seed-format schema used by
+    EdgeRelationsDefinition.
+
+    Parameters
+    ----------
+    registry_path : Path | str | None
+        Path to EDGE_REGISTRY.csv. Defaults to ``registries/EDGE_REGISTRY.csv``.
+
+    Returns
+    -------
+    list[dict]
+        List of seed-format rows ready for DB insertion.
+    """
+    path = Path(registry_path) if registry_path else REGISTRY_PATH
+    if not path.exists():
+        raise FileNotFoundError(f"EDGE_REGISTRY not found: {path}")
+
+    rows: list[dict[str, Any]] = []
+    with open(path, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for reg_row in reader:
+            if not reg_row.get("edge_relation_id", "").strip():
+                continue
+            rows.append(_registry_row_to_edge_def(reg_row))
+
+    logger.info("Loaded %d edge definitions from registry: %s", len(rows), path.name)
+    return rows
+
+
+def sync_seed_csv_from_registry(
+    registry_path: Path | str | None = None,
+    seed_csv_path: Path | str | None = None,
+) -> int:
+    """Regenerate edge_relations.csv seed file from EDGE_REGISTRY.
+
+    Replaces any stale EDGE_* IDs with canonical ER_* IDs.
+
+    Parameters
+    ----------
+    registry_path : Path | str | None
+        Path to EDGE_REGISTRY.csv.
+    seed_csv_path : Path | str | None
+        Path to write the seed CSV. Defaults to database/seeds/edge_relations.csv.
+
+    Returns
+    -------
+    int
+        Number of rows written.
+    """
+    rows = load_edges_from_registry(registry_path)
+    if not rows:
+        return 0
+
+    seeds_dir = Path(__file__).resolve().parent / "seeds"
+    out_path = Path(seed_csv_path) if seed_csv_path else seeds_dir / "edge_relations.csv"
+
+    fieldnames = [
+        "edge_relation_id", "module", "edge_family", "node_x", "node_y",
+        "relation_label", "canonical_statement", "relation_type",
+        "default_effect_direction", "allowed_measure_ids_json",
+        "allowed_upstream_instruments_json", "default_temporal_family",
+        "notes", "version", "active",
+    ]
+
+    with open(out_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    logger.info("Synced %d rows to %s", len(rows), out_path)
+    return len(rows)
+
 # Map CSV filenames to ORM model classes and their primary key column
 SEED_TABLE_MAP: dict[str, tuple[type[Base], str]] = {
     "nodes.csv": (BiomarkerNodeDefinition, "node_id"),

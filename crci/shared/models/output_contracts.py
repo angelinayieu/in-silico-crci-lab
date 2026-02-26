@@ -230,6 +230,48 @@ class DecisionTrace(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  CLINICAL RISK PROFILE (§4.1 — CRCI Risk Percentage)
+# ═══════════════════════════════════════════════════════════════
+
+
+class DomainRiskBreakdown(BaseModel):
+    """Per-domain risk attribution for the CRCI Risk Percentage."""
+
+    domain_id: str
+    domain_label: str
+    node_ids: list[str] = Field(default_factory=list)
+    marginal_risk_pct: float
+    trigger_share_pct: float
+    ivw_weight_pct: float
+    mean_z: float
+    sd_z: float
+    z_5th: float
+    z_95th: float
+    is_directly_observed: bool = False
+    n_observations: int = 0
+
+
+class ClinicalRiskProfile(BaseModel):
+    """CRCI Risk Percentage output — probability of meeting ICCTF criteria.
+
+    Computed by Chain F4 (risk_estimator.py) from Monte Carlo draws.
+    """
+
+    risk_pct: float
+    risk_lower_pct: float
+    risk_upper_pct: float
+    risk_range_text: str = ""
+    risk_tier: str = "UNKNOWN"
+    interval_method: str = "jeffreys"
+    interval_level: float = 0.90
+    mc_se: float = 0.0
+    n_draws_used: int = 0
+    coverage_fraction: float = 0.0
+    low_coverage_warning: bool = False
+    domain_breakdown: list[DomainRiskBreakdown] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  RECOMMENDATION REPORT (top-level output)
 # ═══════════════════════════════════════════════════════════════
 
@@ -255,6 +297,7 @@ class RecommendationReport(BaseModel):
     variance_decomposition: VarianceDecomposition | None = None
     evidence_gaps: EvidenceGapReport | None = None
     decision_trace: DecisionTrace | None = None
+    clinical_risk: ClinicalRiskProfile | None = None
 
     # Safety & warnings
     safety_flags: list[str] = Field(default_factory=list)

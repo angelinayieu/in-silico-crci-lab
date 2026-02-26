@@ -91,6 +91,11 @@ class SEEffInput:
     # v2.0: Family-specific freshness (Module 5)
     parameter_family: str | None = None
     superseded_by_newer: bool = False
+    # DW#6: Annotation-derived σ²_structural (from shared_annotation_features)
+    # When None, falls back to config.SIGMA_SQ_STRUCTURAL_DEFAULT
+    sigma_sq_structural: float | None = None
+    # Edge relation ID for logging annotation provenance
+    edge_relation_id: str | None = None
 
 
 def compute_se_eff(inp: SEEffInput) -> LayeredSEResult:
@@ -222,7 +227,20 @@ def compute_se_eff(inp: SEEffInput) -> LayeredSEResult:
     se_product = inp.se_raw * m_design * m_scale * m_grade
     se_product_sq = se_product * se_product
 
-    sigma_sq_struct = config.SIGMA_SQ_STRUCTURAL_DEFAULT
+    # DW#6 fix: use annotation-derived σ²_structural when available,
+    # fall back to config default otherwise
+    if inp.sigma_sq_structural is not None:
+        sigma_sq_struct = inp.sigma_sq_structural
+        logger.debug(
+            "P3-8 %s: using annotation-derived σ²_structural=%.4f (edge=%s)",
+            inp.ler_id, sigma_sq_struct, inp.edge_relation_id or "?",
+        )
+    else:
+        sigma_sq_struct = config.SIGMA_SQ_STRUCTURAL_DEFAULT
+        logger.debug(
+            "P3-8 %s: using default σ²_structural=%.4f (no annotation data)",
+            inp.ler_id, sigma_sq_struct,
+        )
 
     # Formula P3-3 / P3-8: τ² added only if I² ≥ 50%
     tau_sq_term = het_result.tau_squared if het_result.add_tau_squared else 0.0

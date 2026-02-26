@@ -203,6 +203,13 @@ CONVERSION_OR_TO_SMD_FACTOR: float = 0.5513288954217921  # √3/π
 
 # S4 — Orientation Alignment (Gate P2-G2)
 ORIENTATION_CONFIDENCE_THRESHOLD: float = 0.60
+# DW#5: Data-driven orientation confidence levels
+# When edge direction found in DB → high confidence in orientation
+ORIENTATION_CONFIDENCE_DB_MATCH: float = 0.90
+# When edge_relation_id exists but no direction in DB → moderate
+ORIENTATION_CONFIDENCE_EDGE_ONLY: float = 0.70
+# When no edge_relation_id at all → low confidence
+ORIENTATION_CONFIDENCE_NO_EDGE: float = 0.50
 
 # S5 — Identification Status attenuation factors
 IDENTIFICATION_FACTOR_IDENTIFIED: float = 1.00
@@ -1220,3 +1227,79 @@ EVSI_HYPOTHETICAL_N: int = 50           # hypothetical new study sample size
 EVSI_HIGH_HETEROGENEITY_I2: float = 0.75  # I² threshold for gap flagging
 EVSI_HETEROGENEITY_WEIGHT: float = 1.0    # heuristic upweight for high-I² edges (max 2× at I²=1.0)
 EVIDENCE_GAP_TOP_K: int = 10           # top acquisition targets
+
+# ═══════════════════════════════════════════════════════════════
+#  CHAIN F4: RISK ESTIMATION (§4.1 — CRCI Risk Percentage)
+# ═══════════════════════════════════════════════════════════════
+
+# Domain → NODE_REGISTRY cognitive node mapping (10 ICCTF domains)
+F4_DOMAIN_NODE_MAP: dict[str, list[str]] = {
+    "processing_speed": ["NODE_COG_PROC_SPEED"],
+    "sustained_attention": ["NODE_COG_ATTN_SUSTAINED"],
+    "selective_attention": ["NODE_COG_ATTN_SELECTIVE"],
+    "working_memory": ["NODE_COG_WORK_MEM"],
+    "episodic_memory": ["NODE_COG_EPISODIC_MEM"],
+    "verbal_fluency": ["NODE_COG_VERBAL_FLUENCY"],
+    "executive_planning": ["NODE_COG_EXEC_PLANNING"],
+    "executive_inhibition": ["NODE_COG_EXEC_INHIBITION"],
+    "visuospatial": ["NODE_COG_VISUOSPATIAL"],
+    "language": ["NODE_COG_LANGUAGE"],
+}
+
+# Human-readable labels for each domain_id
+F4_DOMAIN_LABELS: dict[str, str] = {
+    "processing_speed": "Processing Speed",
+    "sustained_attention": "Sustained Attention",
+    "selective_attention": "Selective Attention",
+    "working_memory": "Working Memory",
+    "episodic_memory": "Episodic Memory",
+    "verbal_fluency": "Verbal Fluency",
+    "executive_planning": "Executive Planning",
+    "executive_inhibition": "Executive Inhibition",
+    "visuospatial": "Visuospatial",
+    "language": "Language",
+}
+
+# Intra-domain aggregation method: "mean" or "min"
+F4_DOMAIN_AGGREGATION: str = "mean"
+
+# ICCTF classification thresholds (z-scores, negative = impaired)
+F4_THRESHOLD_MULTI_DOMAIN_Z: float = -1.5    # ≥ F4_THRESHOLD_MULTI_DOMAIN_COUNT domains below this → CRCI
+F4_THRESHOLD_MULTI_DOMAIN_COUNT: int = 2      # number of domains required for multi-domain criterion
+F4_THRESHOLD_SINGLE_DOMAIN_Z: float = -2.0    # single domain below this → CRCI (severe criterion)
+
+# Interval estimation
+F4_INTERVAL_METHOD: str = "jeffreys"          # "jeffreys" (Beta posterior) or "mc_se" (normal approx)
+F4_CI_LEVEL: float = 0.90                     # 90% credible interval
+
+# Monte Carlo quality gates
+F4_MIN_DRAWS: int = 1000                      # Gate F-G4b: minimum MC draws for stable estimate
+F4_MIN_COVERAGE: float = 0.50                 # minimum fraction of domains with direct observations
+
+# Risk tier boundaries (percentages)
+F4_TIER_LOW_MAX: float = 15.0                 # < this → LOW
+F4_TIER_MODERATE_MAX: float = 30.0            # < this → MODERATE
+F4_TIER_ELEVATED_MAX: float = 50.0            # < this → ELEVATED
+F4_TIER_HIGH_MAX: float = 70.0                # < this → HIGH; ≥ this → VERY_HIGH
+
+# Trigger share / IVW weight validation tolerances
+F4_TRIGGER_SHARE_SUM_TOLERANCE: float = 0.005  # Σ trigger_share ≈ 1.0 (0.5%)
+F4_IVW_WEIGHT_SUM_TOLERANCE: float = 0.1       # Σ ivw_weight_pct ≈ 100% (in pp)
+
+# ═══════════════════════════════════════════════════════════════
+#  CHAIN D3: SYNERGY BUNDLE (joint propagation mode)
+# ═══════════════════════════════════════════════════════════════
+
+# When True, use joint MC propagation through DAG (preferred, more accurate).
+# When False, use legacy additive mode (faster, less accurate).
+D3_USE_JOINT_PROPAGATION: bool = True
+
+# When True, use cascade joint-posterior-overlay for multi-intervention bundles.
+D3_USE_CASCADE_JPO: bool = True
+
+# When True, allow antagonistic (negative) gamma synergy terms.
+# When False, clamp negative gamma to zero (more conservative).
+D3_ALLOW_ANTAGONISTIC_GAMMA: bool = False
+
+# Variance inflation per (k choose 3) triple in k-way synergy estimation.
+D3_KWAY_VARIANCE_INFLATION_PER_TRIPLE: float = 0.01

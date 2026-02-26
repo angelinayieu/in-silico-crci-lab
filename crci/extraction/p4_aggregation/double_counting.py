@@ -520,3 +520,48 @@ def _build_resolved(
         total_n=total_n,
         resolution_notes=notes,
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R4: NMA / PAIRWISE OVERLAP DETECTION
+# ═══════════════════════════════════════════════════════════════
+
+
+def detect_nma_pairwise_overlap(
+    claims: list,
+    edge_id: str,
+) -> list[str]:
+    """R4.2: Detect when both NMA and standard pairwise MA claims co-exist.
+
+    If an edge has both NMA_MIXED and POOLED_ESTIMATE meta-source claims,
+    there is potential overlap that should be flagged for review.
+
+    Parameters
+    ----------
+    claims : list
+        List of claim-like objects with ``meta_source_flag`` attribute.
+    edge_id : str
+        Edge identifier for the warning message.
+
+    Returns
+    -------
+    list[str]
+        Warning messages. Contains one "R4-NMA3" warning if overlap
+        detected, empty list otherwise.
+    """
+    has_nma = False
+    has_pairwise = False
+
+    for claim in claims:
+        flag = getattr(claim, "meta_source_flag", None)
+        if flag == "NMA_MIXED":
+            has_nma = True
+        elif flag == "POOLED_ESTIMATE":
+            has_pairwise = True
+
+    if has_nma and has_pairwise:
+        return [
+            f"R4-NMA3: Edge {edge_id} has both NMA_MIXED and "
+            f"POOLED_ESTIMATE claims — potential overlap, review needed."
+        ]
+    return []

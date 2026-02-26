@@ -68,6 +68,16 @@ class RecoveryTrajectory:
     # Number of time points
     n_timepoints: int
 
+    # Per-node nadir and baseline from E1 — shape (n_nodes,)
+    # (fix §8.2 feedback 2.2: F4T uses these directly instead of
+    # re-estimating via solve_linear_coefficients)
+    theta_nadir: np.ndarray | None = None
+    theta_base: np.ndarray | None = None
+
+    # Explicit time axis in months — shape (T,)
+    # (fix §8.2 feedback 2.3: avoids assuming t_index == month)
+    time_months: np.ndarray | None = None
+
     # Gate status
     gate_e_g2_passed: bool = False
 
@@ -331,6 +341,11 @@ def compute_recovery_trajectory(
         recovery_params=params,
         T_horizons=config.E_PREDICTION_HORIZONS,
         n_timepoints=T,
+        # Fix §8.2 feedback 2.2: carry E1 nadir/base for F4T
+        theta_nadir=nadir.theta_nadir,
+        theta_base=nadir.theta_base,
+        # Fix §8.2 feedback 2.3: carry explicit time axis
+        time_months=t_months,
     )
 
     # Gate E-G2

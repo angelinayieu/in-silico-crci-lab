@@ -249,6 +249,11 @@ def run_p2_harmonization(
     # ── P2-S4: Orientation Alignment ──
     logger.info("P2-S4: Aligning orientation")
     from crci.extraction.p2_harmonization.orientation_aligner import align_orientation
+    from crci.shared.config import (
+        ORIENTATION_CONFIDENCE_DB_MATCH,
+        ORIENTATION_CONFIDENCE_EDGE_ONLY,
+        ORIENTATION_CONFIDENCE_NO_EDGE,
+    )
 
     # Build edge_relation_id → default_effect_direction lookup from DB
     _edge_direction_cache: dict[str, int] = {}
@@ -271,16 +276,29 @@ def run_p2_harmonization(
             direction = _edge_direction_cache.get(eid) if eid else None
             if direction is not None:
                 dag_orientation = Orientation.HIGHER_BETTER if direction == 1 else Orientation.HIGHER_WORSE
+                # DW#5 fix: derive confidence from data quality — direction found in DB
+                orientation_confidence = ORIENTATION_CONFIDENCE_DB_MATCH
+            elif eid:
+                dag_orientation = Orientation.HIGHER_WORSE  # Conservative default
+                logger.debug("P2-S4: No direction found for edge %s; defaulting to HIGHER_WORSE", eid)
+                # DW#5 fix: edge exists but no direction → moderate confidence
+                orientation_confidence = ORIENTATION_CONFIDENCE_EDGE_ONLY
             else:
                 dag_orientation = Orientation.HIGHER_WORSE  # Conservative default
-                if eid:
-                    logger.debug("P2-S4: No direction found for edge %s; defaulting to HIGHER_WORSE", eid)
+                # DW#5 fix: no edge_relation_id → low confidence
+                orientation_confidence = ORIENTATION_CONFIDENCE_NO_EDGE
 
+            # reported_direction_positive=True is the standard convention:
+            # in virtually all papers, a positive effect size means the
+            # outcome measure increased. The DAG orientation (HIGHER_BETTER /
+            # HIGHER_WORSE) handles whether increase is good or bad.
+            # If a paper reverses this convention, a future extraction field
+            # (e.g., ScaledNumeric.reversed_reporting) should override this.
             aligned = align_orientation(
                 scaled=scaled_item,
                 dag_orientation=dag_orientation,
-                reported_direction_positive=True,  # Default assumption
-                orientation_confidence=0.7,  # Moderate default
+                reported_direction_positive=True,
+                orientation_confidence=orientation_confidence,
             )
             aligned_list.append(aligned)
         except Exception as exc:

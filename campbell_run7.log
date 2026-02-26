@@ -1,0 +1,62 @@
+14:52:49 [INFO] crci.shared.db: Database engine created for sqlite:////workspaces/in-silico-crci-lab/crci_dev.db
+14:52:49 [INFO] crci.extraction.pipeline: PDF hash computed for campbell2017.pdf: cc421190dac86bc0
+14:52:49 [INFO] crci.extraction.pipeline: Created extraction run RUN_20260226T145249_7d51bccd for campbell2017.pdf (hash=cc421190dac86bc0, model=claude-sonnet-4-20250514)
+14:52:49 [INFO] crci.extraction.pipeline: Starting chain 'P0: Pre-Extraction Triage' for run RUN_20260226T145249_7d51bccd
+14:52:49 [INFO] crci.extraction.p0_triage.runner: P0-S1: Ingesting PDF campbell2017.pdf
+14:52:53 [INFO] crci.extraction.p0_triage.pdf_ingestion: PDF ingested: path=data/manual_uploads/pdfs/campbell2017.pdf pages=21 quality=GOOD has_tables=True has_figures=True sections=2
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S1: Extracted DOI from PDF text: 10.1002/pon.4370
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S0: Found DOI-based meta.json at data/manual_uploads/pdfs/10.1002_pon.4370.meta.json
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S0: Loaded DOI-based meta.json: 34 keys, target_edges=['ER_ACTIVITY_PROC_SPEED', 'ER_ACTIVITY_VERBAL_FLUENCY', 'ER_ACTIVITY_EPIMEM', 'ER_ACTIVITY_COG_COMPLAINTS']
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S1 complete: quality=GOOD, pages=21, tables=True, figures=True
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S2: Screening relevance
+14:52:53 [INFO] crci.extraction.p0_triage.relevance_screening: Relevance screening: score=1.000 decision=ACCEPT inclusion=5/5 exclusion=False
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-S2 complete: score=1.00, decision=ACCEPT
+14:52:53 [INFO] crci.extraction.p0_triage.runner: P0-PTC: Classifying paper type
+14:52:53 [INFO] crci.extraction.p0_triage.paper_type_classifier: Paper type classification: truncated text from 41200 to 15000 chars
+14:52:56 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:52:56 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=e44c7a9aefec8da0 prompt_tokens=5719 completion_tokens=92 latency_ms=3450
+14:52:56 [INFO] crci.extraction.p0_triage.paper_type_classifier: Paper type classified: subtype=RCT_exercise confidence=0.95 reasoning=This is a randomized controlled trial testing a 24-week aerobic exercise intervention versus usual lifestyle control on cognitive outcomes in breast cancer survivors, which directly fits the RCT_exercise category for studies examining exercise/physical activity interventions for cognitive outcomes in cancer patients.
+14:52:56 [INFO] crci.extraction.p0_triage.runner: P0-PTC complete: subtype=RCT_exercise, confidence=0.95
+14:52:56 [INFO] crci.extraction.p0_triage.runner: P0-S3: Selecting extraction mode
+14:52:56 [INFO] crci.extraction.p0_triage.mode_selection: Triage complete: paper_id=doi:10.1002/pon.4370 decision=ACCEPT mode=DEEP subtype=RCT_exercise score=1.000
+14:52:56 [INFO] crci.extraction.p0_triage.runner: P0-S3 complete: paper_id=doi:10.1002/pon.4370, mode=DEEP, subtype=RCT_exercise
+14:52:56 [INFO] crci.extraction.p0_triage.runner: Registered new study doi:10.1002/pon.4370 in study_registry_v1 (id_source=doi)
+14:52:56 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T145249_7d51bccd stage='P0: Pre-Extraction Triage' status=success
+14:52:56 [INFO] crci.extraction.pipeline: Starting chain 'P1: Hybrid Multi-Agent Extraction' for run RUN_20260226T145249_7d51bccd
+14:52:56 [INFO] crci.extraction.p1_extraction.runner: P1-CR: Building PaperMap for doi:10.1002/pon.4370
+14:52:56 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: starting for paper_id=doi:10.1002/pon.4370, text_length=41200
+14:53:03 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:03 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=fd83081499a15487 prompt_tokens=13140 completion_tokens=447 latency_ms=6267
+14:53:07 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:07 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=72adbf0f0310293a prompt_tokens=13142 completion_tokens=176 latency_ms=4264
+14:53:07 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-b: detected 2 tables, 1 figures
+14:53:07 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-c: identified 69 candidate spans
+14:53:09 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:09 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=851d033d79d73894 prompt_tokens=4089 completion_tokens=44 latency_ms=1795
+14:53:09 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: completed paper_id=doi:10.1002/pon.4370 — sections=9, tables=2, figures=1, candidate_spans=69, n_total=19, study_design=RCT
+14:53:09 [INFO] crci.extraction.p1_extraction.runner: P1-CR complete: sections=9, tables=2, figures=1, spans=69
+14:53:09 [INFO] crci.extraction.p1_extraction.runner: P1-AG: Running DEEP-mode extraction agents
+14:53:09 [INFO] crci.extraction.p1_extraction.runner: Running agent MetadataAgent
+14:53:09 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG01: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['title', 'abstract', 'affiliations', 'acknowledgements']
+14:53:12 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:12 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=5dcf95ce1dbdf1ac prompt_tokens=1851 completion_tokens=196 latency_ms=2725
+14:53:12 [INFO] crci.extraction.p1_extraction.agents.ag01_metadata: AG01: title text not found in canonical text, creating SpanLabel with offset 0. Entity: title='Effect of aerobic exercise on cancer-associated cognitive impairment: A proof-of-concept RCT', reason: text not located.
+14:53:12 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG01: completed paper_id=doi:10.1002/pon.4370 — span_labels=1, annotations=0, elapsed_ms=2728, status=success
+14:53:12 [INFO] crci.extraction.p1_extraction.runner: Agent MetadataAgent produced 0 annotations, 1 span_labels
+14:53:12 [INFO] crci.extraction.p1_extraction.runner: Running agent DesignAgent
+14:53:12 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG02: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'abstract']
+14:53:14 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:14 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=f3f755ea137e5ca9 prompt_tokens=4853 completion_tokens=76 latency_ms=1923
+14:53:14 [INFO] crci.extraction.p1_extraction.agents.ag02_design: AG02: text 'simple' not found in canonical text, using offset 0 as fallback. Entity: search_text='simple', reason: text not located.
+14:53:14 [INFO] crci.extraction.p1_extraction.agents.ag02_design: AG02: text 'usual_care' not found in canonical text, using offset 0 as fallback. Entity: search_text='usual_care', reason: text not located.
+14:53:14 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG02: completed paper_id=doi:10.1002/pon.4370 — span_labels=5, annotations=0, elapsed_ms=1924, status=success
+14:53:14 [INFO] crci.extraction.p1_extraction.runner: Agent DesignAgent produced 0 annotations, 5 span_labels
+14:53:14 [INFO] crci.extraction.p1_extraction.runner: Running agent CohortAgent
+14:53:14 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG03: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']
+14:53:18 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:53:18 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=b7500cc1696d2056 prompt_tokens=9462 completion_tokens=128 latency_ms=3945
+14:53:18 [INFO] crci.extraction.p1_extraction.agents.ag03_cohort: AG03: percent_female '100.0' not found in canonical text, creating SpanLabel with offset 0. Entity: percent_female=100.0, reason: text not located.
+14:53:18 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG03: completed paper_id=doi:10.1002/pon.4370 — span_labels=3, annotations=3, elapsed_ms=3946, status=success
+14:53:18 [INFO] crci.extraction.p1_extraction.runner: Agent CohortAgent produced 3 annotations, 3 span_labels
+14:53:18 [INFO] crci.extraction.p1_extraction.runner: Running agent OutcomeAgent
+14:53:18 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG04: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']

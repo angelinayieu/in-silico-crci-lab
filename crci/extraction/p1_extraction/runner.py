@@ -276,4 +276,71 @@ def run_p1_extraction(
         atb_result.total_rejected,
     )
 
+    # ── P1-LIFECYCLE: Annotation Lifecycle Promotion ──
+    # Evaluate annotations for promotion (raw → reviewed → promoted).
+    # Promoted annotations feed downstream consumers (σ² adjustment,
+    # safety rules, etc.). This must run AFTER ATB writes reconciled
+    # annotations to the DB.
+    #
+    # DW#2 fix: flush before querying so ATB-added annotations are visible
+    # to the lifecycle query (autoflush should handle this, but be explicit).
+    try:
+        session.flush()
+    except Exception as exc:
+        logger.warning(
+            "P1-LIFECYCLE: pre-lifecycle flush failed (%s), "
+            "annotations may not be visible to lifecycle query",
+            exc,
+        )
+
+    try:
+        from crci.extraction.p1_extraction.annotation_lifecycle import run_lifecycle
+
+        lifecycle_result = run_lifecycle(
+            session,
+            study_id=paper_id,
+            extraction_run_id=extraction_run_id,
+        )
+        context["lifecycle_result"] = {
+            "promoted": lifecycle_result.promoted_count,
+            "reviewed": lifecycle_result.reviewed_count,
+            "held": lifecycle_result.held_count,
+            "consumers": lifecycle_result.consumer_counts,
+        }
+        logger.info(
+            "P1-LIFECYCLE: evaluated=%d, promoted=%d, held=%d",
+            lifecycle_result.total_evaluated,
+            lifecycle_result.promoted_count,
+            lifecycle_result.held_count,
+        )
+
+        # DW#2 diagnostic: if lifecycle ran but promoted nothing, log details
+        if (
+            lifecycle_result.total_evaluated > 0
+            and lifecycle_result.promoted_count == 0
+            and lifecycle_result.reviewed_count == 0
+        ):
+            logger.warning(
+                "P1-LIFECYCLE: evaluated %d annotations but none promoted or "
+                "reviewed — all annotations remain at current maturity. "
+                "Check reconciled_confidence and cross_agent_support_n values.",
+                lifecycle_result.total_evaluated,
+            )
+            # Log first few decision reasons for debugging
+            for decision in lifecycle_result.decisions[:5]:
+                logger.warning(
+                    "  → %s [%s]: %s",
+                    decision.annotation_id[:12],
+                    decision.category,
+                    decision.reason,
+                )
+    except Exception as exc:
+        logger.warning(
+            "P1-LIFECYCLE: annotation lifecycle failed — annotations will "
+            "remain at maturity='raw' and downstream consumers will use "
+            "defaults. Error: %s",
+            exc,
+        )
+        context["lifecycle_result"] = {}
+
     return context

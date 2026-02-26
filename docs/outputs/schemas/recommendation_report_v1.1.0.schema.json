@@ -1,0 +1,1256 @@
+{
+  "$defs": {
+    "ClinicalRiskProfile": {
+      "description": "Clinical CRCI risk assessment with domain decomposition.\n\nThis is a MODEL-DERIVED probability, not a clinically calibrated rate.\nSee calibration_status field and \u00a75.3 of IMPLEMENTATION_PLAN_RISK_PERCENTAGE.\n\nProduced by: risk_estimator.py (F4)\nConsumed by: report_assembler.py \u2192 risk_dashboard.py (PRES)",
+      "properties": {
+        "risk_pct": {
+          "title": "Risk Pct",
+          "type": "number"
+        },
+        "risk_lower_pct": {
+          "title": "Risk Lower Pct",
+          "type": "number"
+        },
+        "risk_upper_pct": {
+          "title": "Risk Upper Pct",
+          "type": "number"
+        },
+        "risk_range_text": {
+          "title": "Risk Range Text",
+          "type": "string"
+        },
+        "risk_tier": {
+          "title": "Risk Tier",
+          "type": "string"
+        },
+        "interval_method": {
+          "title": "Interval Method",
+          "type": "string"
+        },
+        "interval_level": {
+          "default": 0.9,
+          "title": "Interval Level",
+          "type": "number"
+        },
+        "mc_se": {
+          "default": 0.0,
+          "title": "Mc Se",
+          "type": "number"
+        },
+        "n_draws_used": {
+          "default": 0,
+          "title": "N Draws Used",
+          "type": "integer"
+        },
+        "criteria": {
+          "default": "ICCTF_Wefel2011_domain_level",
+          "title": "Criteria",
+          "type": "string"
+        },
+        "domain_aggregation": {
+          "default": "mean",
+          "title": "Domain Aggregation",
+          "type": "string"
+        },
+        "calibration_status": {
+          "default": "uncalibrated_model_derived",
+          "title": "Calibration Status",
+          "type": "string"
+        },
+        "coverage_fraction": {
+          "default": 0.0,
+          "title": "Coverage Fraction",
+          "type": "number"
+        },
+        "low_coverage_warning": {
+          "default": false,
+          "title": "Low Coverage Warning",
+          "type": "boolean"
+        },
+        "conditioning": {
+          "default": "posterior_at_t",
+          "title": "Conditioning",
+          "type": "string"
+        },
+        "thresholds": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Thresholds",
+          "type": "object"
+        },
+        "domain_breakdown": {
+          "items": {
+            "$ref": "#/$defs/DomainRiskBreakdown"
+          },
+          "title": "Domain Breakdown",
+          "type": "array"
+        }
+      },
+      "required": [
+        "risk_pct",
+        "risk_lower_pct",
+        "risk_upper_pct",
+        "risk_range_text",
+        "risk_tier",
+        "interval_method"
+      ],
+      "title": "ClinicalRiskProfile",
+      "type": "object"
+    },
+    "CompositeScore": {
+      "description": "CRCI Composite Score \u2014 severity-weighted mean across subdomains.\n\nPopulation-normed percentile.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "subject_ref": {
+          "title": "Subject Ref",
+          "type": "string"
+        },
+        "composite_z": {
+          "title": "Composite Z",
+          "type": "number"
+        },
+        "composite_percentile": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Composite Percentile"
+        },
+        "overall_severity": {
+          "$ref": "#/$defs/SeverityTier"
+        },
+        "domain_scores": {
+          "items": {
+            "$ref": "#/$defs/DomainScore"
+          },
+          "title": "Domain Scores",
+          "type": "array"
+        },
+        "population_norm_used": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Population Norm Used"
+        },
+        "calibration_mode": {
+          "default": "index_mode",
+          "title": "Calibration Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "subject_ref",
+        "composite_z",
+        "overall_severity"
+      ],
+      "title": "CompositeScore",
+      "type": "object"
+    },
+    "DecisionTrace": {
+      "description": "Full decision audit trail for transparency.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/DecisionTraceEntry"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "decision_critical_edges": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Decision Critical Edges",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "DecisionTrace",
+      "type": "object"
+    },
+    "DecisionTraceEntry": {
+      "description": "Single decision in the audit trail.",
+      "properties": {
+        "step": {
+          "title": "Step",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        }
+      },
+      "required": [
+        "step",
+        "description",
+        "outcome"
+      ],
+      "title": "DecisionTraceEntry",
+      "type": "object"
+    },
+    "DiffEffectSummary": {
+      "description": "Differential intervention effect between two contexts (F5-M4).",
+      "properties": {
+        "intervention_id": {
+          "title": "Intervention Id",
+          "type": "string"
+        },
+        "context_a": {
+          "title": "Context A",
+          "type": "string"
+        },
+        "context_b": {
+          "title": "Context B",
+          "type": "string"
+        },
+        "delta_C_diff_mean": {
+          "title": "Delta C Diff Mean",
+          "type": "number"
+        },
+        "delta_C_diff_ci_lower": {
+          "title": "Delta C Diff Ci Lower",
+          "type": "number"
+        },
+        "delta_C_diff_ci_upper": {
+          "title": "Delta C Diff Ci Upper",
+          "type": "number"
+        },
+        "baseline_contribution": {
+          "title": "Baseline Contribution",
+          "type": "number"
+        },
+        "mechanism_contribution": {
+          "title": "Mechanism Contribution",
+          "type": "number"
+        },
+        "practically_different": {
+          "title": "Practically Different",
+          "type": "boolean"
+        },
+        "decomposition_scoring_policy": {
+          "title": "Decomposition Scoring Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intervention_id",
+        "context_a",
+        "context_b",
+        "delta_C_diff_mean",
+        "delta_C_diff_ci_lower",
+        "delta_C_diff_ci_upper",
+        "baseline_contribution",
+        "mechanism_contribution",
+        "practically_different",
+        "decomposition_scoring_policy"
+      ],
+      "title": "DiffEffectSummary",
+      "type": "object"
+    },
+    "DomainRiskBreakdown": {
+      "description": "Per-domain risk decomposition for clinical display.\n\nThree complementary views per domain (\u00a72.5):\n  A. marginal_risk_pct \u2014 P(this domain is impaired) (Formula F4-4)\n  B. trigger_share_pct \u2014 trigger-share attribution (NOT Shapley, \u00a72.5B)\n  C. ivw_weight_pct   \u2014 precision influence (separate from risk, \u00a72.5C)",
+      "properties": {
+        "domain_id": {
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "domain_label": {
+          "title": "Domain Label",
+          "type": "string"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Node Ids",
+          "type": "array"
+        },
+        "marginal_risk_pct": {
+          "title": "Marginal Risk Pct",
+          "type": "number"
+        },
+        "trigger_share_pct": {
+          "title": "Trigger Share Pct",
+          "type": "number"
+        },
+        "ivw_weight_pct": {
+          "title": "Ivw Weight Pct",
+          "type": "number"
+        },
+        "mean_z": {
+          "title": "Mean Z",
+          "type": "number"
+        },
+        "sd_z": {
+          "title": "Sd Z",
+          "type": "number"
+        },
+        "z_5th": {
+          "title": "Z 5Th",
+          "type": "number"
+        },
+        "z_95th": {
+          "title": "Z 95Th",
+          "type": "number"
+        },
+        "is_directly_observed": {
+          "title": "Is Directly Observed",
+          "type": "boolean"
+        },
+        "n_observations": {
+          "default": 0,
+          "title": "N Observations",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "domain_id",
+        "domain_label",
+        "marginal_risk_pct",
+        "trigger_share_pct",
+        "ivw_weight_pct",
+        "mean_z",
+        "sd_z",
+        "z_5th",
+        "z_95th",
+        "is_directly_observed"
+      ],
+      "title": "DomainRiskBreakdown",
+      "type": "object"
+    },
+    "DomainScore": {
+      "description": "Single cognitive domain score.",
+      "properties": {
+        "domain_id": {
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "domain_label": {
+          "title": "Domain Label",
+          "type": "string"
+        },
+        "z_score": {
+          "title": "Z Score",
+          "type": "number"
+        },
+        "severity_tier": {
+          "$ref": "#/$defs/SeverityTier"
+        },
+        "percentile": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Percentile"
+        },
+        "contributing_nodes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contributing Nodes",
+          "type": "array"
+        },
+        "confidence_sd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence Sd"
+        }
+      },
+      "required": [
+        "domain_id",
+        "domain_label",
+        "z_score",
+        "severity_tier"
+      ],
+      "title": "DomainScore",
+      "type": "object"
+    },
+    "EvidenceGapItem": {
+      "description": "Single evidence gap.",
+      "properties": {
+        "edge_param_id": {
+          "title": "Edge Param Id",
+          "type": "string"
+        },
+        "edge_label": {
+          "title": "Edge Label",
+          "type": "string"
+        },
+        "gap_type": {
+          "title": "Gap Type",
+          "type": "string"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "discovery_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discovery Score"
+        },
+        "evsi": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evsi"
+        }
+      },
+      "required": [
+        "edge_param_id",
+        "edge_label",
+        "gap_type",
+        "severity",
+        "description"
+      ],
+      "title": "EvidenceGapItem",
+      "type": "object"
+    },
+    "EvidenceGapReport": {
+      "description": "Prioritized evidence gap report (\u00a74.5).",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "gaps": {
+          "items": {
+            "$ref": "#/$defs/EvidenceGapItem"
+          },
+          "title": "Gaps",
+          "type": "array"
+        },
+        "top_acquisition_targets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Top Acquisition Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "EvidenceGapReport",
+      "type": "object"
+    },
+    "NodeTrajectory": {
+      "description": "Trajectory for a single node under a scenario.",
+      "properties": {
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "node_label": {
+          "title": "Node Label",
+          "type": "string"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/TrajectoryPoint"
+          },
+          "title": "Points",
+          "type": "array"
+        },
+        "final_delta_z": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Delta Z"
+        }
+      },
+      "required": [
+        "node_id",
+        "node_label"
+      ],
+      "title": "NodeTrajectory",
+      "type": "object"
+    },
+    "PathwayContribution": {
+      "description": "Single pathway's contribution to a node.",
+      "properties": {
+        "pathway_id": {
+          "title": "Pathway Id",
+          "type": "string"
+        },
+        "pathway_label": {
+          "title": "Pathway Label",
+          "type": "string"
+        },
+        "contribution_fraction": {
+          "title": "Contribution Fraction",
+          "type": "number"
+        },
+        "activation_z": {
+          "default": 0.0,
+          "title": "Activation Z",
+          "type": "number"
+        },
+        "key_edges": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Key Edges",
+          "type": "array"
+        },
+        "evidence_quality": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Quality"
+        }
+      },
+      "required": [
+        "pathway_id",
+        "pathway_label",
+        "contribution_fraction"
+      ],
+      "title": "PathwayContribution",
+      "type": "object"
+    },
+    "PathwayProfile": {
+      "description": "Per-patient pathway activation profile.",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "subject_ref": {
+          "title": "Subject Ref",
+          "type": "string"
+        },
+        "pathway_contributions": {
+          "items": {
+            "$ref": "#/$defs/PathwayContribution"
+          },
+          "title": "Pathway Contributions",
+          "type": "array"
+        },
+        "dominant_pathway_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dominant Pathway Id"
+        },
+        "coverage_fraction": {
+          "default": 0.0,
+          "title": "Coverage Fraction",
+          "type": "number"
+        }
+      },
+      "required": [
+        "run_id",
+        "subject_ref"
+      ],
+      "title": "PathwayProfile",
+      "type": "object"
+    },
+    "ReportOutputMode": {
+      "enum": [
+        "CLINICAL",
+        "POPULATION",
+        "RESEARCH"
+      ],
+      "title": "ReportOutputMode",
+      "type": "string"
+    },
+    "RiskDiffSummary": {
+      "description": "Risk differential between two contexts (F5).\n\nrisk_diff_pct = risk_A - risk_B, so positive means A has higher risk.",
+      "properties": {
+        "context_a": {
+          "title": "Context A",
+          "type": "string"
+        },
+        "context_b": {
+          "title": "Context B",
+          "type": "string"
+        },
+        "risk_diff_pct": {
+          "title": "Risk Diff Pct",
+          "type": "number"
+        },
+        "risk_diff_ci_lower": {
+          "title": "Risk Diff Ci Lower",
+          "type": "number"
+        },
+        "risk_diff_ci_upper": {
+          "title": "Risk Diff Ci Upper",
+          "type": "number"
+        },
+        "domain_diffs": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Domain Diffs",
+          "type": "object"
+        }
+      },
+      "required": [
+        "context_a",
+        "context_b",
+        "risk_diff_pct",
+        "risk_diff_ci_lower",
+        "risk_diff_ci_upper"
+      ],
+      "title": "RiskDiffSummary",
+      "type": "object"
+    },
+    "ScheduleAction": {
+      "description": "Single action within a schedule plan.",
+      "properties": {
+        "action_id": {
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_label": {
+          "title": "Action Label",
+          "type": "string"
+        },
+        "action_class": {
+          "title": "Action Class",
+          "type": "string"
+        },
+        "dose_value": {
+          "title": "Dose Value",
+          "type": "number"
+        },
+        "dose_unit": {
+          "title": "Dose Unit",
+          "type": "string"
+        },
+        "timing_summary": {
+          "title": "Timing Summary",
+          "type": "string"
+        },
+        "frequency": {
+          "title": "Frequency",
+          "type": "string"
+        },
+        "duration_days": {
+          "title": "Duration Days",
+          "type": "integer"
+        },
+        "expected_benefit_z": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Benefit Z"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_label",
+        "action_class",
+        "dose_value",
+        "dose_unit",
+        "timing_summary",
+        "frequency",
+        "duration_days"
+      ],
+      "title": "ScheduleAction",
+      "type": "object"
+    },
+    "SchedulePlan": {
+      "description": "Complete schedule plan for presentation.",
+      "properties": {
+        "schedule_id": {
+          "title": "Schedule Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "plan_rank": {
+          "title": "Plan Rank",
+          "type": "integer"
+        },
+        "plan_type": {
+          "title": "Plan Type",
+          "type": "string"
+        },
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ScheduleAction"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "utility_score": {
+          "default": 0.0,
+          "title": "Utility Score",
+          "type": "number"
+        },
+        "stability_class": {
+          "$ref": "#/$defs/StabilityClass",
+          "default": "STABLE"
+        },
+        "p_rank_1": {
+          "default": 0.0,
+          "title": "P Rank 1",
+          "type": "number"
+        },
+        "expected_outcomes": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Expected Outcomes",
+          "type": "object"
+        },
+        "risk_summary": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Risk Summary",
+          "type": "object"
+        },
+        "rationale": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rationale",
+          "type": "array"
+        },
+        "constraints_applied": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints Applied",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "cri_95_lower": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cri 95 Lower"
+        },
+        "cri_95_upper": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cri 95 Upper"
+        }
+      },
+      "required": [
+        "schedule_id",
+        "run_id",
+        "plan_rank",
+        "plan_type"
+      ],
+      "title": "SchedulePlan",
+      "type": "object"
+    },
+    "SeverityTier": {
+      "description": "6-tier z-score mapping (\u00a72.20).",
+      "enum": [
+        "Excellent",
+        "Good",
+        "Mild Concern",
+        "Moderate",
+        "Poor",
+        "Severe"
+      ],
+      "title": "SeverityTier",
+      "type": "string"
+    },
+    "StabilityClass": {
+      "enum": [
+        "STABLE",
+        "SOFT",
+        "UNSTABLE"
+      ],
+      "title": "StabilityClass",
+      "type": "string"
+    },
+    "SubpopulationComparisonSummary": {
+      "description": "Presentation-ready F5 output (JSON-serializable).\n\nFull SubpopulationComparisonResult from F5 contains raw numpy arrays\nand internal hashes not suitable for serialization. This summary\nbridges the gap for the presentation layer.\n\nProduced by: report_assembler.py (via _build_subpop_summary)\nConsumed by: presentation layer (comparison panel)",
+      "properties": {
+        "contexts_compared": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contexts Compared",
+          "type": "array"
+        },
+        "n_contexts": {
+          "default": 0,
+          "title": "N Contexts",
+          "type": "integer"
+        },
+        "rank_concordance_matrix": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "title": "Rank Concordance Matrix",
+          "type": "object"
+        },
+        "risk_differentials": {
+          "items": {
+            "$ref": "#/$defs/RiskDiffSummary"
+          },
+          "title": "Risk Differentials",
+          "type": "array"
+        },
+        "differential_effects": {
+          "items": {
+            "$ref": "#/$defs/DiffEffectSummary"
+          },
+          "title": "Differential Effects",
+          "type": "array"
+        },
+        "comparison_valid": {
+          "default": true,
+          "title": "Comparison Valid",
+          "type": "boolean"
+        },
+        "validity_notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Validity Notes",
+          "type": "array"
+        },
+        "crn_coverage": {
+          "default": "full",
+          "title": "Crn Coverage",
+          "type": "string"
+        },
+        "seed_used": {
+          "default": 0,
+          "title": "Seed Used",
+          "type": "integer"
+        }
+      },
+      "title": "SubpopulationComparisonSummary",
+      "type": "object"
+    },
+    "TemporalTrajectory": {
+      "description": "Projected temporal trajectory over simulation horizon.",
+      "properties": {
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "scenario_label": {
+          "title": "Scenario Label",
+          "type": "string"
+        },
+        "horizon_days": {
+          "title": "Horizon Days",
+          "type": "integer"
+        },
+        "time_step_unit": {
+          "default": "day",
+          "title": "Time Step Unit",
+          "type": "string"
+        },
+        "node_trajectories": {
+          "items": {
+            "$ref": "#/$defs/NodeTrajectory"
+          },
+          "title": "Node Trajectories",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scenario_id",
+        "scenario_label",
+        "horizon_days"
+      ],
+      "title": "TemporalTrajectory",
+      "type": "object"
+    },
+    "TrajectoryPoint": {
+      "description": "Single time point in a trajectory.",
+      "properties": {
+        "day": {
+          "title": "Day",
+          "type": "integer"
+        },
+        "z_mean": {
+          "title": "Z Mean",
+          "type": "number"
+        },
+        "z_sd": {
+          "title": "Z Sd",
+          "type": "number"
+        },
+        "z_p10": {
+          "title": "Z P10",
+          "type": "number"
+        },
+        "z_p90": {
+          "title": "Z P90",
+          "type": "number"
+        }
+      },
+      "required": [
+        "day",
+        "z_mean",
+        "z_sd",
+        "z_p10",
+        "z_p90"
+      ],
+      "title": "TrajectoryPoint",
+      "type": "object"
+    },
+    "VarianceComponent": {
+      "description": "Single variance source.",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "fraction": {
+          "title": "Fraction",
+          "type": "number"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "source",
+        "fraction"
+      ],
+      "title": "VarianceComponent",
+      "type": "object"
+    },
+    "VarianceDecomposition": {
+      "description": "5-source variance decomposition (\u00a72.20.1).",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "components": {
+          "items": {
+            "$ref": "#/$defs/VarianceComponent"
+          },
+          "title": "Components",
+          "type": "array"
+        },
+        "total_variance": {
+          "default": 0.0,
+          "title": "Total Variance",
+          "type": "number"
+        },
+        "dominant_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dominant Source"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "VarianceDecomposition",
+      "type": "object"
+    }
+  },
+  "description": "Top-level output contract \u2014 everything the presentation layer needs.\n\nThis is the single object that flows from Runtime to Presentation.\nSCHEMA VERSION: see config.OUTPUT_SCHEMA_VERSION.\nBump on any field addition/removal/rename (see \u00a79.2 versioning rules).",
+  "properties": {
+    "output_schema_version": {
+      "default": "v1.1.0",
+      "title": "Output Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "subject_ref": {
+      "title": "Subject Ref",
+      "type": "string"
+    },
+    "output_mode": {
+      "$ref": "#/$defs/ReportOutputMode"
+    },
+    "composite_score": {
+      "$ref": "#/$defs/CompositeScore"
+    },
+    "primary_schedule": {
+      "$ref": "#/$defs/SchedulePlan"
+    },
+    "alternative_schedules": {
+      "items": {
+        "$ref": "#/$defs/SchedulePlan"
+      },
+      "title": "Alternative Schedules",
+      "type": "array"
+    },
+    "clinical_risk": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClinicalRiskProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "subpopulation_comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SubpopulationComparisonSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "pathway_profile": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PathwayProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "trajectories": {
+      "items": {
+        "$ref": "#/$defs/TemporalTrajectory"
+      },
+      "title": "Trajectories",
+      "type": "array"
+    },
+    "variance_decomposition": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VarianceDecomposition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_gaps": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceGapReport"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "decision_trace": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DecisionTrace"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "safety_flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Safety Flags",
+      "type": "array"
+    },
+    "escalation_triggered": {
+      "default": false,
+      "title": "Escalation Triggered",
+      "type": "boolean"
+    },
+    "run_warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Run Warnings",
+      "type": "array"
+    },
+    "engine_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine Version"
+    },
+    "timestamp": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timestamp"
+    }
+  },
+  "required": [
+    "run_id",
+    "subject_ref",
+    "output_mode",
+    "composite_score",
+    "primary_schedule"
+  ],
+  "title": "RecommendationReport",
+  "type": "object"
+}

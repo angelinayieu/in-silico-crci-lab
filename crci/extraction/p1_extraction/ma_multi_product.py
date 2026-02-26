@@ -41,6 +41,7 @@ class MAProductType(StrEnum):
     NMA_PAIRWISE_MATRIX = "nma_pairwise_matrix"
     DOSE_RESPONSE_POINTS = "dose_response_points"
     INCLUDED_STUDY_LIST = "included_study_list"
+    IPD_INTERACTION = "ipd_interaction"
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,12 @@ def build_ma_extraction_plan(
     ma_subtypes = {
         PaperSubtype.META_ANALYSIS.value,
         PaperSubtype.SYSTEMATIC_REVIEW.value,
+        PaperSubtype.PAIRWISE_MA.value,
+        PaperSubtype.NMA.value,
+        PaperSubtype.IPDMA.value,
+        PaperSubtype.DOSE_RESPONSE_MA.value,
+        PaperSubtype.UMBRELLA_REVIEW.value,
+        PaperSubtype.MEGA_ANALYSIS.value,
     }
     if subtype_str not in ma_subtypes:
         logger.debug(
@@ -163,7 +170,30 @@ def build_ma_extraction_plan(
         )
         return MAExtractionPlan(paper_id=paper_id, paper_subtype=subtype_str)
 
+    # Special case: UMBRELLA_REVIEW yields only included study list
+    if subtype_str == PaperSubtype.UMBRELLA_REVIEW.value:
+        return MAExtractionPlan(
+            paper_id=paper_id,
+            paper_subtype=subtype_str,
+            products=[
+                MAProduct(
+                    product_type=MAProductType.INCLUDED_STUDY_LIST,
+                    meta_source_flag=MetaSourceFlag.POOLED_ESTIMATE,
+                    priority=1,
+                    is_mandatory=True,
+                    description="List of included meta-analyses for hop discovery",
+                ),
+            ],
+        )
+
     is_nma, is_dr = _detect_ma_subtype(paper_text, title)
+
+    # Force flags for fine-grained subtypes
+    if subtype_str == PaperSubtype.NMA.value:
+        is_nma = True
+    if subtype_str == PaperSubtype.DOSE_RESPONSE_MA.value:
+        is_dr = True
+    is_ipdma = subtype_str == PaperSubtype.IPDMA.value
 
     products: list[MAProduct] = []
 
@@ -232,6 +262,16 @@ def build_ma_extraction_plan(
             description="Dose-response curve data points from pooled dose-response analysis",
         ))
 
+    # MA-9: IPD interaction (only for IPDMA papers)
+    if is_ipdma:
+        products.append(MAProduct(
+            product_type=MAProductType.IPD_INTERACTION,
+            meta_source_flag=MetaSourceFlag.POOLED_ESTIMATE,
+            priority=7,
+            is_mandatory=False,
+            description="Individual patient data interaction terms and subgroup effects",
+        ))
+
     plan = MAExtractionPlan(
         paper_id=paper_id,
         paper_subtype=subtype_str,
@@ -263,5 +303,48 @@ def get_product_agents(product: MAProduct) -> list[str]:
         MAProductType.SUBGROUP_MODERATOR: ["AG05", "AG08"],
         MAProductType.NMA_PAIRWISE_MATRIX: ["AG05"],
         MAProductType.DOSE_RESPONSE_POINTS: ["AG05"],
+        MAProductType.IPD_INTERACTION: ["AG05"],
     }
     return agent_map.get(product.product_type, ["AG05"])
+
+
+# ═══════════════════════════════════════════════════════════════
+#  MG-02: RANDOM-EFFECTS DEFAULT ENFORCEMENT
+# ═══════════════════════════════════════════════════════════════
+
+
+def enforce_random_effects_default(
+    row: dict,
+    *,
+    notes: str,
+) -> dict:
+    """MG-02: Flag when both random-effects and fixed-effect are mentioned.
+
+    When a meta-analysis mentions BOTH random effects AND fixed effects,
+    flag ``mg02_re_preferred=True`` to indicate RE should be preferred.
+    When only FE is mentioned, set ``mg02_re_preferred=False``.
+    When only RE is mentioned (no conflict), do not set the flag.
+
+    Parameters
+    ----------
+    row : dict
+        Extraction row (modified in-place and returned).
+    notes : str
+        Notes text to search for RE/FE mentions.
+
+    Returns
+    -------
+    dict
+        The row, possibly with ``mg02_re_preferred`` set.
+    """
+    notes_lower = (notes or "").lower()
+    has_random = "random" in notes_lower
+    has_fixed = "fixed" in notes_lower
+
+    if has_random and has_fixed:
+        row["mg02_re_preferred"] = True
+    elif has_fixed and not has_random:
+        row["mg02_re_preferred"] = False
+    # If only RE or neither: no flag set
+
+    return row

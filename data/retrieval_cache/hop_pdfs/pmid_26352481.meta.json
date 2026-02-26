@@ -1,0 +1,12 @@
+{
+  "pmid": "26352481",
+  "doi": "10.1016/j.psyneuen.2015.08.018",
+  "title": "Developmental histories of perceived racial discrimination and diurnal cortisol profiles in adulthood: A 20-year prospective study",
+  "source": "hop_discovery",
+  "hop_depth": 1,
+  "target_edges": [
+    "EDGE_CORTISOL_DEPRESSION",
+    "EDGE_CORTISOL_COGNITION",
+    "EDGE_CORTISOL_FATIGUE"
+  ]
+}

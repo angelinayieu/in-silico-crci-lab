@@ -918,6 +918,7 @@ class TriageDecision(StrEnum):
 
 @unique
 class ExtractionMode(StrEnum):
+    MINIMAL = "MINIMAL"
     SHALLOW = "SHALLOW"
     STANDARD = "STANDARD"
     DEEP = "DEEP"
@@ -1352,6 +1353,26 @@ class PaperSubtype(StrEnum):
     NORMATIVE_COHORT = "normative_cohort"
     DOSE_RESPONSE_STUDY = "dose_response_study"
     LONGITUDINAL_FOLLOWUP = "longitudinal_followup"
+    # ─── Fine-grained MA subtypes (Master Spec §4.1) ────────
+    PAIRWISE_MA = "pairwise_ma"
+    NMA = "nma"
+    IPDMA = "ipdma"
+    DOSE_RESPONSE_MA = "dose_response_ma"
+    UMBRELLA_REVIEW = "umbrella_review"
+    MEGA_ANALYSIS = "mega_analysis"
+    SCOPING_REVIEW = "scoping_review"
+    # ─── Fine-grained RCT subtypes ──────────────────────────
+    STANDARD_RCT = "standard_rct"
+    FACTORIAL_RCT = "factorial_rct"
+    PILOT_RCT = "pilot_rct"
+    CROSSOVER_RCT = "crossover_rct"
+    # ─── Fine-grained observational subtypes ─────────────────
+    PROSPECTIVE_COHORT = "prospective_cohort"
+    RETROSPECTIVE_COHORT = "retrospective_cohort"
+    # ─── Fine-grained mechanistic/other ──────────────────────
+    MECHANISTIC_IN_VITRO = "mechanistic_in_vitro"
+    COMPUTATIONAL_MODEL = "computational_model"
+    METHODS_PAPER = "methods_paper"
     OTHER = "other"
 
 

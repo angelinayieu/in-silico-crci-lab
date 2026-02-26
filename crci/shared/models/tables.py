@@ -2032,3 +2032,23 @@ class AcquisitionQueue(Base):
 
     # v2.0: Paywall tracking
     paywall_flagged = Column(Boolean, default=False)
+
+
+class EvidenceValidationQuarantine(Base):
+    """B14. Quarantine table for evidence rows that fail validation.
+
+    Rows that fail field validation in the validated_writer pipeline
+    are stored here for human review/resolution rather than silently dropped.
+    """
+    __tablename__ = "evidence_validation_quarantine_v1"
+
+    quarantine_id = Column(Text, primary_key=True)
+    study_id = Column(Text, nullable=False)
+    edge_relation_id = Column(Text)
+    source_path = Column(Text)
+    raw_payload_json = Column(Text)
+    validation_errors = Column(Text)
+    quarantine_reason = Column(Text)
+    created_at = Column(Text, nullable=False)
+    resolved_at = Column(Text)
+    resolved_by = Column(Text)

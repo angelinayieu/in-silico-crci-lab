@@ -57,6 +57,11 @@ class InterventionTrajectory:
     delta_aging: np.ndarray         # ℝ^{T} — aging contribution at each time
     delta_C: float                  # Chain D effect magnitude (mean ΔC)
 
+    # Per-node mean delta from D2 — shape (n_nodes,)
+    # (fix §8.2 feedback 2.1: replaces scalar delta_C for per-node
+    # mechanistic intervention effects in F4T)
+    delta_theta_mean: np.ndarray | None = None
+
 
 @dataclass
 class OverlayResult:
@@ -329,19 +334,23 @@ def compute_intervention_overlay(
             continue
         mean_delta_C = float(np.mean(interv_effects.delta_C))
 
+        # Per-node mean delta from D2 (fix §8.2 feedback 2.1)
+        # delta_theta shape: (n_draws, n_nodes) → mean across draws → (n_nodes,)
+        mean_delta_theta = np.mean(interv_effects.delta_theta, axis=0)
+
         # E3a: Temporal kernel
         K_a = _get_kernel_for_intervention(aid, intervention_set, t_months)
 
         # E3d: Full trajectory
-        # θ(t) = θ_natural(t) + ΔC_a · K_a(t) + δ_aging(t)
+        # θ(t) = θ_natural(t) + Δθ_{a,i} · K_a(t) + δ_aging(t)
         # Note: θ_natural already includes recovery. We add intervention + aging.
         theta_intervention = recovery.theta_natural.copy()
 
-        # Add intervention effect (broadcast: ΔC scalar, K_a is (T,))
-        # Each node gets the composite cognitive effect scaled by kernel
-        # Simplified: apply ΔC uniformly across cognitive nodes
+        # Add per-node intervention effect + aging (fix §8.2 feedback 2.1)
         for node_idx in range(theta_intervention.shape[0]):
-            theta_intervention[node_idx, :] += mean_delta_C * K_a + delta_aging
+            theta_intervention[node_idx, :] += (
+                mean_delta_theta[node_idx] * K_a + delta_aging
+            )
 
         trajectories[aid] = InterventionTrajectory(
             intervention_id=aid,
@@ -349,6 +358,8 @@ def compute_intervention_overlay(
             K_a=K_a,
             delta_aging=delta_aging,
             delta_C=mean_delta_C,
+            # Fix §8.2 feedback 2.1: carry per-node delta for F4T
+            delta_theta_mean=mean_delta_theta,
         )
 
     result = OverlayResult(

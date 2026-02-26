@@ -1,0 +1,113 @@
+15:06:13 [INFO] crci.shared.db: Database engine created for sqlite:////workspaces/in-silico-crci-lab/crci_dev.db
+15:06:13 [INFO] crci.extraction.pipeline: PDF hash computed for campbell2017.pdf: cc421190dac86bc0
+15:06:13 [INFO] crci.extraction.pipeline: Created extraction run RUN_20260226T150613_5cb12c16 for campbell2017.pdf (hash=cc421190dac86bc0, model=claude-sonnet-4-20250514)
+15:06:13 [INFO] crci.extraction.pipeline: Starting chain 'P0: Pre-Extraction Triage' for run RUN_20260226T150613_5cb12c16
+15:06:13 [INFO] crci.extraction.p0_triage.runner: P0-S1: Ingesting PDF campbell2017.pdf
+15:06:17 [INFO] crci.extraction.p0_triage.pdf_ingestion: PDF ingested: path=data/manual_uploads/pdfs/campbell2017.pdf pages=21 quality=GOOD has_tables=True has_figures=True sections=2
+15:06:17 [INFO] crci.extraction.p0_triage.runner: P0-S1 complete: quality=GOOD, pages=21, tables=True, figures=True
+15:06:17 [INFO] crci.extraction.p0_triage.runner: P0-S2: Screening relevance
+15:06:17 [INFO] crci.extraction.p0_triage.relevance_screening: Relevance screening: score=1.000 decision=ACCEPT inclusion=5/5 exclusion=False
+15:06:17 [INFO] crci.extraction.p0_triage.runner: P0-S2 complete: score=1.00, decision=ACCEPT
+15:06:17 [INFO] crci.extraction.p0_triage.runner: P0-PTC: Classifying paper type
+15:06:17 [INFO] crci.extraction.p0_triage.paper_type_classifier: Paper type classification: truncated text from 41200 to 15000 chars
+15:06:18 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:18 [ERROR] crci.extraction.p0_triage.paper_type_classifier: Paper type classification LLM call failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtTw6UnZewwWsb1kuc6'}. Defaulting to PaperSubtype.OTHER
+15:06:18 [INFO] crci.extraction.p0_triage.runner: P0-PTC complete: subtype=other, confidence=0.00
+15:06:18 [INFO] crci.extraction.p0_triage.runner: P0-S3: Selecting extraction mode
+15:06:18 [INFO] crci.extraction.p0_triage.mode_selection: Triage complete: paper_id=hash:569a497d04eb5442 decision=ACCEPT mode=STANDARD subtype=other score=1.000
+15:06:18 [INFO] crci.extraction.p0_triage.runner: P0-S3 complete: paper_id=hash:569a497d04eb5442, mode=STANDARD, subtype=other
+15:06:18 [INFO] crci.extraction.p0_triage.runner: Registered new study hash:569a497d04eb5442 in study_registry_v1 (id_source=hash)
+15:06:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T150613_5cb12c16 stage='P0: Pre-Extraction Triage' status=success
+15:06:18 [INFO] crci.extraction.pipeline: Starting chain 'P1: Hybrid Multi-Agent Extraction' for run RUN_20260226T150613_5cb12c16
+15:06:18 [INFO] crci.extraction.p1_extraction.runner: P1-CR: Building PaperMap for hash:569a497d04eb5442
+15:06:18 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: starting for paper_id=hash:569a497d04eb5442, text_length=41200
+15:06:19 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:19 [WARNING] crci.extraction.p1_extraction.canonical_reader: CR-a: LLM section segmentation failed, falling back to heuristic detection.
+15:06:19 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:19 [WARNING] crci.extraction.p1_extraction.canonical_reader: CR-b: LLM table/figure detection failed, falling back to regex detection.
+15:06:19 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-b: detected 2 tables, 1 figures
+15:06:19 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-c: identified 69 candidate spans
+15:06:19 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:19 [WARNING] crci.extraction.p1_extraction.canonical_reader: CR-d: LLM basic study object parsing failed, returning None/empty defaults.
+15:06:19 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: completed paper_id=hash:569a497d04eb5442 — sections=3, tables=2, figures=1, candidate_spans=69, n_total=None, study_design=None
+15:06:19 [INFO] crci.extraction.p1_extraction.runner: P1-CR complete: sections=3, tables=2, figures=1, spans=69
+15:06:19 [INFO] crci.extraction.p1_extraction.runner: P1-AG: Running STANDARD-mode extraction agents
+15:06:19 [INFO] crci.extraction.p1_extraction.runner: Running agent MetadataAgent
+15:06:19 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG01: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['title', 'abstract', 'affiliations', 'acknowledgements']
+15:06:19 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:19 [ERROR] crci.extraction.p1_extraction.runner: Agent MetadataAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU1e5b6eYZWnCSXuj9'}
+15:06:19 [INFO] crci.extraction.p1_extraction.runner: Running agent DesignAgent
+15:06:19 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG02: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'abstract']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent DesignAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU2E43aJvnXXVKtWqy'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent CohortAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG03: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'results']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent CohortAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU2ywebRRZ79xBRmJL'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent OutcomeAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG04: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'results']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent OutcomeAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU3dPPS27Ceq28v7Jf'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent StatsLabelAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG05: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['results', 'tables', 'abstract', 'discussion']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent StatsLabelAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU4JZjZTbwXVzSCXuo'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent ExposureAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG06: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'results']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent ExposureAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU4zjgQsEcTiy1Zk1B'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent MediatorAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG07: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['introduction', 'discussion', 'results']
+15:06:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:20 [ERROR] crci.extraction.p1_extraction.runner: Agent MediatorAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU5fRhSsjpKiTpxkds'}
+15:06:20 [INFO] crci.extraction.p1_extraction.runner: Running agent TemporalAgent
+15:06:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG08: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'results']
+15:06:21 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:21 [ERROR] crci.extraction.p1_extraction.runner: Agent TemporalAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU6HsgGhtok8iSeQWr'}
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: Running agent StrategicIntelAgent
+15:06:21 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG10: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['discussion', 'limitations', 'conclusion']
+15:06:21 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:21 [ERROR] crci.extraction.p1_extraction.runner: Agent StrategicIntelAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU6uLQFpQ42f7A53jH'}
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: Running agent InstrumentValidationAgent
+15:06:21 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG11: starting extraction for paper_id=hash:569a497d04eb5442, target_sections=['methods', 'results', 'tables']
+15:06:21 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 400 Bad Request"
+15:06:21 [ERROR] crci.extraction.p1_extraction.runner: Agent InstrumentValidationAgent failed: Non-retryable API error: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'}, 'request_id': 'req_011CYWtU7XJ5T1J1b3NbX77U'}
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-AG complete: 0 total raw annotations, 0 total span_labels
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-CE: Running ConceptEngine ontology grounding
+15:06:21 [INFO] crci.extraction.p1_extraction.concept_engine: ConceptEngine loaded: 25 edges, 20 nodes, 12 instruments
+15:06:21 [INFO] crci.extraction.p1_extraction.concept_engine: ConceptEngine: 0/0 spans grounded (0% resolved)
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-CE complete: 0/0 spans grounded to edges
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-REC: Reconciling cross-agent annotations
+15:06:21 [WARNING] crci.extraction.p1_extraction.reconciliation: No raw annotations provided for study hash:569a497d04eb5442; returning empty reconciliation
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-REC complete: 0 reconciled, 0 conflicts
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-ATB: Validating annotations through trust boundary
+15:06:21 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB complete for study hash:569a497d04eb5442: 0 accepted, 0 rejected (of 0 input)
+15:06:21 [INFO] crci.extraction.p1_extraction.runner: P1-ATB complete: 0 accepted, 0 rejected
+15:06:21 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T150613_5cb12c16 stage='P1: Hybrid Multi-Agent Extraction' status=success
+15:06:21 [INFO] crci.extraction.pipeline: Starting chain 'TB: Trust Boundary' for run RUN_20260226T150613_5cb12c16
+15:06:21 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1: Parsing numeric claims for hash:569a497d04eb5442
+15:06:21 [WARNING] crci.extraction.tb_trust_boundary.runner: TB-S1: 69 CandidateSpan(s) found on PaperMap but no SpanLabel(s) available — CandidateSpans lack label_type and cannot be parsed. Skipping.
+15:06:21 [INFO] crci.extraction.tb_trust_boundary.numeric_parser: NumericParser: 0/0 spans parsed successfully, 0 failed.
+15:06:21 [ERROR] crci.extraction.pipeline: Extraction run RUN_20260226T150613_5cb12c16 FAILED: Gate violation TB-G1: Gate TB-G1 violated: Zero spans parsed successfully out of 0 inputs. REJECT paper: no parseable statistics.
+Context: {'total_spans': 0, 'failed_count': 0}
+15:06:21 [INFO] crci.extraction.pipeline: Committed run RUN_20260226T150613_5cb12c16 with status=failed before re-raising GateViolation (preserving study_registry + evidence data)
+15:06:21 [ERROR] __main__: Pipeline failed: Gate TB-G1 violated: Zero spans parsed successfully out of 0 inputs. REJECT paper: no parseable statistics.
+Traceback (most recent call last):
+  File "/workspaces/in-silico-crci-lab/scripts/run_extraction.py", line 102, in main
+    run = run_extraction_pipeline(
+          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/in-silico-crci-lab/crci/extraction/pipeline.py", line 528, in run_extraction_pipeline
+    return _run_pipeline_with_session(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/in-silico-crci-lab/crci/extraction/pipeline.py", line 583, in _run_pipeline_with_session
+    context = _run_single_chain(
+              ^^^^^^^^^^^^^^^^^^
+  File "/workspaces/in-silico-crci-lab/crci/extraction/pipeline.py", line 393, in _run_single_chain
+    result_context = chain_fn(session, run, context)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/in-silico-crci-lab/crci/extraction/tb_trust_boundary/runner.py", line 87, in run_tb_trust_boundary
+    parsed_numerics = parse_spans(raw_for_parsing)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspaces/in-silico-crci-lab/crci/extraction/tb_trust_boundary/numeric_parser.py", line 1506, in parse_spans
+    raise GateViolation(
+crci.shared.models.intermediate_states.GateViolation: Gate TB-G1 violated: Zero spans parsed successfully out of 0 inputs. REJECT paper: no parseable statistics.

@@ -69,11 +69,20 @@ def run_tb_trust_boundary(
         raw_for_parsing = []
         assembly_input = []
 
-    # Also check PaperMap candidate_spans as fallback
+    # NOTE: PaperMap.candidate_spans are CandidateSpan objects (text, char_start,
+    # char_end) — they lack .value and .label_type required by parse_spans().
+    # CandidateSpan is a *pre-labelling* detection; SpanLabel is the *post-AG05*
+    # labelled version. We cannot meaningfully parse CandidateSpans, so we skip
+    # them and let the downstream TB-G1 gate handle the zero-span case.
     paper_map = context.get("paper_map")
     if not raw_for_parsing and paper_map and hasattr(paper_map, "candidate_spans"):
-        raw_for_parsing = list(paper_map.candidate_spans)
-        assembly_input = raw_for_parsing
+        if paper_map.candidate_spans:
+            logger.warning(
+                "TB-S1: %d CandidateSpan(s) found on PaperMap but no "
+                "SpanLabel(s) available — CandidateSpans lack label_type "
+                "and cannot be parsed. Skipping.",
+                len(paper_map.candidate_spans),
+            )
 
     parsed_numerics = parse_spans(raw_for_parsing)
 

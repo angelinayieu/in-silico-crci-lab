@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "DiffEffectSummary": {
+      "description": "Differential intervention effect between two contexts (F5-M4).",
+      "properties": {
+        "intervention_id": {
+          "title": "Intervention Id",
+          "type": "string"
+        },
+        "context_a": {
+          "title": "Context A",
+          "type": "string"
+        },
+        "context_b": {
+          "title": "Context B",
+          "type": "string"
+        },
+        "delta_C_diff_mean": {
+          "title": "Delta C Diff Mean",
+          "type": "number"
+        },
+        "delta_C_diff_ci_lower": {
+          "title": "Delta C Diff Ci Lower",
+          "type": "number"
+        },
+        "delta_C_diff_ci_upper": {
+          "title": "Delta C Diff Ci Upper",
+          "type": "number"
+        },
+        "baseline_contribution": {
+          "title": "Baseline Contribution",
+          "type": "number"
+        },
+        "mechanism_contribution": {
+          "title": "Mechanism Contribution",
+          "type": "number"
+        },
+        "practically_different": {
+          "title": "Practically Different",
+          "type": "boolean"
+        },
+        "decomposition_scoring_policy": {
+          "title": "Decomposition Scoring Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intervention_id",
+        "context_a",
+        "context_b",
+        "delta_C_diff_mean",
+        "delta_C_diff_ci_lower",
+        "delta_C_diff_ci_upper",
+        "baseline_contribution",
+        "mechanism_contribution",
+        "practically_different",
+        "decomposition_scoring_policy"
+      ],
+      "title": "DiffEffectSummary",
+      "type": "object"
+    },
+    "RiskDiffSummary": {
+      "description": "Risk differential between two contexts (F5).\n\nrisk_diff_pct = risk_A - risk_B, so positive means A has higher risk.",
+      "properties": {
+        "context_a": {
+          "title": "Context A",
+          "type": "string"
+        },
+        "context_b": {
+          "title": "Context B",
+          "type": "string"
+        },
+        "risk_diff_pct": {
+          "title": "Risk Diff Pct",
+          "type": "number"
+        },
+        "risk_diff_ci_lower": {
+          "title": "Risk Diff Ci Lower",
+          "type": "number"
+        },
+        "risk_diff_ci_upper": {
+          "title": "Risk Diff Ci Upper",
+          "type": "number"
+        },
+        "domain_diffs": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Domain Diffs",
+          "type": "object"
+        }
+      },
+      "required": [
+        "context_a",
+        "context_b",
+        "risk_diff_pct",
+        "risk_diff_ci_lower",
+        "risk_diff_ci_upper"
+      ],
+      "title": "RiskDiffSummary",
+      "type": "object"
+    }
+  },
+  "description": "Presentation-ready F5 output (JSON-serializable).\n\nFull SubpopulationComparisonResult from F5 contains raw numpy arrays\nand internal hashes not suitable for serialization. This summary\nbridges the gap for the presentation layer.\n\nProduced by: report_assembler.py (via _build_subpop_summary)\nConsumed by: presentation layer (comparison panel)",
+  "properties": {
+    "contexts_compared": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Contexts Compared",
+      "type": "array"
+    },
+    "n_contexts": {
+      "default": 0,
+      "title": "N Contexts",
+      "type": "integer"
+    },
+    "rank_concordance_matrix": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "number"
+        },
+        "type": "object"
+      },
+      "title": "Rank Concordance Matrix",
+      "type": "object"
+    },
+    "risk_differentials": {
+      "items": {
+        "$ref": "#/$defs/RiskDiffSummary"
+      },
+      "title": "Risk Differentials",
+      "type": "array"
+    },
+    "differential_effects": {
+      "items": {
+        "$ref": "#/$defs/DiffEffectSummary"
+      },
+      "title": "Differential Effects",
+      "type": "array"
+    },
+    "comparison_valid": {
+      "default": true,
+      "title": "Comparison Valid",
+      "type": "boolean"
+    },
+    "validity_notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Validity Notes",
+      "type": "array"
+    },
+    "crn_coverage": {
+      "default": "full",
+      "title": "Crn Coverage",
+      "type": "string"
+    },
+    "seed_used": {
+      "default": 0,
+      "title": "Seed Used",
+      "type": "integer"
+    }
+  },
+  "title": "SubpopulationComparisonSummary",
+  "type": "object"
+}

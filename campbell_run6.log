@@ -1,0 +1,599 @@
+14:44:44 [INFO] crci.shared.db: Database engine created for sqlite:////workspaces/in-silico-crci-lab/crci_dev.db
+14:44:44 [INFO] crci.extraction.pipeline: PDF hash computed for campbell2017.pdf: cc421190dac86bc0
+14:44:45 [INFO] crci.extraction.pipeline: Created extraction run RUN_20260226T144444_94eff667 for campbell2017.pdf (hash=cc421190dac86bc0, model=claude-sonnet-4-20250514)
+14:44:45 [INFO] crci.extraction.pipeline: Starting chain 'P0: Pre-Extraction Triage' for run RUN_20260226T144444_94eff667
+14:44:45 [INFO] crci.extraction.p0_triage.runner: P0-S1: Ingesting PDF campbell2017.pdf
+14:44:49 [INFO] crci.extraction.p0_triage.pdf_ingestion: PDF ingested: path=data/manual_uploads/pdfs/campbell2017.pdf pages=21 quality=GOOD has_tables=True has_figures=True sections=2
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S1: Extracted DOI from PDF text: 10.1002/pon.4370
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S0: Found DOI-based meta.json at data/manual_uploads/pdfs/10.1002_pon.4370.meta.json
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S0: Loaded DOI-based meta.json: 34 keys, target_edges=['ER_ACTIVITY_PROC_SPEED', 'ER_ACTIVITY_VERBAL_FLUENCY', 'ER_ACTIVITY_EPIMEM', 'ER_ACTIVITY_COG_COMPLAINTS']
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S1 complete: quality=GOOD, pages=21, tables=True, figures=True
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S2: Screening relevance
+14:44:49 [INFO] crci.extraction.p0_triage.relevance_screening: Relevance screening: score=1.000 decision=ACCEPT inclusion=5/5 exclusion=False
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-S2 complete: score=1.00, decision=ACCEPT
+14:44:49 [INFO] crci.extraction.p0_triage.runner: P0-PTC: Classifying paper type
+14:44:49 [INFO] crci.extraction.p0_triage.paper_type_classifier: Paper type classification: truncated text from 41200 to 15000 chars
+14:44:53 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:44:53 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=e44c7a9aefec8da0 prompt_tokens=5719 completion_tokens=92 latency_ms=3884
+14:44:53 [INFO] crci.extraction.p0_triage.paper_type_classifier: Paper type classified: subtype=RCT_exercise confidence=0.95 reasoning=This is a randomized controlled trial testing a 24-week aerobic exercise intervention versus usual lifestyle control on cognitive outcomes in breast cancer survivors, which directly fits the RCT_exercise category for studies examining exercise/physical activity interventions for cognitive outcomes in cancer patients.
+14:44:53 [INFO] crci.extraction.p0_triage.runner: P0-PTC complete: subtype=RCT_exercise, confidence=0.95
+14:44:53 [INFO] crci.extraction.p0_triage.runner: P0-S3: Selecting extraction mode
+14:44:53 [INFO] crci.extraction.p0_triage.mode_selection: Triage complete: paper_id=doi:10.1002/pon.4370 decision=ACCEPT mode=DEEP subtype=RCT_exercise score=1.000
+14:44:53 [INFO] crci.extraction.p0_triage.runner: P0-S3 complete: paper_id=doi:10.1002/pon.4370, mode=DEEP, subtype=RCT_exercise
+14:44:53 [INFO] crci.extraction.p0_triage.runner: Registered new study doi:10.1002/pon.4370 in study_registry_v1 (id_source=doi)
+14:44:53 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P0: Pre-Extraction Triage' status=success
+14:44:53 [INFO] crci.extraction.pipeline: Starting chain 'P1: Hybrid Multi-Agent Extraction' for run RUN_20260226T144444_94eff667
+14:44:53 [INFO] crci.extraction.p1_extraction.runner: P1-CR: Building PaperMap for doi:10.1002/pon.4370
+14:44:53 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: starting for paper_id=doi:10.1002/pon.4370, text_length=41200
+14:45:00 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:00 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=fd83081499a15487 prompt_tokens=13140 completion_tokens=447 latency_ms=6908
+14:45:07 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:07 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=72adbf0f0310293a prompt_tokens=13142 completion_tokens=176 latency_ms=7392
+14:45:07 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-b: detected 2 tables, 1 figures
+14:45:07 [INFO] crci.extraction.p1_extraction.canonical_reader: CR-c: identified 69 candidate spans
+14:45:09 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:09 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=851d033d79d73894 prompt_tokens=4089 completion_tokens=44 latency_ms=1778
+14:45:09 [INFO] crci.extraction.p1_extraction.canonical_reader: CanonicalReader.read: completed paper_id=doi:10.1002/pon.4370 — sections=9, tables=2, figures=1, candidate_spans=69, n_total=19, study_design=RCT
+14:45:09 [INFO] crci.extraction.p1_extraction.runner: P1-CR complete: sections=9, tables=2, figures=1, spans=69
+14:45:09 [INFO] crci.extraction.p1_extraction.runner: P1-AG: Running DEEP-mode extraction agents
+14:45:09 [INFO] crci.extraction.p1_extraction.runner: Running agent MetadataAgent
+14:45:09 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG01: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['title', 'abstract', 'affiliations', 'acknowledgements']
+14:45:12 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:12 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=5dcf95ce1dbdf1ac prompt_tokens=1851 completion_tokens=196 latency_ms=3190
+14:45:12 [INFO] crci.extraction.p1_extraction.agents.ag01_metadata: AG01: title text not found in canonical text, creating SpanLabel with offset 0. Entity: title='Effect of aerobic exercise on cancer-associated cognitive impairment: A proof-of-concept RCT', reason: text not located.
+14:45:12 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG01: completed paper_id=doi:10.1002/pon.4370 — span_labels=1, annotations=0, elapsed_ms=3191, status=success
+14:45:12 [INFO] crci.extraction.p1_extraction.runner: Agent MetadataAgent produced 0 annotations, 1 span_labels
+14:45:12 [INFO] crci.extraction.p1_extraction.runner: Running agent DesignAgent
+14:45:12 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG02: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'abstract']
+14:45:16 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:16 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=f3f755ea137e5ca9 prompt_tokens=4853 completion_tokens=76 latency_ms=4009
+14:45:16 [INFO] crci.extraction.p1_extraction.agents.ag02_design: AG02: text 'simple' not found in canonical text, using offset 0 as fallback. Entity: search_text='simple', reason: text not located.
+14:45:16 [INFO] crci.extraction.p1_extraction.agents.ag02_design: AG02: text 'usual_care' not found in canonical text, using offset 0 as fallback. Entity: search_text='usual_care', reason: text not located.
+14:45:16 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG02: completed paper_id=doi:10.1002/pon.4370 — span_labels=5, annotations=0, elapsed_ms=4011, status=success
+14:45:16 [INFO] crci.extraction.p1_extraction.runner: Agent DesignAgent produced 0 annotations, 5 span_labels
+14:45:16 [INFO] crci.extraction.p1_extraction.runner: Running agent CohortAgent
+14:45:16 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG03: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']
+14:45:20 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:20 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=2316ec98400dc1c5 prompt_tokens=9462 completion_tokens=128 latency_ms=3918
+14:45:20 [INFO] crci.extraction.p1_extraction.agents.ag03_cohort: AG03: percent_female '100.0' not found in canonical text, creating SpanLabel with offset 0. Entity: percent_female=100.0, reason: text not located.
+14:45:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG03: completed paper_id=doi:10.1002/pon.4370 — span_labels=3, annotations=3, elapsed_ms=3919, status=success
+14:45:20 [INFO] crci.extraction.p1_extraction.runner: Agent CohortAgent produced 3 annotations, 3 span_labels
+14:45:20 [INFO] crci.extraction.p1_extraction.runner: Running agent OutcomeAgent
+14:45:20 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG04: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']
+14:45:26 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:26 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=2f349d1462c2150f prompt_tokens=9017 completion_tokens=497 latency_ms=6324
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.ag04_outcome: AG04: instrument 'Hopkins Verbal Learning Test-Revised' not found in canonical text, creating SpanLabel with offset 0. Entity: instrument=Hopkins Verbal Learning Test-Revised, reason: text not located.
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.ag04_outcome: AG04: instrument 'Animal Naming' not found in canonical text, creating SpanLabel with offset 0. Entity: instrument=Animal Naming, reason: text not located.
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.ag04_outcome: AG04: instrument 'CES-D 10' not found in canonical text, creating SpanLabel with offset 0. Entity: instrument=CES-D 10, reason: text not located.
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.ag04_outcome: AG04: instrument 'Spielberger State Anxiety Scale' not found in canonical text, creating SpanLabel with offset 0. Entity: instrument=Spielberger State Anxiety Scale, reason: text not located.
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG04: completed paper_id=doi:10.1002/pon.4370 — span_labels=27, annotations=9, elapsed_ms=6326, status=success
+14:45:26 [INFO] crci.extraction.p1_extraction.runner: Agent OutcomeAgent produced 9 annotations, 27 span_labels
+14:45:26 [INFO] crci.extraction.p1_extraction.runner: Running agent StatsLabelAgent
+14:45:26 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG05: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['results', 'tables', 'abstract', 'discussion']
+14:45:37 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:37 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=7b2bf2fc7f7ba578 prompt_tokens=11860 completion_tokens=780 latency_ms=11021
+14:45:37 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG05: completed paper_id=doi:10.1002/pon.4370 — span_labels=7, annotations=0, elapsed_ms=11024, status=success
+14:45:37 [INFO] crci.extraction.p1_extraction.runner: Agent StatsLabelAgent produced 0 annotations, 7 span_labels
+14:45:37 [INFO] crci.extraction.p1_extraction.runner: Running agent ExposureAgent
+14:45:37 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG06: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']
+14:45:40 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:40 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=d6c824099fe17a02 prompt_tokens=9590 completion_tokens=123 latency_ms=2948
+14:45:40 [INFO] crci.extraction.p1_extraction.agents.ag06_exposure: AG06: duration_weeks '24.0' not found in canonical text, creating SpanLabel with offset 0. Entity: duration_weeks=24.0, reason: text not located.
+14:45:40 [INFO] crci.extraction.p1_extraction.agents.ag06_exposure: AG06: frequency '2 supervised sessions per week plus 2 home sessions per week' not found in canonical text, creating SpanLabel with offset 0. Entity: frequency=2 supervised sessions per week plus 2 home sessions per week, reason: text not located.
+14:45:40 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG06: completed paper_id=doi:10.1002/pon.4370 — span_labels=4, annotations=2, elapsed_ms=2949, status=success
+14:45:40 [INFO] crci.extraction.p1_extraction.runner: Agent ExposureAgent produced 2 annotations, 4 span_labels
+14:45:40 [INFO] crci.extraction.p1_extraction.runner: Running agent MediatorAgent
+14:45:40 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG07: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['introduction', 'discussion', 'results']
+14:45:46 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:46 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=6c00deb22a8db7e4 prompt_tokens=7688 completion_tokens=475 latency_ms=5968
+14:45:46 [INFO] crci.extraction.p1_extraction.agents.ag07_mediator: AG07: mediator 'cingulate cortex activation' not found in canonical text, creating SpanLabel with offset 0. Entity: mediator=cingulate cortex activation, reason: text not located.
+14:45:46 [INFO] crci.extraction.p1_extraction.agents.ag07_mediator: AG07: mediator 'superior frontal gyrus activation' not found in canonical text, creating SpanLabel with offset 0. Entity: mediator=superior frontal gyrus activation, reason: text not located.
+14:45:46 [INFO] crci.extraction.p1_extraction.agents.ag07_mediator: AG07: mediator 'brain function' not found in canonical text, creating SpanLabel with offset 0. Entity: mediator=brain function, reason: text not located.
+14:45:46 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG07: completed paper_id=doi:10.1002/pon.4370 — span_labels=8, annotations=8, elapsed_ms=5970, status=success
+14:45:46 [INFO] crci.extraction.p1_extraction.runner: Agent MediatorAgent produced 8 annotations, 8 span_labels
+14:45:46 [INFO] crci.extraction.p1_extraction.runner: Running agent TemporalAgent
+14:45:46 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG08: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results']
+14:45:50 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:50 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=320c514db8b9c963 prompt_tokens=9593 completion_tokens=201 latency_ms=3568
+14:45:50 [INFO] crci.extraction.p1_extraction.agents.ag08_temporal: AG08: timepoint '24-week post-intervention' not found in canonical text, creating SpanLabel with offset 0. Entity: timepoint=24-week post-intervention, reason: text not located.
+14:45:50 [INFO] crci.extraction.p1_extraction.agents.ag08_temporal: AG08: follow_up_weeks '24.0' not found in canonical text, creating SpanLabel with offset 0. Entity: follow_up_weeks=24.0, reason: text not located.
+14:45:50 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG08: completed paper_id=doi:10.1002/pon.4370 — span_labels=4, annotations=4, elapsed_ms=3569, status=success
+14:45:50 [INFO] crci.extraction.p1_extraction.runner: Agent TemporalAgent produced 4 annotations, 4 span_labels
+14:45:50 [INFO] crci.extraction.p1_extraction.runner: Running agent StrategicIntelAgent
+14:45:50 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG10: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['discussion', 'limitations', 'conclusion']
+14:45:58 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:45:58 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=74403c10c517ad73 prompt_tokens=3615 completion_tokens=471 latency_ms=7600
+14:45:58 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG10: completed paper_id=doi:10.1002/pon.4370 — span_labels=0, annotations=4, elapsed_ms=7601, status=success
+14:45:58 [INFO] crci.extraction.p1_extraction.runner: Agent StrategicIntelAgent produced 4 annotations, 0 span_labels
+14:45:58 [INFO] crci.extraction.p1_extraction.runner: Running agent InstrumentValidationAgent
+14:45:58 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG11: starting extraction for paper_id=doi:10.1002/pon.4370, target_sections=['methods', 'results', 'tables']
+14:46:17 [INFO] httpx: HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+14:46:17 [INFO] crci.llm.client: LLM call completed: model=claude-sonnet-4-20250514 prompt_hash=4f6052cf1aae0721 prompt_tokens=10094 completion_tokens=1519 latency_ms=19410
+14:46:17 [INFO] crci.extraction.p1_extraction.agents.base_agent: AG11: completed paper_id=doi:10.1002/pon.4370 — span_labels=15, annotations=1, elapsed_ms=19412, status=success
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: Agent InstrumentValidationAgent produced 1 annotations, 15 span_labels
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-AG complete: 31 total raw annotations, 74 total span_labels
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-AG09: Running span-level reconciliation checks
+14:46:17 [INFO] crci.extraction.p1_extraction.agents.ag09_reconciliation: AG09: starting reconciliation for paper_id=doi:10.1002/pon.4370, total_spans=74 across 10 agents
+14:46:17 [INFO] crci.extraction.p1_extraction.agents.ag09_reconciliation: AG09: completed reconciliation for paper_id=doi:10.1002/pon.4370 — AG09 reconciliation: 74 spans checked, 0 pass, 79 warnings, 0 failures
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-AG09 complete: 74 verdicts — pass=0, warn=79, fail=0
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-CE: Running ConceptEngine ontology grounding
+14:46:17 [INFO] crci.extraction.p1_extraction.concept_engine: ConceptEngine loaded: 137 edges, 20 nodes, 12 instruments
+14:46:17 [INFO] crci.extraction.p1_extraction.concept_engine: ConceptEngine: 74/74 spans grounded (100% resolved)
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-CE complete: 74/74 spans grounded to edges
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-REC: Reconciling cross-agent annotations
+14:46:17 [INFO] crci.extraction.p1_extraction.reconciliation: Persisted 31 raw annotations for study doi:10.1002/pon.4370 to study_annotations_raw_v1
+14:46:17 [INFO] crci.extraction.p1_extraction.reconciliation: REC-a: Clustered 31 raw annotations into 8 clusters for study doi:10.1002/pon.4370
+14:46:17 [INFO] crci.extraction.p1_extraction.reconciliation: REC complete: 31 reconciled annotations from 31 raw emissions (conflict_rate=0.0%) for study doi:10.1002/pon.4370
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-REC complete: 31 reconciled, 0 conflicts
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-ATB: Validating annotations through trust boundary
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation af1ffa62-f150-4406-b1a9-4b8757eebfba has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=af1ffa62-f150-4406-b1a9-4b8757eebfba, category=population_specificity.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation c78ca4c0-15ab-4bae-a28c-ff18d34e1e0e has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=c78ca4c0-15ab-4bae-a28c-ff18d34e1e0e, category=population_specificity.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation bc1e10c2-5731-474a-b00b-7c36fbe639c5 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=bc1e10c2-5731-474a-b00b-7c36fbe639c5, category=population_specificity.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 3cedb988-1261-44f7-bc3c-c8f15bd4c140 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=3cedb988-1261-44f7-bc3c-c8f15bd4c140, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 3e7718c8-6cd4-462f-8baa-b9b3714aab7e has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=3e7718c8-6cd4-462f-8baa-b9b3714aab7e, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation c7907f64-ccbc-43e3-a5d0-cfaaf10c58c5 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=c7907f64-ccbc-43e3-a5d0-cfaaf10c58c5, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 50f944b1-1347-428e-b192-cbcb0b35acb9 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=50f944b1-1347-428e-b192-cbcb0b35acb9, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 2dfd4b06-bca3-4d33-b802-b52f3ab516cb has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=2dfd4b06-bca3-4d33-b802-b52f3ab516cb, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation b98e4e62-54b1-4a18-be6a-133f6af32888 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=b98e4e62-54b1-4a18-be6a-133f6af32888, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 67dfb8f5-9851-4a87-96f6-cb55557d09a8 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=67dfb8f5-9851-4a87-96f6-cb55557d09a8, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 85b13fa9-67c7-45d1-ba46-6c9fa98ccdfe has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=85b13fa9-67c7-45d1-ba46-6c9fa98ccdfe, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 9babff22-7e50-4406-8dac-1cb507a6b09d has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=9babff22-7e50-4406-8dac-1cb507a6b09d, category=measurement_limitation.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: efd89fe0-0e5b-44fd-a846-03ee355c6a1a (rule=AT-01)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation efd89fe0-0e5b-44fd-a846-03ee355c6a1a: rule=AT-01 reason=Missing provenance field: extraction_snippet
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 87bb27c4-3ffe-4a6c-b9d6-9af8c6947b87 (rule=AT-01)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 87bb27c4-3ffe-4a6c-b9d6-9af8c6947b87: rule=AT-01 reason=Missing provenance field: extraction_snippet
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: e3ea8f11-7f1d-4175-bd04-bc437cbb7d5a (rule=AT-01)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation e3ea8f11-7f1d-4175-bd04-bc437cbb7d5a: rule=AT-01 reason=Missing provenance field: extraction_snippet
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 8a805d5f-82e4-4606-a0ed-ba7c5a19453d has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=8a805d5f-82e4-4606-a0ed-ba7c5a19453d, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 8a805d5f-82e4-4606-a0ed-ba7c5a19453d (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 8a805d5f-82e4-4606-a0ed-ba7c5a19453d: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 5274fd41-11e5-4efc-ad8c-2042e3f02596 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=5274fd41-11e5-4efc-ad8c-2042e3f02596, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 5274fd41-11e5-4efc-ad8c-2042e3f02596 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 5274fd41-11e5-4efc-ad8c-2042e3f02596: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 877f3494-77fb-4de9-a04a-d08a7bab6ac8 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=877f3494-77fb-4de9-a04a-d08a7bab6ac8, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 877f3494-77fb-4de9-a04a-d08a7bab6ac8 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 877f3494-77fb-4de9-a04a-d08a7bab6ac8: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation ceb3a25c-ea92-4956-ad27-12514d39777f has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=ceb3a25c-ea92-4956-ad27-12514d39777f, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: ceb3a25c-ea92-4956-ad27-12514d39777f (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation ceb3a25c-ea92-4956-ad27-12514d39777f: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation b45f7dd3-d778-4e7a-beef-bb5964af9659 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=b45f7dd3-d778-4e7a-beef-bb5964af9659, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: b45f7dd3-d778-4e7a-beef-bb5964af9659 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation b45f7dd3-d778-4e7a-beef-bb5964af9659: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 27e3068f-d64d-46e9-8d7d-0f33c6da48dd has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=27e3068f-d64d-46e9-8d7d-0f33c6da48dd, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 27e3068f-d64d-46e9-8d7d-0f33c6da48dd (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 27e3068f-d64d-46e9-8d7d-0f33c6da48dd: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 75393119-e690-4a58-9712-09e55ed98353 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=75393119-e690-4a58-9712-09e55ed98353, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 75393119-e690-4a58-9712-09e55ed98353 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 75393119-e690-4a58-9712-09e55ed98353: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation b8942b98-595d-4645-be75-bdd9e6f40607 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=b8942b98-595d-4645-be75-bdd9e6f40607, category=mechanism_hypothesis.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: b8942b98-595d-4645-be75-bdd9e6f40607 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation b8942b98-595d-4645-be75-bdd9e6f40607: rule=AT-03 reason=mechanism_hypothesis requires 'mechanism_type' or 'pathway_id' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation ffda7285-5ca5-4dc5-bd6c-1fca72a88b38 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=ffda7285-5ca5-4dc5-bd6c-1fca72a88b38, category=temporal_onset.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: ffda7285-5ca5-4dc5-bd6c-1fca72a88b38 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation ffda7285-5ca5-4dc5-bd6c-1fca72a88b38: rule=AT-03 reason=temporal_onset requires 'onset_weeks' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation bc431efd-f013-4523-bb6a-20809b465da3 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=bc431efd-f013-4523-bb6a-20809b465da3, category=temporal_onset.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: bc431efd-f013-4523-bb6a-20809b465da3 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation bc431efd-f013-4523-bb6a-20809b465da3: rule=AT-03 reason=temporal_onset requires 'onset_weeks' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 82b7da89-4537-48af-8692-6f273110d368 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=82b7da89-4537-48af-8692-6f273110d368, category=temporal_onset.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 82b7da89-4537-48af-8692-6f273110d368 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 82b7da89-4537-48af-8692-6f273110d368: rule=AT-03 reason=temporal_onset requires 'onset_weeks' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 5845d491-4f61-4507-9d27-60c27ce33e9f has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=5845d491-4f61-4507-9d27-60c27ce33e9f, category=temporal_onset.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: 5845d491-4f61-4507-9d27-60c27ce33e9f (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation 5845d491-4f61-4507-9d27-60c27ce33e9f: rule=AT-03 reason=temporal_onset requires 'onset_weeks' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation b3ea25b5-c565-4382-9f23-5b8dbace8534 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=b3ea25b5-c565-4382-9f23-5b8dbace8534, category=research_gap.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: b3ea25b5-c565-4382-9f23-5b8dbace8534 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation b3ea25b5-c565-4382-9f23-5b8dbace8534: rule=AT-03 reason=research_gap requires 'gap_description' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation d1432298-a8a9-4c51-a86c-94b2cc390591 has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=d1432298-a8a9-4c51-a86c-94b2cc390591, category=research_gap.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: d1432298-a8a9-4c51-a86c-94b2cc390591 (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation d1432298-a8a9-4c51-a86c-94b2cc390591: rule=AT-03 reason=research_gap requires 'gap_description' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation b0db0bcf-5f70-4831-bca1-b9269d59632b has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=b0db0bcf-5f70-4831-bca1-b9269d59632b, category=research_gap.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: Emitted review task for ATB rejection: b0db0bcf-5f70-4831-bca1-b9269d59632b (rule=AT-03)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB REJECTED annotation b0db0bcf-5f70-4831-bca1-b9269d59632b: rule=AT-03 reason=research_gap requires 'gap_description' in structured_data_json
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: AT-01: annotation 5c61f657-b859-4aa8-a035-4f7b2086780e has extraction_snippet but no source_span_id (annotation-only agent). Passing with warning. Entity: annotation_id=5c61f657-b859-4aa8-a035-4f7b2086780e, category=clinical_significance.
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_trust_boundary: ATB complete for study doi:10.1002/pon.4370: 13 accepted, 18 rejected (of 31 input)
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-ATB complete: 13 accepted, 18 rejected
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_profiles: PROFILE: annotation yield for RCT_exercise meets expectations (8 categories found)
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-PROF: annotation yield meets profile expectations
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_lifecycle: Annotation af1ffa62-f150-4406-b1a9-4b8757eebfba promoted: category=population_specificity → consumer=scope_matching (conf=0.59)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_lifecycle: Annotation c78ca4c0-15ab-4bae-a28c-ff18d34e1e0e promoted: category=population_specificity → consumer=scope_matching (conf=0.59)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_lifecycle: Annotation 5c61f657-b859-4aa8-a035-4f7b2086780e promoted: category=clinical_significance → consumer=reporting (conf=0.59)
+14:46:17 [INFO] crci.extraction.p1_extraction.annotation_lifecycle: Annotation lifecycle: evaluated=13, promoted=3, reviewed=10, held=0, consumers={'scope_matching': 2, 'reporting': 1}
+14:46:17 [INFO] crci.extraction.p1_extraction.runner: P1-LIFECYCLE: evaluated=13, promoted=3, held=0
+14:46:17 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P1: Hybrid Multi-Agent Extraction' status=success
+14:46:17 [INFO] crci.extraction.pipeline: Starting chain 'TB: Trust Boundary' for run RUN_20260226T144444_94eff667
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1: Parsing numeric claims for doi:10.1002/pon.4370
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag01_9a226b007940, label_type=TITLE, raw_text='Effect of aerobic exercise on cancer-associated cognitive impairment: A proof-of'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag02_b343ce5c7ad6, label_type=STUDY_DESIGN, raw_text='RCT'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag02_8178b690f525, label_type=RANDOMIZATION, raw_text='simple'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag02_a4a54d5f984c, label_type=CONTROL_TYPE, raw_text='usual_care'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag02_a67769b239bb, label_type=STUDY_ARM, raw_text='aerobic exercise'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag02_932135afd1e7, label_type=STUDY_ARM, raw_text='usual lifestyle control'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_e7f23234c907, label_type=OUTCOME_INSTRUMENT, raw_text='FACT-Cog'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_d0dfa2eee75f, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_8e52146077a3, label_type=OUTCOME_INSTRUMENT, raw_text='Hopkins Verbal Learning Test-Revised'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_bc16ad737b4c, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_86cccd035909, label_type=OUTCOME_INSTRUMENT, raw_text='Trail Making Test'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_b5fc0f3e7e4a, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_2b30c90f6793, label_type=OUTCOME_INSTRUMENT, raw_text='FAS'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_9ec1fbc56e1f, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_78adac8dffe1, label_type=OUTCOME_INSTRUMENT, raw_text='Animal Naming'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_5617a2217739, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_58e38fd0f31b, label_type=OUTCOME_INSTRUMENT, raw_text='Stroop Test'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_0d5283d06ccd, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_2899289a7a14, label_type=OUTCOME_INSTRUMENT, raw_text='FACT-F'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_3e153f808f32, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_f2470d42ab9d, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_04a570338872, label_type=OUTCOME_INSTRUMENT, raw_text='Spielberger State Anxiety Scale'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag04_4cba06a73467, label_type=MEASUREMENT_TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Plausibility FAIL: |beta|=14.2000 > 5.0 for '-14.2' (label=MEAN_DIFFERENCE)
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse REJECTED (plausibility): span_id=ag05_868e8b490182, label_type=MEAN_DIFFERENCE, value=-14.2000, raw_text='-14.2'. Span rejected.
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.numeric_parser: Rule NP-11: SE imputed from p-value for 'p<0.01': SE=0.003882 (p=0.010000, z=2.5762)
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Plausibility FAIL: |beta|=35.0000 > 5.0 for '35%' (label=PERCENT_CHANGE)
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse REJECTED (plausibility): span_id=ag05_235a4c2b5f1b, label_type=PERCENT_CHANGE, value=35.0000, raw_text='35%'. Span rejected.
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.numeric_parser: Rule NP-11: SE imputed from p-value for 'p's > 0.40': SE=0.475366 (p=0.400000, z=0.8415)
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag06_6fc70f3ac068, label_type=INTERVENTION_TYPE, raw_text='aerobic exercise'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_9bb87dec6324, label_type=MEDIATOR, raw_text='hippocampal neurogenesis'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_c67d982f4e70, label_type=MEDIATOR, raw_text='brain activation'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_6745e25431f3, label_type=MEDIATOR, raw_text='cingulate cortex activation'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_8875aac103da, label_type=MEDIATOR, raw_text='superior frontal gyrus activation'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_064f1feccb99, label_type=MEDIATOR, raw_text='aerobic fitness'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_9f7f52b40486, label_type=MEDIATOR, raw_text='physical activity'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_484c2438c3f7, label_type=MEDIATOR, raw_text='brain structure'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag07_4ad961882235, label_type=MEDIATOR, raw_text='brain function'. Span rejected.
+14:46:17 [WARNING] crci.extraction.tb_trust_boundary.numeric_parser: Parse FAILED (no match): span_id=ag08_0d7aa20892b4, label_type=TIMEPOINT, raw_text='baseline'. Span rejected.
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.numeric_parser: NumericParser: 39/74 spans parsed successfully, 35 failed.
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1 complete: 39 claims parsed from 74 span labels
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1b: Assembling span groups
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.group_assembler: GroupAssembler: 38 groups → 71 records (0 complete, 0 derived, 0 proximity-rescued, 0% completion rate, 87% orphan rate)
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1b complete: 71 grouped evidence records from 39 valid claims
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=9.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=10.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with p=0.01, value=0.35, edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.4 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=19.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=52.4 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=52.4 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=100.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=100.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=10.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=10.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=150.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=150.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=2.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=2.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=12.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=12.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=24.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_COG_COMPLAINTS
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_COG_COMPLAINTS
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_VERBAL_FLUENCY
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_VERBAL_FLUENCY
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to record with value=0.0 (no p), edge=ER_ACTIVITY_PROC_SPEED
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S1c: Propagated study n=19 (companion_meta.n_total) to 71 records
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-QA: Running QA gates on 71 grouped records
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate: QA-GATE: Loaded 137 valid edge_relation_ids from definitions
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate: QA-GATE: 1/71 accepted, 70 rejected (QA-1: 0, QA-2: 0, QA-3: 70, QA-4: 0)
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 0: label_type='SAMPLE_SIZE_ARM', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 1: label_type='SAMPLE_SIZE_ARM', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 3: label_type='P_VALUE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 4: label_type='SAMPLE_SIZE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 5: label_type='MEAN_AGE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 6: label_type='MEAN_AGE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 7: label_type='PERCENT_FEMALE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 8: label_type='PERCENT_FEMALE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 9: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 10: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 11: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 12: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 13: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 14: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 15: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 16: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 17: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 18: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 19: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 20: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 21: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 22: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 23: label_type='OUTCOME_INSTRUMENT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 24: label_type='OUTCOME_INSTRUMENT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 25: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 26: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 27: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 28: label_type='MEASUREMENT_TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 29: label_type='DOSE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 30: label_type='DOSE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 31: label_type='DURATION_WEEKS', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 32: label_type='DURATION_WEEKS', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 33: label_type='FREQUENCY', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 34: label_type='FREQUENCY', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 35: label_type='TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 36: label_type='TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 37: label_type='TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 38: label_type='TIMEPOINT', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 39: label_type='FOLLOW_UP_WEEKS', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 40: label_type='FOLLOW_UP_WEEKS', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 41: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 42: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 43: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 44: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 45: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 46: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 47: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 48: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 49: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 50: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 51: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 52: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 53: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 54: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 55: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 56: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 57: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 58: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 59: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 60: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 61: label_type='MEASUREMENT_INVARIANCE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 62: label_type='MEASUREMENT_INVARIANCE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 63: label_type='MEASUREMENT_INVARIANCE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 64: label_type='MEASUREMENT_INVARIANCE', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 65: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 66: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 67: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 68: label_type='POPULATION_DESCRIPTOR', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 69: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.qa_gate:   REJECTED [QA-3] ESTIMAND_UNDECLARED: Record 70: label_type='INSTRUMENT_NAME', declared_estimand='None' — cannot map to allowed family
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.quarantine_writer: Quarantine: 70/70 rejected records persisted to edge_evidence_quarantine_v1 for run RUN_20260226T144444_94eff667
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-QA: 70 records quarantined, 1 accepted for P2
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S2: Running consistency checks
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.consistency_checker: Consistency check for paper doi:10.1002/pon.4370: 39 validated, 0 warnings, 0 rejected
+14:46:17 [INFO] crci.extraction.tb_trust_boundary.runner: TB-S2 complete: 39 validated, 0 warnings, 0 rejected
+14:46:17 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='TB: Trust Boundary' status=success
+14:46:17 [INFO] crci.extraction.pipeline: Starting chain 'P2: Harmonization & Gating' for run RUN_20260226T144444_94eff667
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2: Using 1 grouped evidence records from TB assembler
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2: Harmonizing 1 claims for doi:10.1002/pon.4370
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2: Resolved study_design='RCT' for doi:10.1002/pon.4370
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S1: Running plausibility checks
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S1 complete: 1/1 passed plausibility
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S2: Converting effect sizes
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S2 complete: 1 converted, 0 failed
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S3: Harmonizing scales
+14:46:17 [INFO] crci.extraction.p2_harmonization.runner: P2-S3: Using meta.json sample N=19 for F→d conversion
+14:46:18 [INFO] crci.extraction.p2_harmonization.se_derivation_cascade: span_id=grp_grp_003: SE cascade L3a — SE from exact p=0.0100, SE=0.1359
+14:46:18 [INFO] crci.extraction.p2_harmonization.scale_harmonizer: span_id=grp_grp_003: no SD available for group_diff standardization; using PROXY_PER_SD scale
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S3 complete: 1 harmonized
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S3b: Running SD standardization audit
+14:46:18 [WARNING] crci.extraction.p2_harmonization.sd_standardization: SD standardization for grp_grp_003: no SD available, returning raw values
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S4: Aligning orientation
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S4: Loaded 137 edge directions from DB
+14:46:18 [INFO] crci.extraction.p2_harmonization.orientation_aligner: span_id=grp_grp_003: sign flipped (dag=higher_better, reported_positive=True) — beta 0.3500 → -0.3500
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S4 complete: 1 aligned
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S5: Scoring identification status
+14:46:18 [INFO] crci.extraction.p2_harmonization.identification_scorer: span_id=grp_grp_003: identification_status=identified, factor=1.00 — base status from design 'RCT': identified
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-S5 complete: 1 scored
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-R2: Applying per-subtype enforcement rules
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: PG-01: RCT paper (subtype=RCT_exercise) lacks randomization language. Demoting identification_status to partially_identified.
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-FA: Assigning parameter families
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-LAYER  cancer_validation_status inferred as 'validated_cancer' from cancer_type='breast'
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2: HarmonizedClaim for doi:10.1002/pon.4370 is NOT complete for P3 (defaults will fire). Provenance: {'grade_level': 'default', 'days_since_measurement': 'default', 'is_trait': 'default', 'shared_control_flag': 'default', 'endpoint_vs_change': 'default', 'is_cancer_matched': 'default', 'is_superseded': 'default'}
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-FA complete: 1 records assigned families: {'edge_intervention': 1}
+14:46:18 [INFO] crci.extraction.evidence_writer: Evidence persistence for study doi:10.1002/pon.4370: 1 inserted, 0 updated, 0 skipped
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2-EW: Persisted 1 evidence rows to edge_evidence_v1
+14:46:18 [INFO] crci.extraction.p2_harmonization.runner: P2: Set context['missingness_report'] — 1/4 families present
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P2: Harmonization & Gating' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P3: Seven-Layer Heterogeneity' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.runner: P3: Calibrating 1 records for doi:10.1002/pon.4370 through 7 layers
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.runner: P3: Record type=HarmonizedClaim, fields=['cancer_validation_status', 'canonical_scale', 'ci_lower', 'ci_upper', 'construct', 'copy', 'days_since_measurement', 'dict', 'edge_relation_id', 'endpoint_vs_change', 'from_orm', 'grade_level', 'harmonization_status', 'harmonized_beta', 'harmonized_scale', 'harmonized_se', 'heterogeneity_json', 'is_cancer_matched', 'is_complete_for_p3', 'is_superseded', 'is_trait', 'json', 'layer_fields_provenance', 'ler_id', 'meta_source_flag', 'model_computed_fields', 'model_config', 'model_construct', 'model_copy', 'model_dump', 'model_dump_json', 'model_extra', 'model_fields', 'model_fields_set', 'model_json_schema', 'model_parametrized_name', 'model_post_init', 'model_rebuild', 'model_validate', 'model_validate_json', 'model_validate_strings', 'n_control', 'n_effect', 'n_total', 'n_treatment', 'parameter_family', 'parent_meta_study_id', 'parse_file', 'parse_obj', 'parse_raw', 'profile_id', 'pub_year', 'quality_rating', 'schema', 'schema_json', 'se_derivation_level', 'se_source', 'shared_control_flag', 'shared_control_study_id', 'study_design', 'study_id', 'update_forward_refs', 'validate']
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.runner: P3: Data availability: 0/1 have SE, 0/1 have beta
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.layers: apply_all_layers: processed 1 records through 7 layers
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.runner: P3 layers complete: 1 records calibrated
+14:46:18 [WARNING] crci.extraction.p3_heterogeneity.layers: L7 freshness: no publication year available. Using default weight 0.85.
+14:46:18 [INFO] crci.extraction.p3_heterogeneity.runner: P3 complete: 1/1 records survived (100% survival rate), 0 gate failures
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P3: Seven-Layer Heterogeneity' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P4: Aggregation + DCR' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4: Aggregating 1 calibrated records for doi:10.1002/pon.4370
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-CL: 0 lineage groups detected, 0 supplementary studies flagged
+14:46:18 [INFO] crci.extraction.p4_aggregation.evidence_grouper: Evidence grouper: produced 1 GroupedEvidence objects from 1 claims
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-GRP: 1 evidence groups formed
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-DCR: 1 groups after double-counting resolution
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-SC: shared-control split applied to 0 records, endpoint/change alignment on 0 groups
+14:46:18 [INFO] crci.extraction.p4_aggregation.meta_analyzer: Edge ER_ACTIVITY_PROC_SPEED: sigma_sq_structural defaulting to 0.2500 -- no limitation_unmeasured_confounder annotations
+14:46:18 [INFO] crci.extraction.p4_aggregation.meta_analyzer: Edge ER_ACTIVITY_PROC_SPEED: p_inclusion_adjustment = 0.0 -- no null_finding_context annotations
+14:46:18 [INFO] crci.extraction.p4_aggregation.meta_analyzer: Edge ER_ACTIVITY_PROC_SPEED: k=1 -> DIRECT, beta=-0.3500, SE=0.6625
+14:46:18 [INFO] crci.extraction.p4_aggregation.meta_analyzer: Meta-analysis complete: 1 edges processed, methods: {'DIRECT': 1}
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-MA: 1 pooled estimates computed
+14:46:18 [WARNING] crci.extraction.p4_aggregation.verification_escalation: edge=ER_ACTIVITY_PROC_SPEED, ler_id=LER_doi:10.1002/pon.4370_c2d0d9b42c0ae6b4: ESCALATED to Tier 1 by rules ['E1', 'E2', 'E4'] (w_i=1.0000)
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-ESC: 1 edges checked, 1 edges have escalated records
+14:46:18 [INFO] crci.extraction.p4_aggregation.prior_selector: Prior fallback level 4 (uninformative) for edge ER_ACTIVITY_PROC_SPEED: no literary prior found, using N(0.0, 1.0)
+14:46:18 [INFO] crci.extraction.p4_aggregation.prior_selector: Prior selection complete: 1 edges processed. Types: RobustMAP=0, Commensurate=0, Power=1, MechanisticSynth=0, Placeholder=0
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-PRI: priors assigned for 1 edges
+14:46:18 [INFO] crci.extraction.p4_aggregation.edge_writer: P4-WR complete: 1 edges written to edges_v1. Build ID: build_bc780b21f7ee. Methods: DIRECT=1
+14:46:18 [INFO] crci.extraction.p4_aggregation.runner: P4-WRT: 1 edges written to edges_v1
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P4: Aggregation + DCR' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P4B: Publication Bias Assessment' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p4b_publication_bias.runner: P4B: Running publication bias assessment on 1 pooled estimates
+14:46:18 [INFO] crci.extraction.p4b_publication_bias.runner: P4B: Skipping edge ER_ACTIVITY_PROC_SPEED — k=1 < 2 for bias assessment
+14:46:18 [INFO] crci.extraction.p4b_publication_bias.runner: P4B complete: 0 edges assessed for publication bias
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P4B: Publication Bias Assessment' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P5: Sufficiency & Coherence' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5: Running sufficiency assessment
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-MISS: 4 components tracked, 1 present (25.0% complete)
+14:46:18 [INFO] crci.extraction.p5_sufficiency.pathway_loader: Loaded 60 PathwayDefinition(s) from 22 registry pathways
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-CV: Loaded 60 pathway definitions from registries
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_0' has missing edges: ER_TNF_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_1' has missing edges: ER_TNF_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_2' has missing edges: ER_TNF_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_3' has missing edges: ER_CHEMO_TNF, ER_TNF_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_4' has missing edges: ER_CHEMO_CRP, ER_CRP_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_5' has missing edges: ER_CHEMO_IL6, ER_IL6_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_6' has missing edges: ER_CHEMO_TNF, ER_TNF_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_7' has missing edges: ER_CHEMO_CRP, ER_CRP_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_8' has missing edges: ER_CHEMO_IL6, ER_IL6_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_9' has missing edges: ER_CHEMO_TNF, ER_TNF_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_10' has missing edges: ER_CHEMO_CRP, ER_CRP_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_11' has missing edges: ER_CHEMO_IL6, ER_IL6_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_12' has missing edges: ER_CRP_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_13' has missing edges: ER_CRP_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_14' has missing edges: ER_CRP_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_15' has missing edges: ER_IL6_OIC, ER_OIC_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_16' has missing edges: ER_IL6_OIC, ER_OIC_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M01_NEUROINFLAMMATION__path_17' has missing edges: ER_IL6_OIC, ER_OIC_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_0' has missing edges: ER_CORTISOL_HPA, ER_HPA_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_1' has missing edges: ER_CORTISOL_HPA, ER_HPA_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_2' has missing edges: ER_STRESS_CORTISOL, ER_CORTISOL_HPA, ER_HPA_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_3' has missing edges: ER_STRESS_CORTISOL, ER_CORTISOL_HPA, ER_HPA_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_4' has missing edges: ER_CHEMO_CORTISOL, ER_CORTISOL_HPA, ER_HPA_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M03_HPA_DYSREGULATION__path_5' has missing edges: ER_CHEMO_CORTISOL, ER_CORTISOL_HPA, ER_HPA_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_0' has missing edges: ER_BDNF_NEUROPLAST, ER_NEUROPLAST_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_1' has missing edges: ER_BDNF_NEUROPLAST, ER_NEUROPLAST_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_2' has missing edges: ER_COGACTIVITY_EPIMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_3' has missing edges: ER_COGACTIVITY_BDNF, ER_BDNF_NEUROPLAST, ER_NEUROPLAST_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_4' has missing edges: ER_COGACTIVITY_BDNF, ER_BDNF_NEUROPLAST, ER_NEUROPLAST_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_5' has missing edges: ER_ACTIVITY_EPIMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_6' has missing edges: ER_ACTIVITY_NEUROPLAST, ER_NEUROPLAST_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_7' has missing edges: ER_ACTIVITY_BDNF, ER_BDNF_NEUROPLAST, ER_NEUROPLAST_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_8' has missing edges: ER_ACTIVITY_NEUROPLAST, ER_NEUROPLAST_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M04_NEUROPLASTICITY__path_9' has missing edges: ER_ACTIVITY_BDNF, ER_BDNF_NEUROPLAST, ER_NEUROPLAST_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M05_NEUROGENESIS__path_0' has missing edges: ER_BDNF_NEUROGENESIS, ER_NEUROGENESIS_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M07_DNA_DAMAGE__path_0' has missing edges: ER_RADIATION_GH2AX, ER_GH2AX_DNA, ER_DNA_SENESCENCE; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M07_DNA_DAMAGE__path_1' has missing edges: ER_CHEMO_GH2AX, ER_GH2AX_DNA, ER_DNA_SENESCENCE; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M08_GUT_BRAIN__path_0' has missing edges: ER_DIET_SHANNON, ER_SHANNON_GUTBRAIN, ER_GUTBRAIN_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M08_GUT_BRAIN__path_1' has missing edges: ER_CHEMO_SHANNON, ER_SHANNON_GUTBRAIN, ER_GUTBRAIN_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M08_GUT_BRAIN__path_2' has missing edges: ER_CHEMO_DIET, ER_DIET_SHANNON, ER_SHANNON_GUTBRAIN, ER_GUTBRAIN_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M08_GUT_BRAIN__path_3' has missing edges: ER_SHANNON_GUTBRAIN, ER_GUTBRAIN_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M09_SENESCENCE__path_0' has missing edges: ER_P16_SENESCENCE, ER_SENESCENCE_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M12_EPIGENETIC__path_0' has missing edges: ER_CHEMO_EPIGENETIC, ER_EPIGENETIC_NEUROPLAST; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M12_EPIGENETIC__path_1' has missing edges: ER_CHEMO_EPIGENETIC, ER_EPIGENETIC_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M13_METABOLIC__path_0' has missing edges: ER_DIET_GLUCOSE, ER_GLUCOSE_METABOLIC, ER_METABOLIC_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M13_METABOLIC__path_1' has missing edges: ER_GLUCOSE_METABOLIC, ER_METABOLIC_OIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M16_MYELIN__path_0' has missing edges: ER_CHEMO_MYELIN, ER_MYELIN_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M16_MYELIN__path_1' has missing edges: ER_CHEMO_MYELIN, ER_MYELIN_VERBAL; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M17_DOPAMINERGIC__path_0' has missing edges: ER_FATIGUE_SELFEFFICACY; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M17_DOPAMINERGIC__path_1' has missing edges: ER_CHEMO_DOPAMINE, ER_DOPAMINE_FATIGUE, ER_FATIGUE_SELFEFFICACY; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_M17_DOPAMINERGIC__path_2' has missing edges: ER_CHEMO_DOPAMINE, ER_DOPAMINE_INHIBITION; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C1_SLEEP__path_0' has missing edges: ER_LIGHT_SLEEP, ER_SLEEP_EPISODIC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C1_SLEEP__path_1' has missing edges: ER_LIGHT_SLEEP, ER_SLEEP_ATTN; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C1_SLEEP__path_2' has missing edges: ER_LIGHT_SLEEP, ER_SLEEP_WORKMEM; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C2_FATIGUE__path_0' has missing edges: ER_PAIN_FATIGUE, ER_FATIGUE_PROCSPEED; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C2_FATIGUE__path_1' has missing edges: ER_PAIN_FATIGUE, ER_FATIGUE_ATTN; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C5_SOCIAL__path_0' has missing edges: ER_DEPRESSION_SOCIAL, ER_SOCIAL_EXEC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C5_SOCIAL__path_1' has missing edges: ER_DEPRESSION_SOCIAL, ER_SOCIAL_VERBAL; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C5_SOCIAL__path_2' has missing edges: ER_FATIGUE_SOCIAL, ER_SOCIAL_EXEC; marking as UNTESTABLE
+14:46:18 [WARNING] crci.extraction.p5_sufficiency.chain_validator: P5-S2: Pathway 'PW_C5_SOCIAL__path_3' has missing edges: ER_FATIGUE_SOCIAL, ER_SOCIAL_VERBAL; marking as UNTESTABLE
+14:46:18 [INFO] crci.extraction.p5_sufficiency.chain_validator: P5 Chain Validation complete: 60 pathways validated, 0 PASS, 0 MONITOR, 0 INVESTIGATE, 60 UNTESTABLE
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-CV: 60 chains validated
+14:46:18 [INFO] crci.extraction.p5_sufficiency.coverage_analyzer: P5-S1 Coverage: 1 edges total, 0 STRONG, 0 MODERATE, 1 WEAK, 0 GAP (coverage=100.0%)
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-COV: coverage 100.0% (1/1 edges)
+14:46:18 [INFO] crci.extraction.p5_sufficiency.evalue_computer: P5-S6 E-value for edge 'ER_ACTIVITY_PROC_SPEED': beta=-0.3500, RR=1.3751, E-value=2.0932 (MODERATE)
+14:46:18 [INFO] crci.extraction.p5_sufficiency.evalue_computer: P5-S6 E-value batch: 1 edges, avg=2.0932, min=2.0932, 0 fragile (E < 1.5)
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-EV: E-values computed for 1 edges
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5-GAP: no systematic gaps detected
+14:46:18 [INFO] crci.extraction.p5_sufficiency.sufficiency_reporter: P5-S7 Sufficiency Report: MARGINAL — 0 sufficient, 1 marginal, 0 insufficient out of 1 edges, 0 gaps, 0 warnings
+14:46:18 [INFO] crci.extraction.p5_sufficiency.runner: P5 complete: overall grade=unknown
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P5: Sufficiency & Coherence' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P6: Deployment Validation' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p6_deployment.runner: P6: Running deployment validation
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G1 (minimum_edges): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G2 (positive_se): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G3 (positive_k): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G4 (plausible_betas): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G5 (se_not_excessive): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G6 (consistent_scales): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G7 (no_duplicate_edges): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G8 (sufficiency_check): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G9 (no_severe_bias): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G10 (coverage_minimum): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G11 (edge_param_ids): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G12 (heterogeneity): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G13 (prior_documented): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G14 (aggregation_documented): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G15 (se_inflation_coherence): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G16 (se_inflation_pub_bias): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G17 (total_n_positive): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Rule G18 (no_critical_gaps): PASS
+14:46:18 [INFO] crci.extraction.p6_deployment.validation_runner: P6-VR Validation complete: 18 PASS, 0 WARN, 0 FAIL (total 18 rules)
+14:46:18 [INFO] crci.extraction.p6_deployment.runner: P6-VAL: 18 passed, 0 warnings, 0 failed
+14:46:18 [INFO] crci.extraction.p6_deployment.deploy_gate: P6-DG: DEPLOY — all 18 rules passed, 0 warnings.
+14:46:18 [INFO] crci.extraction.p6_deployment.runner: P6 complete: deployment gate DEPLOY
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P6: Deployment Validation' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Starting chain 'P7: Full-Spectrum Parameter Compilation' for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Starting P7 compilation for run RUN_20260226T144444_94eff667
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Psychometric compiler: no instrument evidence rows, skipping
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Prior compiler: no population norms rows, skipping
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Temporal compiler: no temporal evidence rows, skipping
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Dose-response compiler: no dose evidence rows, skipping
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Modifier compiler: no subgroup evidence rows, skipping
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: Synergy compiler: no factorial trial data available, skipping (expected — factorial designs rare in cancer cognition)
+14:46:18 [INFO] crci.extraction.p7_compilers.runner: P7 compilation complete: 0 total rows compiled, 0 gates passed, 0 gates failed
+14:46:18 [INFO] crci.extraction.pipeline: Checkpoint: run=RUN_20260226T144444_94eff667 stage='P7: Full-Spectrum Parameter Compilation' status=success
+14:46:18 [INFO] crci.extraction.pipeline: Extraction run RUN_20260226T144444_94eff667 completed successfully.
+14:46:18 [INFO] crci.extraction.pipeline: POST-INTEGRITY: check complete for study doi:10.1002/pon.4370 (1 compiled edges, 0 UNASSIGNED, 0 NULL beta)
+14:46:18 [WARNING] __main__: Completeness check failed: Study 'doi:10.1002/pon.4370' not found in study_registry_v1
+
+======================================================================
+EXTRACTION RESULTS
+======================================================================
+Run ID:    RUN_20260226T144444_94eff667
+Status:    completed
+PDF:       data/manual_uploads/pdfs/campbell2017.pdf
+
+Stages completed: 10
+  [OK] P0: Pre-Extraction Triage
+  [OK] P1: Hybrid Multi-Agent Extraction
+  [OK] TB: Trust Boundary
+  [OK] P2: Harmonization & Gating
+  [OK] P3: Seven-Layer Heterogeneity
+  [OK] P4: Aggregation + DCR
+  [OK] P4B: Publication Bias Assessment
+  [OK] P5: Sufficiency & Coherence
+  [OK] P6: Deployment Validation
+  [OK] P7: Full-Spectrum Parameter Compilation
+======================================================================
