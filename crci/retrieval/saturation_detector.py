@@ -1,9 +1,9 @@
-# VERIFIED: formulas — SAT-1 (novelty ratio), SAT-2 (saturation flag)
-# VERIFIED: imports — shared/config, shared/models/tables
-# VERIFIED: backward wiring — reads acquisition_queue_v1 rows
-# VERIFIED: forward wiring — updates saturation_flag, consumed by acquisition_scheduler
-# VERIFIED: no hardcoded formula parameters
-# VERIFIED: gates — SAT-G1 halts acquisition loop when saturated
+# ASSUMPTIONS:
+#   - Novelty ratio is computed from per-cycle DOI/PMID overlap.
+#   - Saturation flag is advisory; caller decides whether to halt.
+# TEST COVERAGE: None yet — needs tests/test_saturation_detector.py
+# REVIEW:
+#   - Cycle numbering assumes sequential invocation within one session.
 """
 Component: SYS_EXTRACTION.EX-ACQ.SaturationDetector
 Spec: Master Spec §9.7 (Search Saturation)

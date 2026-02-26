@@ -749,6 +749,8 @@ class StudyRegistry(Base):
     journal = Column(Text)
     year = Column(Integer)
     doi = Column(Text)
+    doi_normalized = Column(Text)  # Normalized DOI for dedup (lowercase, no prefix)
+    id_source = Column(Text, default="legacy")  # 'doi', 'pmid', 'pmcid', 'hash', 'legacy'
     pmid = Column(Text)
     pmcid = Column(Text)
     study_design = Column(Text)
@@ -774,6 +776,12 @@ class StudyRegistry(Base):
     multi_arm = Column(Boolean, default=False)
     n_arms = Column(Integer)
     trial_registry_id = Column(Text)
+
+    # v2.0: Hop provenance — set at ingestion time when a study is acquired
+    # via hop discovery (MS §9.4). Direct acquisitions have hop_depth=0.
+    hop_depth = Column(Integer, default=0)
+    hop_source_study_id = Column(Text)      # study_id of the MA/SR that triggered this hop
+    acquisition_queue_id = Column(Text)     # FK to acquisition_queue_v1.queue_id
 
 
 class StudyCohortProfile(Base):
@@ -1017,6 +1025,9 @@ class EdgeEvidence(Base):
     parameter_family = Column(Text)          # psychometrics, edge_intervention, etc.
     freshness_w = Column(Float)              # computed w_fresh
     freshness_superseded = Column(Boolean, default=False)
+
+    # v2.1: Idempotent evidence writes (PERSISTENCE_FIX_CHANGELOG.md S3)
+    span_hash = Column(Text)  # Deterministic hash for dedup key
 
     notes = Column(Text)
 

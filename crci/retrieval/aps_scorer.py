@@ -1,9 +1,13 @@
-# VERIFIED: formula matches AUTOMATED_RETRIEVAL_PLAN.md Part 6, Step 3
-# VERIFIED: APS = 0.35·EdgeGap + 0.20·DesignBonus + 0.20·PopMatch
-#                + 0.15·Recency + 0.10·SourceQuality
-# VERIFIED: author-gap boost: APS × 1.5 (capped at 1.0)
-# VERIFIED: imports — config for APS_WEIGHTS, APS_THRESHOLD
-# VERIFIED: gate: APS >= 0.40 → DISPATCH, < 0.40 → DEFER
+# ASSUMPTIONS:
+#   - CandidateMetadata is populated from search API responses.
+#   - APS weights sum to 1.0 (enforced by config validation).
+#   - Hop boost is additive, not multiplicative (spec: +0.15 delta).
+# TEST COVERAGE: None yet — needs tests/test_aps_scorer.py
+# REVIEW:
+#   - _score_edge_gap defaults to 0.5 without gap context — this is a
+#     generous assumption; real gap data requires populated edge tables.
+#   - _score_source_quality uses citation counts only — journal impact
+#     factor or h-index data not yet integrated.
 """
 Component: SYS_EXTRACTION.EX-ACQ.APSScorer
 Spec: AUTOMATED_RETRIEVAL_PLAN.md Part 6, Step 3
@@ -161,6 +165,7 @@ def score_candidates(
     target_entity_ids: dict[str, str] | None = None,
     author_gap_boost_ids: set[str] | None = None,
     workstream: str | None = None,
+    hop_boost_map: dict[str, float] | None = None,
 ) -> list[APSScoredCandidate]:
     """Score candidates using the APS formula.
 
@@ -170,12 +175,19 @@ def score_candidates(
     Author-gap boost: If candidate maps to an edge with author-identified
     research gaps (from study_annotations_v1), APS_final = min(1.0, APS × 1.5)
 
+    Hop citation boost: If candidate was queued via hop discovery,
+    APS_final += citation_hop_boost (additive, from config.HOP_CITATION_APS_BOOST).
+    This makes hop-derived candidates more likely to pass the DISPATCH threshold.
+
     Args:
         candidates: CandidateMetadata from search_coordinator.
         gap_edges: Set of edge IDs with insufficient evidence.
         target_entity_ids: Mapping from candidate dedup key to target entity ID.
         author_gap_boost_ids: Set of edge IDs with author-identified gaps.
         workstream: Workstream name for the candidates.
+        hop_boost_map: Mapping from candidate dedup key to hop citation boost value.
+            Populated from acquisition_queue_v1.aps_components_json when re-scoring
+            hop-derived candidates.
 
     Returns:
         List of APSScoredCandidate, sorted by APS descending.
@@ -219,6 +231,20 @@ def score_candidates(
                 candidate.title or candidate.doi,
                 target_id,
             )
+
+        # Hop citation boost (additive)
+        hop_boosted = False
+        if hop_boost_map:
+            ckey = _candidate_key(candidate)
+            hop_delta = hop_boost_map.get(ckey, 0.0)
+            if hop_delta > 0:
+                aps = min(1.0, aps + hop_delta)
+                hop_boosted = True
+                logger.debug(
+                    "Hop citation boost +%.2f applied for '%s'",
+                    hop_delta,
+                    candidate.title or candidate.doi,
+                )
 
         # Gate: APS >= threshold → DISPATCH, else DEFER
         decision = "DISPATCH" if aps >= threshold else "DEFER"

@@ -1,8 +1,9 @@
-# VERIFIED: flow matches AUTOMATED_RETRIEVAL_PLAN.md Part 6, Step 4
-# VERIFIED: source priority: Europe PMC → Unpaywall → skip (abstract-only)
-# VERIFIED: imports — adapters, config for FULLTEXT_SOURCE_PRIORITY
-# VERIFIED: backward wiring — reads APSScoredCandidate from aps_scorer
-# VERIFIED: forward wiring — writes RetrievalResult + acquisition_queue_v1
+# ASSUMPTIONS:
+#   - APSScoredCandidate has .candidate.doi or .candidate.pmid for lookup.
+#   - Europe PMC and Unpaywall adapters return PDF bytes or None.
+# TEST COVERAGE: None yet — needs tests/test_fulltext_retriever.py
+# REVIEW:
+#   - No retry logic on transient HTTP failures from source adapters.
 """
 Component: SYS_EXTRACTION.EX-ACQ.FulltextRetriever
 Spec: AUTOMATED_RETRIEVAL_PLAN.md Part 6, Step 4

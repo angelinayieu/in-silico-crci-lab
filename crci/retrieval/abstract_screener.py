@@ -1,9 +1,9 @@
-# VERIFIED: formulas — keyword intersection score, design boost
-# VERIFIED: imports — shared/config, retrieval/models
-# VERIFIED: backward wiring — reads CandidateMetadata from search_coordinator
-# VERIFIED: forward wiring — writes AbstractRelevance to acquisition_queue_v1
-# VERIFIED: no hardcoded formula parameters
-# VERIFIED: gates — IRRELEVANT blocks retrieval dispatch
+# ASSUMPTIONS:
+#   - CandidateMetadata.abstract is populated from search API responses.
+#   - Keyword lists in config cover CRCI-relevant terms adequately.
+# TEST COVERAGE: None yet — needs tests/test_abstract_screener.py
+# REVIEW:
+#   - Keyword matching is simple substring; no NLP or semantic similarity.
 """
 Component: SYS_EXTRACTION.EX-ACQ.AbstractScreener
 Spec: AUTOMATED_RETRIEVAL_PLAN.md Part 3 (Pre-Retrieval Filter)

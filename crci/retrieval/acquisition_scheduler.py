@@ -1,8 +1,12 @@
-# VERIFIED: flow matches AUTOMATED_RETRIEVAL_PLAN.md Part 6, Steps 1-7
-# VERIFIED: imports — query_generator, search_coordinator, aps_scorer, fulltext_retriever
-# VERIFIED: v2.0 — abstract_screener, id_resolver, saturation_detector, hop_discoverer
-# VERIFIED: budget-aware, workstream-configurable
-# VERIFIED: modes: single_run, continuous (loop), dry_run
+# ASSUMPTIONS:
+#   - All retrieval sub-modules (query_generator, search_coordinator, etc.) are
+#     importable and functional. Failures are caught and logged, not fatal.
+#   - Session is provided by caller; this module does NOT commit.
+# TEST COVERAGE: None yet — needs tests/test_acquisition_scheduler.py
+# REVIEW:
+#   - Hop candidates queued with aps_score=None need re-scoring in next cycle.
+#     Current flow does not re-pull queued candidates for APS scoring.
+#   - Exception swallowing (try/except continue) may hide systematic failures.
 """
 Component: SYS_EXTRACTION.EX-ACQ.AcquisitionScheduler
 Spec: AUTOMATED_RETRIEVAL_PLAN.md Part 6 (Steps 1-7), Part 9 (Budget)

@@ -1,19 +1,34 @@
-# VERIFIED: formulas — HOP-1 (citation APS boost)
-# VERIFIED: imports — shared/config, shared/models/tables, retrieval/models
-# VERIFIED: backward wiring — reads study_registry_v1, study_annotations_v1
-# VERIFIED: forward wiring — writes acquisition_queue_v1 entries
-# VERIFIED: no hardcoded formula parameters
-# VERIFIED: gates — HOP-G1 (max depth), HOP-G2 (dedup against existing)
+# ASSUMPTIONS:
+#   - StudyRegistry.included_study_ids_json is TEXT containing a JSON array of
+#     objects with optional keys: doi, pmid, title, first_author, year.
+#   - StudyRegistry.hop_depth is set at ingestion time (0 for directly acquired).
+#   - AcquisitionQueue JSONB columns accept Python dicts directly (SQLAlchemy JSON type).
+#   - Caller commits the session after calling these functions.
+# TEST COVERAGE: tests/test_hop_discoverer.py
+# REVIEW:
+#   - _get_ma_edge_ids returns empty if P2-P4 haven't run yet for the MA.
+#     This is expected — target_edge_ids_json will be None.
+#   - Annotation-based hops require structured_data_json.cited_references —
+#     if agents don't produce this field, no annotation hops will fire.
 """
 Component: SYS_EXTRACTION.EX-ACQ.HopDiscoverer
 Spec: Master Spec §9.4 (Content-Driven Hops)
       AUTOMATED_RETRIEVAL_PLAN.md Part 3 (Citation Chain Expansion)
-Formulas: HOP-1 (citation APS boost = +0.15 per MS §9.4)
-Reads: study_registry_v1 (extracted papers), study_annotations_v1 (references)
-       edge_evidence_v1 (meta-analysis included_study_ids)
+Formulas: HOP-1 — citation APS boost = +HOP_CITATION_APS_BOOST (additive delta,
+          stored in aps_components_json; aps_score is set to None pending full scoring)
+Reads: study_registry_v1 (extracted papers, hop_depth column)
+       study_annotations_v1 (literature_comparison, mechanism_hypothesis, research_gap)
+       edge_evidence_v1 (optional — for target_edge_ids)
 Writes: acquisition_queue_v1 (new hop-derived candidates)
-Gates: HOP-G1 — hop_depth <= HOP_MAX_DEPTH (no infinite chains)
-       HOP-G2 — dedup against study_registry_v1 (no re-acquisition)
+Gates:
+    HOP-G1 — hop_depth + 1 <= HOP_MAX_DEPTH (no infinite chains)
+    HOP-G2 — dedup against normalized DOI/PMID in study_registry_v1 + acquisition_queue_v1
+    HOP-G3 — per-paper cap: <= HOP_MAX_TARGETS_PER_PAPER per source MA/SR
+    HOP-G4 — global cap: <= HOP_MAX_TOTAL_PER_RUN per discovery invocation
+Transaction semantics:
+    This module calls session.flush() but NOT session.commit().
+    The caller (typically acquisition_scheduler or pipeline.py) is responsible
+    for committing. Safe to call inside an outer transaction.
 """
 from __future__ import annotations
 
@@ -31,28 +46,58 @@ from crci.shared.models.tables import (
     StudyRegistry,
     EdgeEvidence,
 )
+from crci.retrieval.identifier_utils import (
+    normalize_doi,
+    normalize_pmid,
+    candidate_dedup_key,
+)
 
 logger = logging.getLogger(__name__)
 
+# ═══════════════════════════════════════════════════════════════
+#  SUBTYPE ALLOWLIST — which study_subtype values are MA/SR
+# ═══════════════════════════════════════════════════════════════
 
-def discover_hops_from_meta_analyses(session: Session) -> int:
+_MA_SR_SUBTYPES: set[str] = {
+    # PaperSubtype enum canonical values
+    "meta_analysis",
+    "systematic_review",
+    # Legacy / fine-grained subtypes (future classification)
+    "pairwise_ma", "nma", "ipdma",
+    "dose_response_ma", "mega_analysis",
+}
+
+
+def discover_hops_from_meta_analyses(
+    session: Session,
+    global_budget_remaining: int | None = None,
+) -> int:
     """Extract included study lists from meta-analyses and queue them.
 
-    Meta-analyses in study_registry_v1 with included_study_ids_json
-    contain DOIs/PMIDs of their component studies. These are high-value
-    acquisition targets (same edge, validated by MA authors).
+    For each MA/SR in study_registry_v1 that has included_study_ids_json,
+    queue the constituent studies for acquisition.
 
-    Formula HOP-1: citation_aps_boost = +HOP_CITATION_APS_BOOST
-    Gate HOP-G1: hop_depth <= HOP_MAX_DEPTH
-    Gate HOP-G2: skip if DOI/PMID already in study_registry_v1
+    APS semantics (HOP-1): The hop boost (+0.15) is stored as a component
+    in aps_components_json. aps_score is set to None because full APS
+    scoring requires abstract/metadata that we don't have yet. The APS
+    scorer will compute the real score and add the boost when the candidate
+    is processed in the next acquisition cycle.
+
+    Gates enforced:
+        HOP-G1: source study's hop_depth + 1 <= HOP_MAX_DEPTH
+        HOP-G2: normalized DOI/PMID/dedup_key not in known sets
+        HOP-G3: <= HOP_MAX_TARGETS_PER_PAPER per source study
+        HOP-G4: <= global_budget_remaining (if provided)
 
     Args:
-        session: Active database session.
+        session: Active database session. Caller must commit.
+        global_budget_remaining: If provided, stop after this many candidates.
 
     Returns:
         Number of new candidates queued.
     """
     max_depth = config.HOP_MAX_DEPTH
+    per_paper_cap = config.HOP_MAX_TARGETS_PER_PAPER
 
     # Find meta-analyses with included study lists
     stmt = (
@@ -60,18 +105,12 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
             StudyRegistry.study_id,
             StudyRegistry.included_study_ids_json,
             StudyRegistry.study_subtype,
+            StudyRegistry.hop_depth,
         )
         .where(
             and_(
                 StudyRegistry.included_study_ids_json.isnot(None),
-                StudyRegistry.study_subtype.in_([
-                    # PaperSubtype enum values (canonical)
-                    "meta_analysis",
-                    "systematic_review",
-                    # Legacy/fine-grained subtypes (for future classification)
-                    "pairwise_ma", "nma", "ipdma",
-                    "dose_response_ma", "mega_analysis",
-                ]),
+                StudyRegistry.study_subtype.in_(list(_MA_SR_SUBTYPES)),
             )
         )
     )
@@ -81,16 +120,26 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
         logger.info("No meta-analyses with included study lists found")
         return 0
 
-    # Load known DOIs and PMIDs for HOP-G2 dedup
-    known_dois, known_pmids = _load_known_identifiers(session)
-    queued_dois, queued_pmids = _load_queued_identifiers(session)
-    all_known_dois = known_dois | queued_dois
-    all_known_pmids = known_pmids | queued_pmids
+    # Load known identifiers for HOP-G2 dedup (normalized)
+    known_keys = _load_all_known_keys(session)
 
     new_count = 0
+    budget = global_budget_remaining
 
     for row in ma_rows:
         study_id = row.study_id
+        source_depth = row.hop_depth or 0
+
+        # Gate HOP-G1: check if hops from this source would exceed max depth
+        candidate_depth = source_depth + 1
+        if candidate_depth > max_depth:
+            logger.debug(
+                "HOP-G1: skipping MA %s — hop_depth %d would exceed max %d",
+                study_id, candidate_depth, max_depth,
+            )
+            continue
+
+        # Parse included studies
         try:
             included_ids = json.loads(row.included_study_ids_json)
         except (json.JSONDecodeError, TypeError):
@@ -100,12 +149,35 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
             continue
 
         if not isinstance(included_ids, list):
+            logger.warning(
+                "included_study_ids_json is not a list for study %s", study_id,
+            )
             continue
 
-        # Find edges associated with this MA for target_edge_ids
+        # Try to get target edges (may be empty if P2-P4 haven't run yet)
         target_edges = _get_ma_edge_ids(session, study_id)
 
+        queued_this_paper = 0
+
         for entry in included_ids:
+            # Gate HOP-G3: per-paper cap
+            if queued_this_paper >= per_paper_cap:
+                logger.info(
+                    "HOP-G3: per-paper cap (%d) reached for MA %s, "
+                    "skipping remaining %d entries",
+                    per_paper_cap, study_id,
+                    len(included_ids) - queued_this_paper,
+                )
+                break
+
+            # Gate HOP-G4: global cap
+            if budget is not None and new_count >= budget:
+                logger.info(
+                    "HOP-G4: global budget (%d) exhausted during MA hop discovery",
+                    budget,
+                )
+                break
+
             if not isinstance(entry, dict):
                 continue
 
@@ -118,7 +190,6 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
             # Build search query for entries without DOI/PMID
             search_query = None
             if not doi and not pmid:
-                # Construct search query from author + year
                 if first_author and year:
                     search_query = f"{first_author} {year}"
                 elif first_author:
@@ -126,45 +197,56 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
                 elif title:
                     search_query = title
                 else:
-                    continue  # Skip if no identifiable info
+                    continue  # Skip: no identifiable info
 
-            # Gate HOP-G2: skip known papers
-            if doi and doi.lower() in all_known_dois:
-                continue
-            if pmid and pmid in all_known_pmids:
+            # Gate HOP-G2: dedup using normalized keys
+            dedup_key = candidate_dedup_key(
+                doi=doi or None,
+                pmid=pmid or None,
+                title=title or None,
+                first_author=first_author or None,
+                year=year,
+            )
+            if dedup_key in known_keys:
                 continue
 
-            # Queue the hop candidate
-            # Note: If no DOI/PMID, use search_query in candidate_title
-            # for the acquisition system to search by author+year
+            # Normalize identifiers before storing
+            ndoi = normalize_doi(doi) if doi else None
+            npmid = normalize_pmid(pmid) if pmid else None
             display_title = title or search_query
+
             queue_entry = AcquisitionQueue(
                 queue_id=f"HOP_{uuid.uuid4().hex[:12]}",
-                candidate_doi=doi or None,
-                candidate_pmid=pmid or None,
+                candidate_doi=ndoi,
+                candidate_pmid=npmid,
                 candidate_title=display_title,
-                # Pass Python objects for JSONB columns (no json.dumps — SQLAlchemy handles serialization)
                 target_edge_ids_json=target_edges if target_edges else None,
-                aps_score=config.HOP_CITATION_APS_BOOST,  # Formula HOP-1: base boost
+                # APS semantics: aps_score=None (pending full scoring).
+                # The boost is stored as a component for the APS scorer to apply.
+                aps_score=None,
                 aps_components_json={
                     "citation_hop_boost": config.HOP_CITATION_APS_BOOST,
+                    "hop_source": "meta_analysis_included_list",
                     "search_query": search_query,
                     "first_author": first_author,
                     "year": year,
+                    "dedup_key": dedup_key,
                 },
                 status="queued",
                 retrieval_status="PENDING",
                 hop_source_study_id=study_id,
-                hop_depth=1,  # Gate HOP-G1: depth=1 (direct from MA)
+                hop_depth=candidate_depth,
             )
             session.add(queue_entry)
             new_count += 1
+            queued_this_paper += 1
 
             # Track for dedup within this batch
-            if doi:
-                all_known_dois.add(doi.lower())
-            if pmid:
-                all_known_pmids.add(pmid)
+            known_keys.add(dedup_key)
+
+        # Check global budget after each paper
+        if budget is not None and new_count >= budget:
+            break
 
     session.flush()
 
@@ -175,18 +257,30 @@ def discover_hops_from_meta_analyses(session: Session) -> int:
     return new_count
 
 
-def discover_hops_from_annotations(session: Session) -> int:
+def discover_hops_from_annotations(
+    session: Session,
+    global_budget_remaining: int | None = None,
+) -> int:
     """Extract cited references from annotations and queue promising ones.
 
     Papers that cite other papers in their discussion (captured as annotations
     with category='literature_comparison' or 'mechanism_hypothesis') may
     point to high-value targets.
 
-    Gate HOP-G1: hop_depth <= HOP_MAX_DEPTH
-    Gate HOP-G2: dedup against study_registry_v1 + acquisition_queue_v1
+    APS semantics: Same as discover_hops_from_meta_analyses — aps_score=None,
+    hop boost stored in aps_components_json for the APS scorer to apply.
+
+    Gates enforced:
+        HOP-G1: source study's hop_depth + 1 <= HOP_MAX_DEPTH
+        HOP-G2: normalized dedup_key not in known sets
+        HOP-G4: <= global_budget_remaining (if provided)
+
+    Note: No per-paper cap (HOP-G3) applied here because annotation refs
+    are typically few per paper and already filtered by category.
 
     Args:
-        session: Active database session.
+        session: Active database session. Caller must commit.
+        global_budget_remaining: If provided, stop after this many candidates.
 
     Returns:
         Number of new candidates queued.
@@ -214,18 +308,29 @@ def discover_hops_from_annotations(session: Session) -> int:
         logger.debug("No citation annotations found for hop discovery")
         return 0
 
-    known_dois, known_pmids = _load_known_identifiers(session)
-    queued_dois, queued_pmids = _load_queued_identifiers(session)
-    all_known_dois = known_dois | queued_dois
-    all_known_pmids = known_pmids | queued_pmids
+    known_keys = _load_all_known_keys(session)
+
+    # Cache hop_depth per study_id to avoid repeated queries
+    depth_cache: dict[str, int] = {}
 
     new_count = 0
+    budget = global_budget_remaining
 
     for ann in annotations:
+        # Gate HOP-G4: global cap
+        if budget is not None and new_count >= budget:
+            logger.info(
+                "HOP-G4: global budget (%d) exhausted during annotation hop discovery",
+                budget,
+            )
+            break
+
         try:
-            data = json.loads(ann.structured_data_json) if isinstance(
-                ann.structured_data_json, str
-            ) else ann.structured_data_json
+            data = (
+                json.loads(ann.structured_data_json)
+                if isinstance(ann.structured_data_json, str)
+                else ann.structured_data_json
+            )
         except (json.JSONDecodeError, TypeError):
             continue
 
@@ -237,9 +342,27 @@ def discover_hops_from_annotations(session: Session) -> int:
         if not isinstance(refs, list):
             continue
 
+        # Gate HOP-G1: check source depth (cached)
+        source_id = ann.study_id
+        if source_id not in depth_cache:
+            depth_cache[source_id] = _get_study_hop_depth(session, source_id)
+        source_depth = depth_cache[source_id]
+        candidate_depth = source_depth + 1
+
+        if candidate_depth > max_depth:
+            logger.debug(
+                "HOP-G1: skipping annotation from %s — depth %d > max %d",
+                source_id, candidate_depth, max_depth,
+            )
+            continue
+
         for ref in refs:
             if not isinstance(ref, dict):
                 continue
+
+            # Gate HOP-G4: global cap (inner loop)
+            if budget is not None and new_count >= budget:
+                break
 
             doi = ref.get("doi", "")
             pmid = ref.get("pmid", "")
@@ -248,44 +371,38 @@ def discover_hops_from_annotations(session: Session) -> int:
             if not doi and not pmid:
                 continue
 
-            # Gate HOP-G2: dedup
-            if doi and doi.lower() in all_known_dois:
-                continue
-            if pmid and pmid in all_known_pmids:
+            # Gate HOP-G2: dedup via normalized keys
+            dedup_key = candidate_dedup_key(
+                doi=doi or None,
+                pmid=pmid or None,
+                title=title or None,
+            )
+            if dedup_key in known_keys:
                 continue
 
-            # Check hop depth from source study
-            source_depth = _get_study_hop_depth(session, ann.study_id)
-            if source_depth + 1 > max_depth:
-                logger.debug(
-                    "HOP-G1: skipping hop from %s — depth %d would exceed max %d",
-                    ann.study_id, source_depth + 1, max_depth,
-                )
-                continue
+            ndoi = normalize_doi(doi) if doi else None
+            npmid = normalize_pmid(pmid) if pmid else None
 
             queue_entry = AcquisitionQueue(
                 queue_id=f"HOP_{uuid.uuid4().hex[:12]}",
-                candidate_doi=doi or None,
-                candidate_pmid=pmid or None,
+                candidate_doi=ndoi,
+                candidate_pmid=npmid,
                 candidate_title=title or None,
-                aps_score=config.HOP_CITATION_APS_BOOST,
-                # Pass Python dict for JSONB column (no json.dumps)
+                # APS semantics: aps_score=None (pending full scoring)
+                aps_score=None,
                 aps_components_json={
                     "citation_hop_boost": config.HOP_CITATION_APS_BOOST,
                     "annotation_category": ann.category,
+                    "dedup_key": dedup_key,
                 },
                 status="queued",
                 retrieval_status="PENDING",
-                hop_source_study_id=ann.study_id,
-                hop_depth=source_depth + 1,
+                hop_source_study_id=source_id,
+                hop_depth=candidate_depth,
             )
             session.add(queue_entry)
             new_count += 1
-
-            if doi:
-                all_known_dois.add(doi.lower())
-            if pmid:
-                all_known_pmids.add(pmid)
+            known_keys.add(dedup_key)
 
     session.flush()
 
@@ -297,19 +414,46 @@ def discover_hops_from_annotations(session: Session) -> int:
 
 
 def run_hop_discovery(session: Session) -> int:
-    """Run all hop discovery strategies.
+    """Run all hop discovery strategies, enforcing a global cap.
+
+    Strategies run in priority order:
+        1. MA/SR included study lists (highest relevance)
+        2. Annotation cited references (supplementary)
+
+    Gate HOP-G4: Total candidates across ALL strategies <=
+        config.HOP_MAX_TOTAL_PER_RUN.
+
+    Transaction semantics: This function calls session.flush() but does
+    NOT commit. The caller (acquisition_scheduler Step 5) owns the
+    transaction boundary and must call session.commit().
 
     Args:
-        session: Active database session.
+        session: Active database session. Caller must commit.
 
     Returns:
         Total number of new candidates queued.
     """
-    total = 0
-    total += discover_hops_from_meta_analyses(session)
-    total += discover_hops_from_annotations(session)
+    global_cap = config.HOP_MAX_TOTAL_PER_RUN
 
-    logger.info("Hop discovery complete: %d total new candidates", total)
+    ma_count = discover_hops_from_meta_analyses(
+        session, global_budget_remaining=global_cap,
+    )
+
+    remaining = global_cap - ma_count
+    ann_count = 0
+    if remaining > 0:
+        ann_count = discover_hops_from_annotations(
+            session, global_budget_remaining=remaining,
+        )
+    else:
+        logger.info(
+            "HOP-G4: global cap (%d) already reached by MA strategy, "
+            "skipping annotation strategy",
+            global_cap,
+        )
+
+    total = ma_count + ann_count
+    logger.info("Hop discovery complete: %d total (%d MA, %d annotation)", total, ma_count, ann_count)
     return total
 
 
@@ -318,38 +462,76 @@ def run_hop_discovery(session: Session) -> int:
 # ═══════════════════════════════════════════════════════════════
 
 
-def _load_known_identifiers(session: Session) -> tuple[set[str], set[str]]:
-    """Load DOIs and PMIDs from study_registry_v1 for dedup."""
-    stmt_doi = (
-        select(StudyRegistry.doi)
-        .where(StudyRegistry.doi.isnot(None))
-    )
-    stmt_pmid = (
-        select(StudyRegistry.pmid)
-        .where(StudyRegistry.pmid.isnot(None))
-    )
-    dois = {row[0].lower() for row in session.execute(stmt_doi).all()}
-    pmids = {row[0] for row in session.execute(stmt_pmid).all()}
-    return dois, pmids
+def _load_all_known_keys(session: Session) -> set[str]:
+    """Load normalized dedup keys from study_registry_v1 AND acquisition_queue_v1.
 
+    Uses DOI-based keys when DOI is available, PMID-based otherwise.
+    Also checks aps_components_json for dedup_key stored during hop queuing.
 
-def _load_queued_identifiers(session: Session) -> tuple[set[str], set[str]]:
-    """Load DOIs and PMIDs from acquisition_queue_v1 for dedup."""
-    stmt_doi = (
-        select(AcquisitionQueue.candidate_doi)
-        .where(AcquisitionQueue.candidate_doi.isnot(None))
+    Returns:
+        Set of dedup key strings (all normalized).
+    """
+    keys: set[str] = set()
+
+    # From study_registry_v1: DOIs and PMIDs
+    stmt_sr = select(
+        StudyRegistry.doi,
+        StudyRegistry.pmid,
+    ).where(
+        or_(
+            StudyRegistry.doi.isnot(None),
+            StudyRegistry.pmid.isnot(None),
+        )
     )
-    stmt_pmid = (
-        select(AcquisitionQueue.candidate_pmid)
-        .where(AcquisitionQueue.candidate_pmid.isnot(None))
+    for row in session.execute(stmt_sr).all():
+        doi, pmid = row
+        key = candidate_dedup_key(
+            doi=doi,
+            pmid=pmid,
+        )
+        keys.add(key)
+
+    # From acquisition_queue_v1: DOIs, PMIDs, and stored dedup_keys
+    stmt_aq = select(
+        AcquisitionQueue.candidate_doi,
+        AcquisitionQueue.candidate_pmid,
+        AcquisitionQueue.aps_components_json,
     )
-    dois = {row[0].lower() for row in session.execute(stmt_doi).all()}
-    pmids = {row[0] for row in session.execute(stmt_pmid).all()}
-    return dois, pmids
+    for row in session.execute(stmt_aq).all():
+        c_doi, c_pmid, components = row
+
+        # Primary key from DOI/PMID
+        key = candidate_dedup_key(doi=c_doi, pmid=c_pmid)
+        keys.add(key)
+
+        # Also load the stored dedup_key from components (may include
+        # title-based keys for entries without DOI/PMID)
+        if isinstance(components, dict):
+            stored = components.get("dedup_key")
+            if stored:
+                keys.add(stored)
+        elif isinstance(components, str):
+            try:
+                parsed = json.loads(components)
+                stored = parsed.get("dedup_key")
+                if stored:
+                    keys.add(stored)
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                pass
+
+    return keys
 
 
 def _get_ma_edge_ids(session: Session, study_id: str) -> list[str]:
-    """Get edge relation IDs associated with a meta-analysis study."""
+    """Get edge relation IDs associated with a meta-analysis study.
+
+    NOTE: This returns empty for freshly-ingested MAs because P1 extraction
+    creates StudyRegistry + included_study_ids_json, but edge_evidence rows
+    are only created after P2-P4 run. This is expected — the target_edge_ids
+    field on AcquisitionQueue is informational, not required for candidate
+    processing. The acquisition scheduler will match candidates to edges
+    during APS scoring.
+    """
     stmt = (
         select(EdgeEvidence.edge_relation_id)
         .where(
@@ -364,44 +546,15 @@ def _get_ma_edge_ids(session: Session, study_id: str) -> list[str]:
 
 
 def _get_study_hop_depth(session: Session, study_id: str) -> int:
-    """Get the hop depth for a study (0 if directly acquired, >0 if hop-derived).
+    """Get hop depth directly from study_registry_v1.hop_depth column.
 
-    Checks if this study was itself a hop candidate by matching on
-    DOI or PMID.
+    Returns 0 for directly-acquired studies (column default).
+    Returns >0 for hop-derived studies.
+    Returns 0 if study_id not found (defensive).
     """
-    # Get the study's identifiers
-    id_stmt = (
-        select(StudyRegistry.doi, StudyRegistry.pmid)
-        .where(StudyRegistry.study_id == study_id)
-    )
-    id_row = session.execute(id_stmt).first()
-    if id_row is None:
-        return 0
-
-    study_doi, study_pmid = id_row
-
-    # Build match conditions: DOI or PMID
-    match_conditions = []
-    if study_doi:
-        match_conditions.append(
-            AcquisitionQueue.candidate_doi == study_doi
-        )
-    if study_pmid:
-        match_conditions.append(
-            AcquisitionQueue.candidate_pmid == study_pmid
-        )
-    if not match_conditions:
-        return 0
-
     stmt = (
-        select(AcquisitionQueue.hop_depth)
-        .where(
-            and_(
-                AcquisitionQueue.hop_source_study_id.isnot(None),
-                or_(*match_conditions),
-            )
-        )
-        .limit(1)
+        select(StudyRegistry.hop_depth)
+        .where(StudyRegistry.study_id == study_id)
     )
     result = session.execute(stmt).scalar_one_or_none()
     return result if result is not None else 0

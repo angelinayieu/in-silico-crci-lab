@@ -15,7 +15,6 @@ Gates: P0-G1 (parse failure blocks), P0-G2 (REJECT excludes from extraction)
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +23,7 @@ from sqlalchemy.orm import Session
 from crci.shared.models.enums import PipelineStatus
 from crci.shared.models.intermediate_states import GateViolation, TriageResult
 from crci.shared.models.tables import ExtractionRun, StudyRegistry
+from crci.shared.study_identity import compute_study_id, normalize_doi, check_duplicate_study
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,28 @@ def run_p0_triage(
     from crci.extraction.p0_triage.mode_selection import select_extraction_mode
     from crci.shared.models.enums import PaperSubtype
 
-    paper_id = f"STUDY_{uuid.uuid4().hex[:12]}"
+    # ── Compute deterministic study_id (S1 fix) ──
+    metadata = ingested.get("metadata", {})
+    paper_id, id_source = compute_study_id(metadata)
+    doi_normalized = normalize_doi(metadata.get("doi"))
+
+    # ── Check for existing study (dedup) ──
+    existing_id = check_duplicate_study(
+        session,
+        doi=metadata.get("doi"),
+        pmid=metadata.get("pmid"),
+        pmcid=metadata.get("pmcid"),
+    )
+    if existing_id:
+        logger.info(
+            "P0: Study already exists as %s, reusing (dedup by %s)",
+            existing_id,
+            id_source,
+        )
+        paper_id = existing_id
+        context["is_rerun"] = True
+    else:
+        context["is_rerun"] = False
 
     # Convert raw subtype string to enum
     try:
@@ -144,34 +165,50 @@ def run_p0_triage(
         triage_result.paper_subtype,
     )
 
-    # ── Register in study_registry_v1 with v2.0 columns ──
-    metadata = ingested.get("metadata", {})
-    study_row = StudyRegistry(
-        study_id=paper_id,
-        title=metadata.get("title", pdf_path.stem),
-        authors=metadata.get("author", ""),
-        doi=metadata.get("doi"),
-        year=metadata.get("year"),
-        study_design=classified.get("study_design"),
-        # v2.0 columns
-        study_subtype=str(subtype_enum.value) if subtype_enum else None,
-        pdf_path=str(pdf_path),
-        canonical_text_path=None,  # Set if we persist canonical text to disk
-        file_type="pdf",
-        parse_quality=ingested.get("pdf_quality", "GOOD"),
-    )
-    session.add(study_row)
+    # ── Register/Update in study_registry_v1 with v2.0 columns (UPSERT) ──
+    existing_study = session.query(StudyRegistry).filter(
+        StudyRegistry.study_id == paper_id
+    ).first()
+
+    if existing_study:
+        # Update existing study (rerun case)
+        existing_study.title = metadata.get("title", pdf_path.stem)
+        existing_study.authors = metadata.get("author", "") or existing_study.authors
+        existing_study.doi = metadata.get("doi") or existing_study.doi
+        existing_study.doi_normalized = doi_normalized or existing_study.doi_normalized
+        existing_study.year = metadata.get("year") or existing_study.year
+        existing_study.study_design = classified.get("study_design") or existing_study.study_design
+        existing_study.study_subtype = str(subtype_enum.value) if subtype_enum else existing_study.study_subtype
+        existing_study.pdf_path = str(pdf_path)
+        existing_study.parse_quality = ingested.get("pdf_quality", "GOOD")
+        logger.info("Updated existing study %s in study_registry_v1", paper_id)
+    else:
+        # Insert new study
+        study_row = StudyRegistry(
+            study_id=paper_id,
+            title=metadata.get("title", pdf_path.stem),
+            authors=metadata.get("author", ""),
+            doi=metadata.get("doi"),
+            doi_normalized=doi_normalized,
+            id_source=id_source,
+            pmid=metadata.get("pmid"),
+            pmcid=metadata.get("pmcid"),
+            year=metadata.get("year"),
+            study_design=classified.get("study_design"),
+            # v2.0 columns
+            study_subtype=str(subtype_enum.value) if subtype_enum else None,
+            pdf_path=str(pdf_path),
+            canonical_text_path=None,
+            file_type="pdf",
+            parse_quality=ingested.get("pdf_quality", "GOOD"),
+            hop_depth=0,  # Directly acquired, not a hop-derived study
+        )
+        session.add(study_row)
+        logger.info("Registered new study %s in study_registry_v1 (id_source=%s)", paper_id, id_source)
 
     # Link extraction run to study
     run.study_id = paper_id
     run.extraction_mode = triage_result.extraction_mode.value
     session.flush()
-
-    logger.info(
-        "Registered study %s in study_registry_v1 (subtype=%s, quality=%s)",
-        paper_id,
-        subtype_enum.value,
-        ingested.get("pdf_quality", "GOOD"),
-    )
 
     return context

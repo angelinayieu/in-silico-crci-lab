@@ -1,8 +1,9 @@
-# VERIFIED: formulas — AUDIT-1 (sufficiency grade), AUDIT-2 (gap priority)
-# VERIFIED: imports — shared/config, shared/models/tables
-# VERIFIED: backward wiring — reads edge_evidence_v1, edge_relations_definitions_v1
-# VERIFIED: forward wiring — produces gap reports consumed by query_generator
-# VERIFIED: no hardcoded formula parameters
+# ASSUMPTIONS:
+#   - edge_evidence_v1 and edge_relations_definitions_v1 are populated before audit.
+#   - Gap reports include edge IDs that map to valid entries in EDGE_REGISTRY.
+# TEST COVERAGE: None yet — needs tests/test_pathway_evidence_auditor.py
+# REVIEW:
+#   - Sufficiency thresholds are config-driven but may need tuning.
 """
 Component: SYS_EXTRACTION.EX-ACQ.PathwayEvidenceAuditor
 Spec: Master Spec §9.6 (Evidence Landscape Monitoring)

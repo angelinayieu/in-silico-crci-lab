@@ -17,8 +17,6 @@ Writes: Nothing (imported by all downstream modules)
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 
 # ═══════════════════════════════════════════════════════════════
 #  STRUCTURAL UNCERTAINTY (§2.6, §2.8)
@@ -1178,6 +1176,8 @@ SATURATION_MAX_CYCLES: int = 20
 # v2.0: Content-driven hops (MS §9.4)
 HOP_MAX_DEPTH: int = 2
 HOP_CITATION_APS_BOOST: float = 0.15
+HOP_MAX_TARGETS_PER_PAPER: int = 20       # §9.4: max hop candidates per source MA/SR
+HOP_MAX_TOTAL_PER_RUN: int = 100           # Global safety cap per discovery run
 
 # v2.0: ID cross-resolution
 ID_RESOLVER_CROSSREF_TIMEOUT_S: int = 10
