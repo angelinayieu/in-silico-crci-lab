@@ -33,6 +33,7 @@ from crci.shared.models.output_contracts import (
     DomainScore,
     EvidenceGapItem,
     EvidenceGapReport,
+    ExtractionQualitySummary,
     NodeTrajectory,
     RecommendationReport,
     ScheduleAction,
@@ -599,6 +600,8 @@ def assemble_report(
     overlay: OverlayResult | None = None,
     uncertainty: UncertaintyResult | None = None,
     node_labels: dict[str, str] | None = None,
+    # Extraction quality (from completeness_checker, aggregated)
+    extraction_quality: ExtractionQualitySummary | None = None,
 ) -> RecommendationReport:
     """RT-I4: Assemble complete RecommendationReport.
 
@@ -693,6 +696,7 @@ def assemble_report(
         safety_flags=safety_flags,
         run_warnings=warnings,
         timestamp=session.timestamp,
+        extraction_quality=extraction_quality,
     )
 
     logger.info(

@@ -18,6 +18,7 @@ from crci.shared.models.intermediate_states import GateViolation
 
 from crci.algorithm.chain_f_analytics.variance_decomposer import (
     CriticalEdge,
+    PairwiseDominanceEntry,
     StabilityClass,
     StabilityState,
     _compute_per_draw_rankings,
@@ -25,6 +26,7 @@ from crci.algorithm.chain_f_analytics.variance_decomposer import (
     _compute_rank_probabilities,
     _identify_critical_edges,
     _validate_gate_f_g2,
+    _validate_score_arrays,
     compute_decision_stability,
 )
 from crci.algorithm.chain_d_simulation.ranker import (
@@ -191,14 +193,21 @@ class TestPairwiseDominance:
     """Test pairwise dominance computation."""
 
     def test_basic_dominance(self):
-        """a always > b → P(a>b) = 1.0."""
+        """a always > b → P(a>b) = 1.0, P(tie) = 0.0."""
         scores = {
             "a": np.array([0.5, 0.6, 0.7]),
             "b": np.array([0.3, 0.4, 0.5]),
         }
         dom = _compute_pairwise_dominance(scores)
-        assert abs(dom[("a", "b")] - 1.0) < 1e-10
-        assert abs(dom[("b", "a")] - 0.0) < 1e-10
+        entry_ab = dom[("a", "b")]
+        assert isinstance(entry_ab, PairwiseDominanceEntry)
+        assert abs(entry_ab.p_gt - 1.0) < 1e-10
+        assert abs(entry_ab.p_lt - 0.0) < 1e-10
+        assert abs(entry_ab.p_tie - 0.0) < 1e-10
+        # Reverse entry
+        entry_ba = dom[("b", "a")]
+        assert abs(entry_ba.p_gt - 0.0) < 1e-10
+        assert abs(entry_ba.p_lt - 1.0) < 1e-10
 
     def test_mixed_dominance(self):
         scores = {
@@ -206,7 +215,36 @@ class TestPairwiseDominance:
             "b": np.array([0.3, 0.5]),
         }
         dom = _compute_pairwise_dominance(scores)
-        assert abs(dom[("a", "b")] - 0.5) < 1e-10
+        assert abs(dom[("a", "b")].p_gt - 0.5) < 1e-10
+        assert abs(dom[("a", "b")].p_lt - 0.5) < 1e-10
+        assert abs(dom[("a", "b")].p_tie - 0.0) < 1e-10
+
+    def test_ties_handled_correctly(self):
+        """When ties exist, P(a>b) + P(b>a) < 1 and P(tie) > 0."""
+        scores = {
+            "a": np.array([0.5, 0.5, 0.3]),
+            "b": np.array([0.3, 0.5, 0.5]),
+        }
+        dom = _compute_pairwise_dominance(scores)
+        entry = dom[("a", "b")]
+        # Draw 0: a>b, Draw 1: tie, Draw 2: b>a
+        assert abs(entry.p_gt - 1.0 / 3) < 1e-10
+        assert abs(entry.p_lt - 1.0 / 3) < 1e-10
+        assert abs(entry.p_tie - 1.0 / 3) < 1e-10
+        # Invariant: p_gt + p_lt + p_tie == 1.0
+        assert abs(entry.p_gt + entry.p_lt + entry.p_tie - 1.0) < 1e-10
+
+    def test_all_ties(self):
+        """All identical scores → P(tie) = 1.0."""
+        scores = {
+            "a": np.array([0.5, 0.5, 0.5]),
+            "b": np.array([0.5, 0.5, 0.5]),
+        }
+        dom = _compute_pairwise_dominance(scores)
+        entry = dom[("a", "b")]
+        assert abs(entry.p_gt - 0.0) < 1e-10
+        assert abs(entry.p_lt - 0.0) < 1e-10
+        assert abs(entry.p_tie - 1.0) < 1e-10
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -298,3 +336,139 @@ class TestConfigConstants:
 
     def test_n_critical_edges(self):
         assert config.F2_N_CRITICAL_EDGES == 3
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Pre-Gate: Score Array Validation (F-G2a)
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestScoreArrayValidation:
+    """Test pre-gate F-G2a: score array consistency and finiteness."""
+
+    def test_valid_arrays(self):
+        scores = {
+            "a": np.array([0.5, 0.6]),
+            "b": np.array([0.3, 0.4]),
+        }
+        assert _validate_score_arrays(scores) == 2
+
+    def test_empty_scores(self):
+        assert _validate_score_arrays({}) == 0
+
+    def test_mismatched_lengths_raises(self):
+        scores = {
+            "a": np.array([0.5, 0.6, 0.7]),
+            "b": np.array([0.3, 0.4]),
+        }
+        with pytest.raises(GateViolation, match="F-G2a"):
+            _validate_score_arrays(scores)
+
+    def test_nan_raises(self):
+        scores = {
+            "a": np.array([0.5, float("nan"), 0.7]),
+            "b": np.array([0.3, 0.4, 0.5]),
+        }
+        with pytest.raises(GateViolation, match="F-G2a.*non-finite"):
+            _validate_score_arrays(scores)
+
+    def test_inf_raises(self):
+        scores = {
+            "a": np.array([0.5, float("inf"), 0.7]),
+            "b": np.array([0.3, 0.4, 0.5]),
+        }
+        with pytest.raises(GateViolation, match="F-G2a.*non-finite"):
+            _validate_score_arrays(scores)
+
+    def test_zero_length_raises(self):
+        scores = {
+            "a": np.array([]),
+            "b": np.array([]),
+        }
+        with pytest.raises(GateViolation, match="F-G2a.*n_draws = 0"):
+            _validate_score_arrays(scores)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SAFE_B Mode + Tie-Breaking + Critical Edge Flags
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestScoreMode:
+    """Test SAFE_A vs SAFE_B evaluation."""
+
+    def test_safe_a_default(self):
+        rng = np.random.default_rng(42)
+        scores = {
+            "a": rng.normal(0.5, 0.05, 100),
+            "b": rng.normal(0.3, 0.05, 100),
+        }
+        ranking = _make_ranking_result(scores)
+        result = compute_decision_stability(ranking, score_mode="SAFE_A")
+        assert result.score_mode == "SAFE_A"
+        assert result.gate_f_g2_passed
+
+    def test_safe_b_mode(self):
+        """SAFE_B adjusts scores via SAFE_A + 0.5*ln(p_adhere)."""
+        scores = {
+            "a": np.ones(50) * 0.8,
+            "b": np.ones(50) * 0.6,
+        }
+        ranking = _make_ranking_result(scores)
+        result = compute_decision_stability(ranking, score_mode="SAFE_B")
+        assert result.score_mode == "SAFE_B"
+        assert result.gate_f_g2_passed
+        # With p_adhere=0.8, SAFE_B = SAFE_A + 0.5*ln(0.8)
+        # Both shifted by same amount, so rank order preserved
+        assert result.rank_1_probabilities["a"] == 1.0
+
+
+class TestDeterministicTieBreaking:
+    """Test that tie-breaking is deterministic via sorted action_ids."""
+
+    def test_ties_broken_by_sorted_action_id(self):
+        """Among tied scores, alphabetically first action_id gets rank 1."""
+        scores = {
+            "z_last": np.array([0.5]),
+            "a_first": np.array([0.5]),
+        }
+        ranks, n = _compute_per_draw_rankings(scores)
+        assert n == 1
+        # "a_first" < "z_last" alphabetically, so a_first gets rank 1 on tie
+        assert ranks["a_first"][0] == 1
+        assert ranks["z_last"][0] == 2
+
+    def test_order_independent_of_dict_insertion(self):
+        """Result is identical regardless of dict key insertion order."""
+        scores1 = {"c": np.array([0.5, 0.3]), "a": np.array([0.5, 0.7])}
+        scores2 = {"a": np.array([0.5, 0.7]), "c": np.array([0.5, 0.3])}
+        ranks1, _ = _compute_per_draw_rankings(scores1)
+        ranks2, _ = _compute_per_draw_rankings(scores2)
+        np.testing.assert_array_equal(ranks1["a"], ranks2["a"])
+        np.testing.assert_array_equal(ranks1["c"], ranks2["c"])
+
+
+class TestCriticalEdgeFlags:
+    """Test that critical_edge_analysis_available flag is set correctly."""
+
+    def test_no_edge_data(self):
+        scores = {
+            "a": np.ones(50) * 0.8,
+            "b": np.ones(50) * 0.2,
+        }
+        ranking = _make_ranking_result(scores)
+        result = compute_decision_stability(ranking)
+        assert result.critical_edge_analysis_available is False
+        assert result.critical_edge_method is None
+
+    def test_with_edge_data(self):
+        rng = np.random.default_rng(99)
+        scores = {
+            "a": rng.normal(0.5, 0.1, 300),
+            "b": rng.normal(0.3, 0.1, 300),
+        }
+        ranking = _make_ranking_result(scores)
+        betas = {"e1": rng.normal(0.0, 1.0, 300)}
+        result = compute_decision_stability(ranking, per_draw_edge_betas=betas)
+        assert result.critical_edge_analysis_available is True
+        assert result.critical_edge_method == "median_split_rank1_distribution"

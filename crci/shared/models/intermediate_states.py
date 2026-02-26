@@ -319,6 +319,53 @@ class HarmonizedClaim(BaseModel):
     # CI fields carried from upstream for P3 CI→SE fallback
     ci_lower: float | None = None
     ci_upper: float | None = None
+    # ── P3 layer-input fields (Slice 8: FIX-4) ──
+    # These fields carry study metadata for P3's 7-layer SE calibration,
+    # eliminating unsafe getattr fallbacks in P3 layers and P4 shared-control.
+    study_design: str = "unclassified"
+    n_total: int | None = None
+    n_treatment: int | None = None
+    n_control: int | None = None
+    cancer_validation_status: str = "general_population"
+    grade_level: str = "MODERATE"
+    pub_year: int | None = None
+    days_since_measurement: float = 0.0
+    is_trait: bool = False
+    # P4 shared-control fields
+    shared_control_flag: bool = False
+    shared_control_study_id: str | None = None
+    endpoint_vs_change: str = "UNCLEAR"
+    is_cancer_matched: bool = False
+    is_superseded: bool = False
+    # P4 verification / meta-analysis source tracking
+    se_derivation_level: str | None = None
+    meta_source_flag: str | None = None
+    # Provenance tracking: records where each field value came from
+    layer_fields_provenance: dict[str, str] = Field(default_factory=dict)
+    # Computed flag: True when key P3 fields have non-default values
+    is_complete_for_p3: bool = False
+
+
+def compute_is_complete_for_p3(
+    study_design: str = "unclassified",
+    cancer_validation_status: str = "general_population",
+    grade_level: str = "MODERATE",
+    pub_year: int | None = None,
+) -> bool:
+    """Check if key P3 fields have non-default values.
+
+    Returns True only when all four critical fields have been populated
+    with study-specific values (not defaults).
+    """
+    if study_design == "unclassified":
+        return False
+    if cancer_validation_status == "general_population":
+        return False
+    if grade_level == "MODERATE":
+        return False
+    if pub_year is None:
+        return False
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -163,9 +163,31 @@ def load_evidence_from_db(
             skipped += 1
             continue
 
-        # Resolve study_design
+        # Resolve study_design → compiler-compatible key
         raw_design = row.study_design or row.study_subtype or "unknown"
         study_design = _DESIGN_MAP.get(raw_design, "unknown")
+
+        # Map RCT → small_rct_default / large_rct based on sample size
+        # (compiler expects these specific keys in DESIGN_MULTIPLIERS)
+        if study_design == "RCT":
+            from crci.shared import config
+            n = row.N_effect if row.N_effect and row.N_effect > 0 else 0
+            if n > config.SMALL_RCT_N_THRESHOLD:
+                study_design = "large_rct"
+            else:
+                study_design = "small_rct_default"
+        elif study_design == "quasi_experimental":
+            study_design = "well_adjusted_cohort"
+        elif study_design == "prospective_cohort":
+            study_design = "well_adjusted_cohort"
+        elif study_design == "retrospective_cohort":
+            study_design = "unadjusted_longitudinal"
+        elif study_design == "cross_sectional":
+            study_design = "cross_sectional_unadjusted"
+        elif study_design == "case_control":
+            study_design = "unadjusted_longitudinal"
+        elif study_design == "pre_post":
+            study_design = "unadjusted_longitudinal"
 
         # Resolve quality grade
         quality_grade = _QUALITY_GRADE_MAP.get(
@@ -211,7 +233,7 @@ def load_evidence_from_db(
             quality_grade=quality_grade,
             scope_weights=_DEFAULT_SCOPE_WEIGHTS.copy(),
             cancer_validation_status="used_cancer",  # Default: paper used cancer cohort
-            temporal_distance_days=0.0,  # Default: no temporal distance info
+            temporal_distance_days=0.0,  # Default: no temporal distance info — L6 will apply w=1.0
             outcome_type=outcome_type,
             is_animal=False,
             is_cross_sectional=is_cross_sectional,
@@ -219,6 +241,17 @@ def load_evidence_from_db(
             sigma_sq_structural=None,
         )
         records.append(record)
+
+    # Log temporal default statistics
+    n_temporal_defaulted = sum(
+        1 for r in records if r.temporal_distance_days == 0.0
+    )
+    if n_temporal_defaulted > 0:
+        logger.warning(
+            "Temporal default: %d/%d evidence records have temporal_distance_days=0.0 "
+            "(no temporal distance info available — L6 SE inflation will not fire)",
+            n_temporal_defaulted, len(records),
+        )
 
     logger.info(
         "Evidence loader: produced %d EvidenceRecord objects (%d skipped)",

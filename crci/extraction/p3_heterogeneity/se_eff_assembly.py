@@ -84,6 +84,9 @@ class SEEffInput:
 
     # L6: Temporal decay
     days_since_measurement: float = 0.0
+    # Flag indicating whether days_since_measurement is truly known
+    # vs. defaulting to 0.0 because no temporal evidence exists
+    temporal_data_available: bool = False
     is_trait: bool = False
 
     # L7: Freshness
@@ -185,6 +188,39 @@ def compute_se_eff(inp: SEEffInput) -> LayeredSEResult:
     layer_multipliers["L6_temporal"] = w_temporal
     layers_applied.append("L6_temporal")
     all_notes.extend(l6_notes)
+
+    # Flag when temporal data is absent (defaulting to 0.0 = no penalty)
+    if not inp.temporal_data_available and inp.days_since_measurement == 0.0:
+        # Apply conservative default from config instead of optimistic 0.0
+        if config.TEMPORAL_DEFAULT_WHEN_ABSENT_DAYS > 0.0:
+            effective_days = config.TEMPORAL_DEFAULT_WHEN_ABSENT_DAYS
+            # Recompute L6 with conservative default
+            w_temporal, excluded, l6_notes_override = layer_6_temporal_decay(
+                days_since_measurement=effective_days,
+                is_trait=inp.is_trait,
+            )
+            layer_multipliers["L6_temporal"] = w_temporal
+            all_notes.extend(l6_notes_override)
+            all_notes.append(
+                f"L6: WARNING — temporal data absent, applied conservative "
+                f"default {effective_days:.1f}d (w_temporal={w_temporal:.4f})"
+            )
+            logger.info(
+                "L6 temporal conservative default: record '%s' has no temporal "
+                "evidence — using TEMPORAL_DEFAULT_WHEN_ABSENT_DAYS=%.1f "
+                "(w_temporal=%.4f instead of 1.0)",
+                inp.ler_id, effective_days, w_temporal,
+            )
+        else:
+            all_notes.append(
+                "L6: WARNING — temporal data absent, "
+                "days_since_measurement=0.0 assumed (w_temporal=1.0, no SE penalty)"
+            )
+            logger.warning(
+                "L6 temporal default: record '%s' has no temporal evidence — "
+                "days_since_measurement=0.0 assumed (w_temporal=1.0, no SE penalty)",
+                inp.ler_id,
+            )
 
     if excluded:
         raise ValueError(

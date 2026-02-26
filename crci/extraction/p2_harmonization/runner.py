@@ -540,3 +540,63 @@ def _assign_canonical_scale(claim: Any) -> str:
     if label_type is None:
         return "RAW"
     return _LABEL_TO_CANONICAL_SCALE.get(label_type.upper(), "RAW")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R2 SUBTYPE-SPECIFIC QUALITY AND IDENTIFICATION RULES
+# ═══════════════════════════════════════════════════════════════
+
+# Subtypes whose RCT label should be verified by randomization language
+_RCT_SUBTYPES = {"RCT_exercise", "standard_rct", "RCT_cognitive", "RCT_pharmacological"}
+
+
+def _verify_rct_randomization(subtype: str, methods_text: str) -> str:
+    """PG-01: Verify RCT randomization language.
+
+    Returns 'identified' if the subtype is not an RCT or if the methods
+    text contains randomization language. Returns 'partially_identified'
+    if the RCT paper lacks randomization language.
+    """
+    if subtype not in _RCT_SUBTYPES:
+        return "identified"
+    text_lower = (methods_text or "").lower()
+    # Match: randomized, randomised, randomly, randomization, randomisation
+    if "random" in text_lower:
+        return "identified"
+    return "partially_identified"
+
+
+def _apply_subtype_quality_caps(quality: str, subtype: str) -> str:
+    """R2.3: Apply subtype-specific quality caps.
+
+    Pilot RCTs are capped at 'moderate' quality.
+    """
+    _PILOT_SUBTYPES = {"pilot_rct"}
+    if subtype in _PILOT_SUBTYPES and quality == "strong":
+        return "moderate"
+    return quality
+
+
+def _apply_subtype_identification_rules(
+    identification: str,
+    subtype: str,
+    meta_source_flag: str | None = None,
+) -> str:
+    """R2.4/R2.5: Apply subtype-specific identification rules.
+
+    - Cross-sectional → always 'not_identified'
+    - Retrospective cohort → capped at 'partially_identified'
+    - NMA mixed estimates → capped at 'partially_identified'
+    """
+    _CROSS_SECTIONAL = {"cross_sectional"}
+    _RETROSPECTIVE = {"retrospective_cohort"}
+
+    if subtype in _CROSS_SECTIONAL:
+        return "not_identified"
+    if subtype in _RETROSPECTIVE:
+        if identification == "identified":
+            return "partially_identified"
+        return identification
+    if meta_source_flag == "NMA_MIXED" and identification == "identified":
+        return "partially_identified"
+    return identification

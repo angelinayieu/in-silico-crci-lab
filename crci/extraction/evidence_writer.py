@@ -28,6 +28,45 @@ from crci.shared.models.tables import EdgeEvidence, ExtractionRun
 logger = logging.getLogger(__name__)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  R2.2: EVIDENCE BLOCKED SUBTYPES
+# ═══════════════════════════════════════════════════════════════
+
+# Paper subtypes that cannot produce evidence rows (MINIMAL-mode only)
+_EVIDENCE_BLOCKED_SUBTYPES: set[str] = {
+    "review_narrative",
+    "case_report",
+    "qualitative",
+    "umbrella_review",
+    "mechanistic_in_vitro",
+    "editorial",
+    "protocol",
+    "erratum",
+}
+
+
+def _check_evidence_row_allowed(subtype: str) -> None:
+    """R2.2: Raise GateViolation if subtype cannot produce evidence rows.
+
+    Args:
+        subtype: Paper subtype string value.
+
+    Raises:
+        GateViolation: If the subtype is in _EVIDENCE_BLOCKED_SUBTYPES.
+    """
+    from crci.shared.models.intermediate_states import GateViolation
+
+    if subtype in _EVIDENCE_BLOCKED_SUBTYPES:
+        raise GateViolation(
+            gate_id="R2.2-EVIDENCE-BLOCK",
+            message=(
+                f"Paper subtype '{subtype}' cannot produce evidence rows. "
+                f"Only study-based subtypes may contribute to edge_evidence_v1."
+            ),
+            context={"subtype": subtype},
+        )
+
+
 def compute_span_hash(
     study_id: str,
     edge_relation_id: str,

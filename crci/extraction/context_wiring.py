@@ -247,7 +247,7 @@ def edge_evidence_to_chain_b_record(
         quality_grade=quality_grade,
         scope_weights=scope_weights,
         cancer_validation_status=cancer_status,
-        temporal_distance_days=0.0,
+        temporal_distance_days=0.0,  # Default: no temporal distance info — L6 will apply w=1.0
         outcome_type=getattr(edge_row, "outcome_component", "subjective") or "subjective",
         is_animal=False,
         is_cross_sectional=is_cross_sectional,

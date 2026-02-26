@@ -165,8 +165,9 @@ def _query_edge_evidence_rows(session: Session, study_id: str) -> list:
 
 def _analyze_layer_readiness(
     edge_rows: list,
+    has_temporal_evidence: bool = False,
 ) -> tuple[dict[str, str], dict[str, int], list[str], list[str]]:
-    """Analyze L1/L4/L5/L7 readiness across edge evidence rows.
+    """Analyze L1/L4/L5/L6/L7 readiness across edge evidence rows.
 
     Returns:
         (layer_readiness, defaults_fired, blocking_issues, edge_evidence_issues)
@@ -174,8 +175,8 @@ def _analyze_layer_readiness(
     n = len(edge_rows)
     if n == 0:
         return (
-            {"L1": "NO_DATA", "L4": "NO_DATA", "L5": "NO_DATA", "L7": "NO_DATA"},
-            {"L1": 0, "L4": 0, "L5": 0, "L7": 0},
+            {"L1": "NO_DATA", "L4": "NO_DATA", "L5": "NO_DATA", "L6": "NO_DATA", "L7": "NO_DATA"},
+            {"L1": 0, "L4": 0, "L5": 0, "L6": 0, "L7": 0},
             [],
             [],
         )
@@ -186,7 +187,18 @@ def _analyze_layer_readiness(
     l5_null = sum(1 for r in edge_rows if not getattr(r, "rob_overall", None))
     l7_null = sum(1 for r in edge_rows if not getattr(r, "pub_year", None))
 
-    defaults_fired = {"L1": l1_null, "L4": l4_null, "L5": l5_null, "L7": l7_null}
+    # L6: Temporal data — count rows where days_since_measurement is NULL/0
+    # (0.0 is the silent default when no temporal evidence exists)
+    l6_defaulting = sum(
+        1 for r in edge_rows
+        if not getattr(r, "days_since_measurement", None)
+        or getattr(r, "days_since_measurement", 0.0) == 0.0
+    )
+    # If no temporal_evidence rows exist for the study at all, ALL rows are defaulting
+    if not has_temporal_evidence:
+        l6_defaulting = n
+
+    defaults_fired = {"L1": l1_null, "L4": l4_null, "L5": l5_null, "L6": l6_defaulting, "L7": l7_null}
 
     # Determine readiness status
     layer_readiness = {}
@@ -218,6 +230,22 @@ def _analyze_layer_readiness(
     else:
         layer_readiness["L5"] = "WILL_DEFAULT"
         issues.append(f"rob_overall NULL for {l5_null}/{n} rows → will default to MODERATE")
+
+    # L6: temporal data — non-blocking (defaults to days_since_measurement=0, i.e. no SE penalty)
+    if l6_defaulting == 0:
+        layer_readiness["L6"] = "READY"
+    elif l6_defaulting == n:
+        layer_readiness["L6"] = "WILL_DEFAULT"
+        issues.append(
+            f"temporal data absent for all {n} rows → L6 temporal decay defaults to w=1.0 "
+            f"(no SE penalty; 'measured today' assumed)"
+        )
+    else:
+        layer_readiness["L6"] = "WILL_DEFAULT"
+        issues.append(
+            f"temporal data absent for {l6_defaulting}/{n} rows → "
+            f"L6 temporal decay will default to w=1.0 for those rows"
+        )
 
     # L7: pub_year — NULL is non-blocking (freshness decay won't fire)
     if l7_null == 0:
@@ -285,7 +313,7 @@ def _compute_completeness_score(report: ExtractionReport) -> float:
 
     Scoring:
     - 50% weight: family coverage (populated / expected)
-    - 30% weight: layer readiness (READY layers / 4)
+    - 30% weight: layer readiness (READY layers / total layers)
     - 20% weight: absence of blocking issues
 
     Blocking issues cap score at 0.5.
@@ -369,8 +397,9 @@ def check_paper_completeness(
     edge_rows = _query_edge_evidence_rows(session, study_id)
 
     # 6. Analyze layer readiness
+    has_temporal = counts.get("F4", 0) > 0
     layer_readiness, defaults_fired, layer_blocking, edge_issues = (
-        _analyze_layer_readiness(edge_rows)
+        _analyze_layer_readiness(edge_rows, has_temporal_evidence=has_temporal)
     )
 
     # 7. Check effect-size consistency
@@ -558,7 +587,7 @@ def print_report(report: ExtractionReport) -> str:
 
     # Defaults that will fire
     lines.append("\n  Defaults that WILL fire:")
-    layer_names = {"L1": "design", "L4": "cancer", "L5": "GRADE", "L7": "freshness"}
+    layer_names = {"L1": "design", "L4": "cancer", "L5": "GRADE", "L6": "temporal", "L7": "freshness"}
     for layer, count in sorted(report.defaults_fired.items()):
         name = layer_names.get(layer, layer)
         total = sum(report.populated_families.get(f, 0) for f in ["F1"])
@@ -589,3 +618,83 @@ def _deterministic_id(prefix: str, *components: str) -> str:
     raw = "|".join(str(c) for c in components)
     h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
     return f"{prefix}{h}"
+
+
+# ============================================================================
+# Aggregate across studies → ExtractionQualitySummary
+# ============================================================================
+
+def aggregate_quality_summary(
+    reports: list[ExtractionReport],
+) -> "ExtractionQualitySummary":
+    """Aggregate per-study ExtractionReports into a session-wide summary.
+
+    Consumed by RecommendationReport.extraction_quality for presentation.
+
+    Args:
+        reports: List of ExtractionReports (one per study).
+
+    Returns:
+        ExtractionQualitySummary (from output_contracts).
+    """
+    from crci.shared.models.output_contracts import ExtractionQualitySummary
+
+    if not reports:
+        return ExtractionQualitySummary()
+
+    n = len(reports)
+
+    # Mean completeness
+    overall = sum(r.completeness_score for r in reports) / n
+
+    # Aggregate defaults_fired across studies
+    total_defaults: dict[str, int] = {}
+    for r in reports:
+        for layer, count in r.defaults_fired.items():
+            total_defaults[layer] = total_defaults.get(layer, 0) + count
+
+    # Count studies missing each family
+    missing_families_summary: dict[str, int] = {}
+    for r in reports:
+        for f in r.missing_families:
+            missing_families_summary[f] = missing_families_summary.get(f, 0) + 1
+
+    # Count blocking issues
+    blocking_count = sum(len(r.blocking_issues) for r in reports)
+
+    # Generate human-readable caveats
+    caveats: list[str] = []
+
+    # Temporal data caveat
+    l6_defaults = total_defaults.get("L6", 0)
+    if l6_defaults > 0:
+        n_missing_temporal = missing_families_summary.get("F4", 0)
+        if n_missing_temporal > 0:
+            caveats.append(
+                f"{n_missing_temporal}/{n} studies lack temporal evidence — "
+                f"temporal SE penalties could not be applied "
+                f"(days_since_measurement defaults to 0, assuming 'measured today')"
+            )
+
+    # Layer defaults caveats
+    for layer, label in [("L4", "cancer validation"), ("L5", "risk-of-bias/GRADE")]:
+        count = total_defaults.get(layer, 0)
+        if count > 0:
+            caveats.append(
+                f"{count} evidence row(s) across {n} studies default on {label} ({layer})"
+            )
+
+    # Blocking caveats
+    if blocking_count > 0:
+        caveats.append(
+            f"{blocking_count} blocking issue(s) detected across {n} studies"
+        )
+
+    return ExtractionQualitySummary(
+        study_count=n,
+        overall_completeness=round(overall, 3),
+        total_defaults_fired=total_defaults,
+        missing_families_summary=missing_families_summary,
+        blocking_issue_count=blocking_count,
+        quality_caveats=caveats,
+    )

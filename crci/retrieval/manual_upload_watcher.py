@@ -177,11 +177,44 @@ def import_structured_csv(
     if template_name == "edge_evidence_template":
         imported = _write_edge_evidence_rows(session, rows, csv_path)
         result.csvs_imported = imported
+    elif template_name == "population_norms_template":
+        from crci.extraction.family_importers import import_population_norm
+        imported = 0
+        for row in rows:
+            try:
+                study_id = _resolve_study_id(session, row.get("doi", ""))
+                if study_id:
+                    row["study_id"] = study_id
+                import_population_norm(session, row)
+                imported += 1
+            except Exception as exc:
+                logger.warning(
+                    "Failed to import population_norm row: %s", exc
+                )
+                result.warnings.append(f"Row import failed: {exc}")
+        result.csvs_imported = imported
+    elif template_name == "instrument_evidence_template":
+        from crci.extraction.family_importers import import_instrument_evidence
+        imported = 0
+        for row in rows:
+            try:
+                study_id = _resolve_study_id(session, row.get("doi", ""))
+                if study_id:
+                    row["study_id"] = study_id
+                import_instrument_evidence(session, row)
+                imported += 1
+            except Exception as exc:
+                logger.warning(
+                    "Failed to import instrument_evidence row: %s", exc
+                )
+                result.warnings.append(f"Row import failed: {exc}")
+        result.csvs_imported = imported
     else:
         # Other template types not yet implemented
         result.warnings.append(
             f"Template '{template_name}' import not yet implemented — "
-            f"only edge_evidence_template is supported. "
+            f"only edge_evidence_template, population_norms_template, "
+            f"and instrument_evidence_template are supported. "
             f"({len(rows)} rows skipped)"
         )
         logger.warning(

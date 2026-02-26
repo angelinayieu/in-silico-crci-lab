@@ -138,3 +138,38 @@ def run_tb_trust_boundary(
     )
 
     return context
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R5 LLM GUARDRAIL HELPERS
+# ═══════════════════════════════════════════════════════════════
+
+
+def _check_figure_only(span: Any) -> bool:
+    """UG-05: Return True if the span is sourced ONLY from a figure.
+
+    A span is figure-only if its source_section contains 'figure'
+    (case-insensitive) but does NOT contain 'table'.
+    """
+    source = getattr(span, "source_section", None) or ""
+    source_lower = source.lower()
+    if "figure" in source_lower and "table" not in source_lower:
+        return True
+    return False
+
+
+def _flag_sensitivity_analysis(span: Any) -> bool:
+    """UG-08: Return True if the span is from a sensitivity/robustness analysis.
+
+    Flags spans whose source_section contains sensitivity-related terms.
+    """
+    source = getattr(span, "source_section", None) or ""
+    source_lower = source.lower()
+    _SENSITIVITY_TERMS = [
+        "sensitivity analysis",
+        "sensitivity",
+        "robustness check",
+        "robustness",
+        "leave-one-out",
+    ]
+    return any(term in source_lower for term in _SENSITIVITY_TERMS)

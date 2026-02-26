@@ -31,12 +31,12 @@ class TestRegistryIsSourceOfTruth:
         """EDGE_REGISTRY.csv must exist."""
         assert REGISTRY_PATH.exists(), f"Registry not found: {REGISTRY_PATH}"
 
-    def test_registry_has_137_data_rows(self):
-        """Registry should have 137 data rows (+ 1 header)."""
+    def test_registry_has_139_data_rows(self):
+        """Registry should have 139 data rows (+ 1 header)."""
         with open(REGISTRY_PATH) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
-        assert len(rows) == 137, f"Expected 137 rows, got {len(rows)}"
+        assert len(rows) == 139, f"Expected 139 rows, got {len(rows)}"
 
     def test_registry_all_er_ids(self):
         """All registry IDs must start with ER_."""

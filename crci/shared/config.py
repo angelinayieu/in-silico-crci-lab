@@ -48,6 +48,12 @@ FRESHNESS_DEFAULT_WEIGHT: float = 0.85  # No pub date → default w_fresh = 0.85
 TEMPORAL_DECAY_RATE: float = 0.05
 TEMPORAL_EXCLUSION_DAYS: int = 90
 TEMPORAL_WEIGHT_FLOOR: float = 0.01  # max(w_temporal, 0.01) floor in Formula P3-6
+# Conservative default when a paper reports no temporal evidence (pre/post only,
+# no intermediate timepoints, no measurement timing). Used instead of 0.0 (which
+# assumes "measured today" and applies no SE penalty). 14 days ≈ typical RCT
+# endpoint-to-measurement window. At 0.05 decay rate: w(14) ≈ 0.497.
+# AUTHOR-CONSTRUCTED: not from spec. Set to 0.0 to disable conservative default.
+TEMPORAL_DEFAULT_WHEN_ABSENT_DAYS: float = 14.0
 
 # ═══════════════════════════════════════════════════════════════
 #  MONTE CARLO SAMPLING (§2.16)

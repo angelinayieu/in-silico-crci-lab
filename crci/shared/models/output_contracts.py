@@ -272,6 +272,36 @@ class ClinicalRiskProfile(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  EXTRACTION QUALITY SUMMARY
+# ═══════════════════════════════════════════════════════════════
+
+
+class ExtractionQualitySummary(BaseModel):
+    """Aggregated extraction quality metrics across all studies in a session.
+
+    Computed by check_paper_completeness() in completeness_checker.py,
+    aggregated across all studies used in the run, and threaded through
+    to the presentation layer for quality disclosure.
+    """
+
+    study_count: int = 0
+    overall_completeness: float = 0.0  # Mean completeness_score across studies [0.0–1.0]
+    total_defaults_fired: dict[str, int] = Field(
+        default_factory=dict,
+        description="Aggregate defaults per layer: {'L1': 0, 'L4': 2, 'L6': 5, ...}",
+    )
+    missing_families_summary: dict[str, int] = Field(
+        default_factory=dict,
+        description="Family code → count of studies missing it: {'F4': 3}",
+    )
+    blocking_issue_count: int = 0
+    quality_caveats: list[str] = Field(
+        default_factory=list,
+        description="Human-readable quality warnings for presentation layer",
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
 #  RECOMMENDATION REPORT (top-level output)
 # ═══════════════════════════════════════════════════════════════
 
@@ -298,6 +328,7 @@ class RecommendationReport(BaseModel):
     evidence_gaps: EvidenceGapReport | None = None
     decision_trace: DecisionTrace | None = None
     clinical_risk: ClinicalRiskProfile | None = None
+    extraction_quality: ExtractionQualitySummary | None = None
 
     # Safety & warnings
     safety_flags: list[str] = Field(default_factory=list)
