@@ -2,31 +2,40 @@
 """
 Phase A: Get evidence data into the database.
 
-This script performs the critical data-loading steps identified in the
-CRITICAL_REVIEW.md:
+This is the CANONICAL manual-import entry point. When you extract a paper
+from PDF into CSVs under data/manual_uploads/structured/<doi-slug>/, run
+this script to load everything into the DB and compile edges_v1.
 
+Steps performed:
   A1. Reseed edge_relations_definitions_v1 from authoritative EDGE_REGISTRY.csv
-      (replaces the 25 EDGE_* stubs with the full 137 ER_* edges)
-  A2. Register all manually extracted studies in study_registry_v1
-  A3. Load CSV evidence from data/manual_uploads/structured/ into edge_evidence_v1
-      (maps CSV columns to DB columns)
-  A4. Verify final state
+  A2. Clean up legacy study entries
+  A3. Register studies in study_registry_v1  (auto-discovers from DOI→study map)
+  A4. Load CSV evidence → edge_evidence_v1   (populates BOTH raw AND harmonized columns)
+  A5. Seed action_catalog_v1                  (from seeds/actions.csv)
+  A6. Compile evidence → edges_v1             (IVW aggregation per edge)
+  A7. Verify final state
+
+Supports two CSV formats:
+  - 12-column minimal: doi,edge_id,beta_raw,se_raw,...,confidence_note
+  - 32-column extended: adds ci_low,ci_high,p_value,...,outcome_node_id
 
 Usage:
     python scripts/load_evidence_into_db.py
     python scripts/load_evidence_into_db.py --dry-run
     python scripts/load_evidence_into_db.py --verbose
+    python scripts/load_evidence_into_db.py --reset   # wipe evidence + edges first
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import logging
+import math
 import os
 import sys
-import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -68,6 +77,16 @@ STUDIES = [
         "study_design": "RCT",
         "notes": "Breast cancer; aerobic exercise vs usual care; n=19; pilot RCT",
     },
+    {
+        "study_id": "STUDY_NORTHEY_2018",
+        "title": "Cognition in breast cancer survivors: A pilot study of interval and continuous exercise",
+        "authors": "Northey JM; Pumpa KL; Quinlan C; Ikin A; Toohey K; Smee DJ; Rattray B",
+        "journal": "Journal of Science and Medicine in Sport",
+        "year": 2018,
+        "doi": "10.1016/j.jsams.2018.11.026",
+        "study_design": "RCT",
+        "notes": "Breast cancer survivors; 3-arm pilot RCT: HIIT vs MOD vs CON; n=17; 12-week cycle ergometer; CogState battery",
+    },
 ]
 
 
@@ -87,6 +106,7 @@ STUDIES = [
 DOI_TO_STUDY = {
     "10.1016/j.lfs.2013.08.011": "STUDY_CHERRIER_2013",
     "10.1002/pon.4370": "STUDY_CAMPBELL_2017",
+    "10.1016/j.jsams.2018.11.026": "STUDY_NORTHEY_2018",
 }
 
 
@@ -257,12 +277,61 @@ def register_studies(engine, dry_run: bool = False) -> int:
 # ============================================================================
 #  STEP 3: Load CSV evidence into edge_evidence_v1
 # ============================================================================
+
+def _compute_span_hash(study_id: str, edge_id: str, beta: float, se: float | None, n: int | None) -> str:
+    """Deterministic hash for dedup — same data = same hash."""
+    se_str = f"{se:.6f}" if se is not None else "none"
+    n_str = str(n) if n is not None else "0"
+    h = hashlib.sha1(f"{study_id}|{edge_id}|{beta:.6f}|{se_str}|{n_str}".encode()).hexdigest()[:16]
+    return h
+
+
+def _safe_float(val: str | None) -> float | None:
+    """Parse float from CSV value, returning None for empty/invalid."""
+    if val is None:
+        return None
+    val = val.strip()
+    if not val or val.lower() in ("", "na", "nan", "none"):
+        return None
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
+def _safe_int(val: str | None) -> int | None:
+    """Parse int from CSV value, returning None for empty/invalid."""
+    if val is None:
+        return None
+    val = val.strip()
+    if not val or val.lower() in ("", "na", "nan", "none"):
+        return None
+    try:
+        return int(float(val))  # handles "19.0"
+    except ValueError:
+        return None
+
+
+def _csv_str(row: dict, key: str) -> str | None:
+    """Get a CSV field as cleaned string, or None if absent/empty."""
+    val = row.get(key)
+    if val is None:
+        return None
+    val = val.strip()
+    return val if val else None
+
+
 def load_csv_evidence(engine, dry_run: bool = False) -> int:
     """Load edge evidence from manual CSV templates into edge_evidence_v1.
 
-    Handles column mapping between CSV template format and DB schema.
-    Looks up edge metadata from the (now-reseeded) edge_relations_definitions_v1
-    table to populate edge_family, node_x, node_y.
+    CRITICAL: This populates BOTH the raw columns (effect_value_reported,
+    se_reported) AND the harmonized columns (harmonized_beta, harmonized_se,
+    harmonization_status, harmonized_scale). For manual CSV extractions,
+    the raw values ARE the harmonized values — they are already clean
+    effect sizes in standard units.
+
+    Handles both 12-column minimal CSVs and 32-column extended CSVs.
+    Deduplicates by span_hash (study + edge + beta + se + n).
     """
     csv_dir = PROJECT_ROOT / "data" / "manual_uploads" / "structured"
     if not csv_dir.exists():
@@ -289,20 +358,45 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
 
     logger.info("Loaded %d edge definitions for lookup", len(edge_defs))
 
+    # Collect existing span_hashes to avoid duplicates
+    existing_hashes: set[str] = set()
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT span_hash FROM edge_evidence_v1 WHERE span_hash IS NOT NULL"))
+        for row in result:
+            existing_hashes.add(row[0])
+
     total_loaded = 0
+
+    # Full INSERT statement covering raw + harmonized + extended columns
     insert_sql = text("""
         INSERT INTO edge_evidence_v1 (
-            ler_id, edge_relation_id, profile_id, study_id,
+            ler_id, edge_param_id, edge_relation_id, profile_id, study_id,
             edge_family, node_x, node_y,
+            upstream_instrument_id,
             effect_type_reported, effect_value_reported, se_reported,
+            ci_low_reported, ci_high_reported, p_value,
             N_effect, effect_size_type,
-            notes, quality_rating, entered_by, entered_at, version, active
+            harmonized_beta, harmonized_se, harmonization_status, harmonized_scale,
+            se_derivation_level, se_quality_tag,
+            rob_overall, identification_status,
+            quality_rating, notes, extraction_snippet,
+            shared_control_flag, endpoint_vs_change, comparison_arm_label,
+            entered_by, entered_at, version, active,
+            span_hash
         ) VALUES (
-            :ler_id, :edge_relation_id, :profile_id, :study_id,
+            :ler_id, :edge_param_id, :edge_relation_id, :profile_id, :study_id,
             :edge_family, :node_x, :node_y,
+            :upstream_instrument_id,
             :effect_type_reported, :effect_value_reported, :se_reported,
+            :ci_low_reported, :ci_high_reported, :p_value,
             :N_effect, :effect_size_type,
-            :notes, :quality_rating, :entered_by, :entered_at, :version, :active
+            :harmonized_beta, :harmonized_se, :harmonization_status, :harmonized_scale,
+            :se_derivation_level, :se_quality_tag,
+            :rob_overall, :identification_status,
+            :quality_rating, :notes, :extraction_snippet,
+            :shared_control_flag, :endpoint_vs_change, :comparison_arm_label,
+            :entered_by, :entered_at, :version, :active,
+            :span_hash
         )
     """)
 
@@ -319,90 +413,148 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                 continue
 
             for row in rows:
-                edge_id = row.get("edge_id", "").strip()
-                doi = row.get("doi", "").strip()
-                study_id = DOI_TO_STUDY.get(doi)
+                edge_id = _csv_str(row, "edge_id")
+                doi = _csv_str(row, "doi")
+                study_id = DOI_TO_STUDY.get(doi) if doi else None
 
                 if not study_id:
-                    logger.warning("Unknown DOI %s in %s, skipping row", doi, csv_path)
+                    logger.warning("Unknown DOI '%s' in %s, skipping row", doi, csv_path)
                     continue
 
                 if not edge_id:
                     logger.warning("Empty edge_id in %s, skipping row", csv_path)
                     continue
 
-                # Look up edge definition
-                edge_def = edge_defs.get(edge_id, {})
-                if not edge_def:
+                beta_raw = _safe_float(row.get("beta_raw"))
+                se_raw = _safe_float(row.get("se_raw"))
+                sample_size = _safe_int(row.get("sample_size"))
+
+                if beta_raw is None:
+                    logger.warning("Missing beta_raw for %s × %s, skipping", study_id, edge_id)
+                    continue
+
+                if se_raw is None or se_raw <= 0:
                     logger.warning(
-                        "Edge %s not found in edge_relations_definitions_v1 "
-                        "(may not be in EDGE_REGISTRY.csv), proceeding with defaults",
-                        edge_id,
-                    )
-
-                # Generate unique LER ID
-                ler_id = f"LER_{study_id}_{edge_id}_{uuid.uuid4().hex[:8]}"
-
-                # Check if this evidence already exists (avoid duplicates)
-                existing = conn.execute(
-                    text(
-                        "SELECT ler_id FROM edge_evidence_v1 "
-                        "WHERE study_id = :sid AND edge_relation_id = :eid"
-                    ),
-                    {"sid": study_id, "eid": edge_id},
-                ).fetchone()
-
-                if existing:
-                    logger.info(
-                        "Evidence for %s × %s already exists (%s), skipping",
-                        study_id, edge_id, existing[0],
+                        "Missing or invalid se_raw (%.4f) for %s × %s, skipping",
+                        se_raw or 0, study_id, edge_id,
                     )
                     continue
 
-                # Map CSV columns to DB columns
-                beta_raw = row.get("beta_raw", "").strip()
-                se_raw = row.get("se_raw", "").strip()
-                sample_size = row.get("sample_size", "").strip()
+                # Dedup by content hash
+                span_hash = _compute_span_hash(study_id, edge_id, beta_raw, se_raw, sample_size)
+                if span_hash in existing_hashes:
+                    logger.info(
+                        "Evidence %s × %s (hash=%s) already exists, skipping",
+                        study_id, edge_id, span_hash,
+                    )
+                    continue
+
+                # Look up edge definition for node_x/node_y
+                edge_def = edge_defs.get(edge_id, {})
+                if not edge_def:
+                    logger.warning(
+                        "Edge %s not in edge_relations_definitions_v1, using defaults",
+                        edge_id,
+                    )
+
+                # Build deterministic ler_id
+                ler_id = f"LER_{study_id}_{edge_id}_{span_hash}"
+
+                # Determine harmonized_scale from effect_size_type
+                effect_size_type = _csv_str(row, "effect_size_type") or "BETWEEN_GROUP"
+                effect_type_original = _csv_str(row, "effect_type_original") or ""
+
+                # Map effect type to a harmonized scale label
+                if "cohen" in effect_type_original.lower() or "cohens_d" in effect_type_original.lower():
+                    harmonized_scale = "cohens_d"
+                elif "mean_diff" in effect_type_original.lower():
+                    harmonized_scale = "mean_diff_raw"
+                elif "odds_ratio" in effect_type_original.lower() or "log_or" in effect_type_original.lower():
+                    harmonized_scale = "log_odds_ratio"
+                elif "hazard" in effect_type_original.lower():
+                    harmonized_scale = "log_hazard_ratio"
+                else:
+                    harmonized_scale = "cohens_d"  # safe default for CRCI
+
+                # Determine quality from rob_overall or default
+                rob_overall = _csv_str(row, "rob_overall")
+                quality_rating = rob_overall or "moderate"
+
+                # SE derivation level from CSV (extended format)
+                se_derivation = _csv_str(row, "se_derivation_method") or "direct"
+
+                # Identification status: manually extracted → at least "plausible"
+                identification_status = "plausible"
+
+                # Build extraction snippet from context
+                snippet_parts = []
+                if _csv_str(row, "effect_size_context"):
+                    snippet_parts.append(_csv_str(row, "effect_size_context"))
+                if _csv_str(row, "beta_sign_convention"):
+                    snippet_parts.append(f"sign_convention={_csv_str(row, 'beta_sign_convention')}")
+                if _csv_str(row, "outcome_directionality"):
+                    snippet_parts.append(f"directionality={_csv_str(row, 'outcome_directionality')}")
+                extraction_snippet = "; ".join(snippet_parts) if snippet_parts else None
 
                 params = {
                     "ler_id": ler_id,
+                    "edge_param_id": f"EP_{edge_id}_{span_hash[:8]}",
                     "edge_relation_id": edge_id,
                     "profile_id": "PROFILE_DEFAULT",
                     "study_id": study_id,
                     "edge_family": edge_def.get("edge_family", "unknown"),
                     "node_x": edge_def.get("node_x", "unknown"),
                     "node_y": edge_def.get("node_y", "unknown"),
-                    "effect_type_reported": row.get("effect_type_original", "").strip(),
-                    "effect_value_reported": float(beta_raw) if beta_raw else None,
-                    "se_reported": float(se_raw) if se_raw else None,
-                    "N_effect": int(sample_size) if sample_size else None,
-                    "effect_size_type": row.get("effect_size_type", "").strip(),
-                    "notes": row.get("confidence_note", "").strip(),
-                    "quality_rating": "moderate",  # Default for manually extracted data
+                    "upstream_instrument_id": _csv_str(row, "instrument_id"),
+                    # Raw columns
+                    "effect_type_reported": effect_type_original,
+                    "effect_value_reported": beta_raw,
+                    "se_reported": se_raw,
+                    "ci_low_reported": _safe_float(row.get("ci_low")),
+                    "ci_high_reported": _safe_float(row.get("ci_high")),
+                    "p_value": _safe_float(row.get("p_value")),
+                    "N_effect": sample_size,
+                    "effect_size_type": effect_size_type,
+                    # HARMONIZED columns — CRITICAL for evidence_loader
+                    "harmonized_beta": beta_raw,
+                    "harmonized_se": se_raw,
+                    "harmonization_status": "harmonized",
+                    "harmonized_scale": harmonized_scale,
+                    # SE provenance
+                    "se_derivation_level": se_derivation,
+                    "se_quality_tag": "manual_extraction",
+                    # Quality & identification
+                    "rob_overall": rob_overall,
+                    "identification_status": identification_status,
+                    "quality_rating": quality_rating,
+                    "notes": _csv_str(row, "confidence_note") or "",
+                    "extraction_snippet": extraction_snippet,
+                    # Extended columns
+                    "shared_control_flag": 1 if _csv_str(row, "shared_control_flag") == "1" else 0,
+                    "endpoint_vs_change": _csv_str(row, "endpoint_vs_change"),
+                    "comparison_arm_label": _csv_str(row, "comparison_arm_label"),
+                    # Audit
                     "entered_by": "manual_csv_import",
-                    "entered_at": datetime.utcnow().isoformat(),
+                    "entered_at": datetime.now(timezone.utc).isoformat(),
                     "version": 1,
                     "active": 1,
+                    "span_hash": span_hash,
                 }
 
                 if dry_run:
                     logger.info(
-                        "[DRY RUN] Would insert LER %s: %s × %s β=%.3f SE=%.3f n=%s",
-                        ler_id, study_id, edge_id,
-                        params["effect_value_reported"] or 0,
-                        params["se_reported"] or 0,
-                        params["N_effect"],
+                        "[DRY RUN] Would insert %s: %s × %s β=%.3f SE=%.3f n=%s",
+                        ler_id, study_id, edge_id, beta_raw, se_raw, sample_size,
                     )
                 else:
                     conn.execute(insert_sql, params)
                     logger.info(
-                        "Inserted %s: %s × %s β=%.3f SE=%.3f n=%s",
-                        ler_id, study_id, edge_id,
-                        params["effect_value_reported"] or 0,
-                        params["se_reported"] or 0,
-                        params["N_effect"],
+                        "Inserted %s: %s × %s β=%.3f SE=%.3f n=%s scale=%s",
+                        ler_id, study_id, edge_id, beta_raw, se_raw,
+                        sample_size, harmonized_scale,
                     )
 
+                existing_hashes.add(span_hash)
                 total_loaded += 1
 
     return total_loaded
@@ -412,39 +564,312 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
 #  STEP 4: Clean up old study entries with wrong IDs
 # ============================================================================
 def cleanup_old_entries(engine, dry_run: bool = False) -> None:
-    """Remove the old Cifu 2018 study_registry entry that used inconsistent ID,
-    and re-insert with consistent naming."""
+    """Remove legacy study entries with inconsistent IDs."""
+    legacy_ids = ["CHERRIER2013", "STUDY_c5c88ae841b4", "STUDY_UNIT_TEST"]
     with engine.begin() as conn:
-        # Check for old STUDY_CIFU_2018 entry
-        result = conn.execute(
-            text("SELECT study_id FROM study_registry_v1 WHERE study_id = 'STUDY_CIFU_2018'")
-        )
-        if result.fetchone():
-            if not dry_run:
-                conn.execute(
-                    text("UPDATE study_registry_v1 SET study_id = 'STUDY_CIFU_2018' WHERE study_id = 'STUDY_CIFU_2018'")
-                )
-                logger.info("Cifu 2018 entry preserved as STUDY_CIFU_2018")
-            else:
-                logger.info("[DRY RUN] Would preserve STUDY_CIFU_2018")
-
-        # Also handle old CHERRIER2013 entry if it exists
-        result = conn.execute(
-            text("SELECT study_id FROM study_registry_v1 WHERE study_id = 'CHERRIER2013'")
-        )
-        if result.fetchone():
-            if not dry_run:
-                conn.execute(
-                    text("DELETE FROM study_registry_v1 WHERE study_id = 'CHERRIER2013'")
-                )
-                logger.info("Removed old CHERRIER2013 entry (replaced by STUDY_CHERRIER_2013)")
+        for old_id in legacy_ids:
+            result = conn.execute(
+                text("SELECT study_id FROM study_registry_v1 WHERE study_id = :sid"),
+                {"sid": old_id},
+            )
+            if result.fetchone():
+                if not dry_run:
+                    conn.execute(
+                        text("DELETE FROM study_registry_v1 WHERE study_id = :sid"),
+                        {"sid": old_id},
+                    )
+                    logger.info("Removed legacy study entry: %s", old_id)
+                else:
+                    logger.info("[DRY RUN] Would remove legacy study entry: %s", old_id)
 
 
 # ============================================================================
-#  STEP 5: Verify final state
+#  STEP 5: Seed action_catalog_v1
+# ============================================================================
+def seed_action_catalog(engine, dry_run: bool = False) -> int:
+    """Seed action_catalog_v1 from crci/database/seeds/actions.csv."""
+    csv_path = PROJECT_ROOT / "crci" / "database" / "seeds" / "actions.csv"
+    if not csv_path.exists():
+        logger.warning("actions.csv not found at %s", csv_path)
+        return 0
+
+    with open(csv_path, "r", newline="") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    logger.info("Read %d actions from %s", len(rows), csv_path)
+
+    loaded = 0
+    with engine.begin() as conn:
+        for row in rows:
+            action_id = row.get("action_id", "").strip()
+            if not action_id:
+                continue
+
+            # Check if exists
+            existing = conn.execute(
+                text("SELECT action_id FROM action_catalog_v1 WHERE action_id = :aid"),
+                {"aid": action_id},
+            ).fetchone()
+            if existing:
+                logger.debug("Action %s already exists, skipping", action_id)
+                continue
+
+            if dry_run:
+                logger.info("[DRY RUN] Would insert action %s", action_id)
+                loaded += 1
+                continue
+
+            conn.execute(
+                text("""
+                    INSERT INTO action_catalog_v1 (
+                        action_id, action_label, action_class, dose_type, dose_unit,
+                        dose_semantics, dose_min, dose_max, dose_recommended_start,
+                        dose_step, time_cost_min_default, cognitive_load_default,
+                        logistics_load_default, overall_burden_default,
+                        adherence_rate_default, evidence_basis, evidence_strength,
+                        notes, version, active
+                    ) VALUES (
+                        :action_id, :action_label, :action_class, :dose_type, :dose_unit,
+                        :dose_semantics, :dose_min, :dose_max, :dose_recommended_start,
+                        :dose_step, :time_cost_min_default, :cognitive_load_default,
+                        :logistics_load_default, :overall_burden_default,
+                        :adherence_rate_default, :evidence_basis, :evidence_strength,
+                        :notes, :version, :active
+                    )
+                """),
+                {
+                    "action_id": action_id,
+                    "action_label": row.get("action_label", "").strip(),
+                    "action_class": row.get("action_class", "").strip(),
+                    "dose_type": row.get("dose_type", "").strip(),
+                    "dose_unit": row.get("dose_unit", "").strip() or None,
+                    "dose_semantics": row.get("dose_semantics", "").strip() or None,
+                    "dose_min": _safe_float(row.get("dose_min")),
+                    "dose_max": _safe_float(row.get("dose_max")),
+                    "dose_recommended_start": _safe_float(row.get("dose_recommended_start")),
+                    "dose_step": _safe_float(row.get("dose_step")),
+                    "time_cost_min_default": _safe_float(row.get("time_cost_min_default")),
+                    "cognitive_load_default": _safe_float(row.get("cognitive_load_default")),
+                    "logistics_load_default": _safe_float(row.get("logistics_load_default")),
+                    "overall_burden_default": _safe_float(row.get("overall_burden_default")),
+                    "adherence_rate_default": _safe_float(row.get("adherence_rate_default")),
+                    "evidence_basis": row.get("evidence_basis", "").strip() or None,
+                    "evidence_strength": row.get("evidence_strength", "").strip() or None,
+                    "notes": row.get("notes", "").strip() or None,
+                    "version": _safe_int(row.get("version")) or 1,
+                    "active": _safe_int(row.get("active")) or 1,
+                },
+            )
+            loaded += 1
+            logger.info("Inserted action %s", action_id)
+
+    return loaded
+
+
+# ============================================================================
+#  STEP 6: Compile evidence → edges_v1 (lightweight IVW aggregation)
+# ============================================================================
+def compile_edges(engine, dry_run: bool = False) -> int:
+    """Compile edge_evidence_v1 → edges_v1 using IVW pooling.
+
+    For each distinct edge_relation_id with harmonized evidence:
+    1. Collect all active rows with valid harmonized_beta + harmonized_se
+    2. If k=1: single-study estimate (beta = that study's beta, SE = that SE)
+    3. If k>=2: IVW pooling: β̂ = Σ(βᵢ/SEᵢ²) / Σ(1/SEᵢ²); SE = 1/√(Σ(1/SEᵢ²))
+    4. Write/update edges_v1 row with compiled parameters
+
+    This replaces the full P4 pipeline for manual imports while
+    preserving the same output contract.
+    """
+    compiled = 0
+
+    with engine.begin() as conn:
+        # Clear existing edges_v1 (will rebuild from evidence)
+        if not dry_run:
+            conn.execute(text("DELETE FROM edges_v1"))
+            logger.info("Cleared edges_v1 for recompilation")
+
+        # Get all distinct edges with evidence
+        result = conn.execute(text("""
+            SELECT edge_relation_id,
+                   harmonized_beta, harmonized_se, N_effect, harmonized_scale,
+                   study_id, quality_rating, rob_overall,
+                   ci_low_reported, ci_high_reported
+            FROM edge_evidence_v1
+            WHERE active = 1
+              AND harmonized_beta IS NOT NULL
+              AND harmonized_se IS NOT NULL
+              AND harmonized_se > 0
+              AND edge_relation_id != 'UNASSIGNED'
+            ORDER BY edge_relation_id
+        """))
+        all_rows = result.fetchall()
+
+        # Group by edge_relation_id
+        from itertools import groupby
+        from operator import itemgetter
+
+        groups = {}
+        for row in all_rows:
+            eid = row[0]
+            if eid not in groups:
+                groups[eid] = []
+            groups[eid].append(row)
+
+        # Also look up edge definitions for metadata
+        edge_defs = {}
+        result = conn.execute(text(
+            "SELECT edge_relation_id, node_x, node_y, default_effect_direction "
+            "FROM edge_relations_definitions_v1"
+        ))
+        for row in result:
+            edge_defs[row[0]] = {
+                "node_x": row[1], "node_y": row[2],
+                "direction": row[3],
+            }
+
+        logger.info("Compiling %d edges from %d evidence rows", len(groups), len(all_rows))
+
+        insert_edge_sql = text("""
+            INSERT INTO edges_v1 (
+                edge_param_id, edge_relation_id,
+                effect_scale, effect_direction,
+                beta_mean, beta_se, beta_dist_family,
+                ci_low, ci_high,
+                aggregation_method, evidence_level,
+                total_n, i_squared, tau_squared,
+                supporting_ler_ids,
+                notes, active, version
+            ) VALUES (
+                :edge_param_id, :edge_relation_id,
+                :effect_scale, :effect_direction,
+                :beta_mean, :beta_se, :beta_dist_family,
+                :ci_low, :ci_high,
+                :aggregation_method, :evidence_level,
+                :total_n, :i_squared, :tau_squared,
+                :supporting_ler_ids,
+                :notes, :active, :version
+            )
+        """)
+
+        for edge_id, evidence_rows in groups.items():
+            k = len(evidence_rows)
+            betas = [r[1] for r in evidence_rows]
+            ses = [r[2] for r in evidence_rows]
+            ns = [r[3] or 0 for r in evidence_rows]
+            scale = evidence_rows[0][4] or "cohens_d"
+            study_ids = [r[5] for r in evidence_rows]
+
+            total_n = sum(ns)
+
+            if k == 1:
+                # Single study — pass through
+                beta_pooled = betas[0]
+                se_pooled = ses[0]
+                aggregation_method = "SINGLE_STUDY"
+                i_squared = 0.0
+                tau_squared = 0.0
+            else:
+                # IVW pooling: Formula P4-1
+                # β̂_IVW = Σ(βᵢ/SEᵢ²) / Σ(1/SEᵢ²)
+                # SE_IVW = 1 / √(Σ(1/SEᵢ²))
+                weights = [1.0 / (se ** 2) for se in ses]
+                sum_weights = sum(weights)
+                beta_pooled = sum(b * w for b, w in zip(betas, weights)) / sum_weights
+                se_pooled = 1.0 / math.sqrt(sum_weights)
+                aggregation_method = "IVW_FIXED"
+
+                # Cochran's Q and I²
+                q_stat = sum(w * (b - beta_pooled) ** 2 for b, w in zip(betas, weights))
+                df = k - 1
+                i_squared = max(0.0, (q_stat - df) / q_stat) if q_stat > 0 else 0.0
+                # DerSimonian-Laird τ²
+                c = sum_weights - sum(w ** 2 for w in weights) / sum_weights
+                tau_squared = max(0.0, (q_stat - df) / c) if c > 0 else 0.0
+
+            # CI from compiled estimate
+            ci_low = beta_pooled - 1.96 * se_pooled
+            ci_high = beta_pooled + 1.96 * se_pooled
+
+            # Determine effect direction from edge definition
+            edge_def = edge_defs.get(edge_id, {})
+            direction = edge_def.get("direction", 0)
+            if direction is None:
+                direction = 0
+            effect_direction = "positive" if direction >= 0 else "negative"
+
+            # Determine evidence level
+            if k >= 3:
+                evidence_level = "DEPLOY"
+            elif k >= 1:
+                evidence_level = "DEPLOY_WITH_WARNINGS"
+            else:
+                evidence_level = "BLOCKED"
+
+            edge_param_id = f"EP_{edge_id}_compiled"
+            ler_list = json.dumps([f"LER_{sid}_{edge_id}" for sid in study_ids])
+
+            params = {
+                "edge_param_id": edge_param_id,
+                "edge_relation_id": edge_id,
+                "effect_scale": scale,
+                "effect_direction": effect_direction,
+                "beta_mean": round(beta_pooled, 6),
+                "beta_se": round(se_pooled, 6),
+                "beta_dist_family": "normal",
+                "ci_low": round(ci_low, 6),
+                "ci_high": round(ci_high, 6),
+                "aggregation_method": aggregation_method,
+                "evidence_level": evidence_level,
+                "total_n": total_n,
+                "i_squared": round(i_squared, 4),
+                "tau_squared": round(tau_squared, 6),
+                "supporting_ler_ids": ler_list,
+                "notes": f"Manual import: k={k} studies, IVW compiled",
+                "active": 1,
+                "version": 1,
+            }
+
+            if dry_run:
+                logger.info(
+                    "[DRY RUN] Would compile edge %s: β=%.4f SE=%.4f k=%d method=%s",
+                    edge_id, beta_pooled, se_pooled, k, aggregation_method,
+                )
+            else:
+                conn.execute(insert_edge_sql, params)
+                logger.info(
+                    "Compiled %s: β=%.4f SE=%.4f k=%d n=%d method=%s level=%s",
+                    edge_id, beta_pooled, se_pooled, k, total_n,
+                    aggregation_method, evidence_level,
+                )
+
+            compiled += 1
+
+    return compiled
+
+
+# ============================================================================
+#  STEP 7: Reset (optional — wipe evidence/edges before reload)
+# ============================================================================
+def reset_evidence(engine) -> None:
+    """Wipe edge_evidence_v1, edges_v1, and related tables for clean reload."""
+    with engine.begin() as conn:
+        for table in ["edges_v1", "edge_evidence_v1", "edge_param_builds_v1",
+                       "study_annotations_v1", "study_annotations_raw_v1",
+                       "review_tasks", "extraction_runs"]:
+            try:
+                result = conn.execute(text(f'DELETE FROM "{table}"'))
+                logger.info("Cleared %s: %d rows removed", table, result.rowcount)
+            except Exception as exc:
+                logger.debug("Could not clear %s: %s", table, exc)
+
+
+# ============================================================================
+#  STEP 8: Verify final state
 # ============================================================================
 def verify_state(engine) -> None:
-    """Print a summary of the database state after loading."""
+    """Print a comprehensive summary of the database state after loading."""
     with engine.connect() as conn:
         print()
         print("=" * 70)
@@ -458,56 +883,89 @@ def verify_state(engine) -> None:
 
         # Study registry
         result = conn.execute(
-            text("SELECT study_id, doi, study_design FROM study_registry_v1 ORDER BY study_id")
+            text("SELECT study_id, doi, study_design, year FROM study_registry_v1 ORDER BY study_id")
         )
         studies = result.fetchall()
         print(f"\n  study_registry_v1: {len(studies)} rows")
         for s in studies:
-            print(f"    {s[0]:30s} DOI={s[1]} ({s[2]})")
+            print(f"    {s[0]:30s} DOI={s[1]} ({s[2]}, {s[3]})")
 
-        # Edge evidence
+        # Edge evidence with harmonized columns
         result = conn.execute(text("SELECT COUNT(*) FROM edge_evidence_v1"))
         evidence_count = result.scalar()
-        print(f"\n  edge_evidence_v1: {evidence_count} rows")
+        result2 = conn.execute(text(
+            "SELECT COUNT(*) FROM edge_evidence_v1 "
+            "WHERE harmonized_beta IS NOT NULL AND harmonized_se IS NOT NULL"
+        ))
+        harmonized_count = result2.scalar()
+        print(f"\n  edge_evidence_v1: {evidence_count} rows ({harmonized_count} harmonized)")
 
-        if evidence_count > 0:
+        if harmonized_count > 0:
             result = conn.execute(
                 text("""
-                    SELECT ler_id, edge_relation_id, study_id,
-                           effect_value_reported, se_reported, N_effect,
-                           effect_size_type
+                    SELECT edge_relation_id, study_id,
+                           harmonized_beta, harmonized_se, harmonized_scale,
+                           N_effect, harmonization_status
                     FROM edge_evidence_v1
-                    ORDER BY study_id, edge_relation_id
+                    WHERE harmonized_beta IS NOT NULL
+                    ORDER BY edge_relation_id, study_id
                 """)
             )
             for row in result:
-                beta = row[3] if row[3] is not None else 0
-                se = row[4] if row[4] is not None else 0
                 print(
-                    f"    {row[2]:25s} × {row[1]:35s} β={beta:+.3f} SE={se:.3f} n={row[5]} ({row[6]})"
+                    f"    {row[1]:25s} × {row[0]:40s} β={row[2]:+.4f} SE={row[3]:.4f} "
+                    f"scale={row[4]} n={row[5]} status={row[6]}"
                 )
 
-        # Coverage
-        result = conn.execute(
-            text("""
-                SELECT COUNT(DISTINCT edge_relation_id)
-                FROM edge_evidence_v1
-            """)
-        )
-        edges_covered = result.scalar()
-        print(f"\n  Edge coverage: {edges_covered}/{edge_def_count} edges have evidence")
+        # Compiled edges
+        result = conn.execute(text("SELECT COUNT(*) FROM edges_v1"))
+        edges_count = result.scalar()
+        print(f"\n  edges_v1 (compiled): {edges_count} rows")
 
-        # Acquisition queue
-        result = conn.execute(text("SELECT COUNT(*) FROM acquisition_queue_v1"))
-        queue_count = result.scalar()
-        print(f"  Acquisition queue: {queue_count} papers")
+        if edges_count > 0:
+            result = conn.execute(
+                text("""
+                    SELECT edge_relation_id, beta_mean, beta_se,
+                           aggregation_method, evidence_level, total_n
+                    FROM edges_v1
+                    WHERE active = 1
+                    ORDER BY edge_relation_id
+                """)
+            )
+            for row in result:
+                print(
+                    f"    {row[0]:40s} β={row[1]:+.4f} SE={row[2]:.4f} "
+                    f"method={row[3]} level={row[4]} n={row[5]}"
+                )
+
+        # Action catalog
+        result = conn.execute(text("SELECT COUNT(*) FROM action_catalog_v1"))
+        action_count = result.scalar()
+        print(f"\n  action_catalog_v1: {action_count} rows")
+
+        # Coverage summary
+        result = conn.execute(text(
+            "SELECT COUNT(DISTINCT edge_relation_id) FROM edge_evidence_v1 "
+            "WHERE harmonized_beta IS NOT NULL"
+        ))
+        edges_covered = result.scalar()
+        print(f"\n  Evidence coverage: {edges_covered}/{edge_def_count} edges have evidence")
+        print(f"  Compiled edges:    {edges_count}/{edges_covered} evidence edges compiled")
 
         print()
         print("=" * 70)
-        if evidence_count > 0:
-            print("  ✅ EVIDENCE DATA IS NOW IN THE DATABASE")
+        ok = harmonized_count > 0 and edges_count > 0 and action_count > 0
+        if ok:
+            print("  ✅ PIPELINE READY: evidence → edges → actions all populated")
         else:
-            print("  ❌ NO EVIDENCE LOADED (check errors above)")
+            problems = []
+            if harmonized_count == 0:
+                problems.append("NO HARMONIZED EVIDENCE")
+            if edges_count == 0:
+                problems.append("NO COMPILED EDGES")
+            if action_count == 0:
+                problems.append("NO ACTIONS")
+            print(f"  ❌ ISSUES: {', '.join(problems)}")
         print("=" * 70)
 
 
@@ -520,40 +978,59 @@ def main() -> int:
     )
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing")
     parser.add_argument("--verbose", "-v", action="store_true", help="Debug logging")
+    parser.add_argument("--reset", action="store_true", help="Wipe evidence/edges before reload")
     args = parser.parse_args()
 
     _setup_logging(args.verbose)
 
     print("=" * 70)
-    print("  CRCI Phase A: Loading Evidence Into Database")
+    print("  CRCI: Loading Evidence Into Database")
     print("=" * 70)
     print(f"  Database: {db_url}")
-    print(f"  Dry run: {args.dry_run}")
+    print(f"  Dry run:  {args.dry_run}")
+    print(f"  Reset:    {args.reset}")
     print()
 
     engine = init_db()
 
+    # Optional reset
+    if args.reset and not args.dry_run:
+        print("[0/7] Resetting evidence and edge tables...")
+        reset_evidence(engine)
+        print("  → Tables cleared\n")
+
     # Step 1: Reseed edge definitions
-    print("[1/4] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
+    print("[1/7] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
     n_edges = reseed_edge_definitions(engine, dry_run=args.dry_run)
     print(f"  → {n_edges} edge definitions loaded")
 
     # Step 2: Clean up old entries
-    print("\n[2/4] Cleaning up old study entries...")
+    print("\n[2/7] Cleaning up legacy study entries...")
     cleanup_old_entries(engine, dry_run=args.dry_run)
 
     # Step 3: Register studies
-    print("\n[3/4] Registering studies in study_registry_v1...")
+    print("\n[3/7] Registering studies in study_registry_v1...")
     n_studies = register_studies(engine, dry_run=args.dry_run)
     print(f"  → {n_studies} new studies registered")
 
     # Step 4: Load CSV evidence
-    print("\n[4/4] Loading CSV evidence into edge_evidence_v1...")
+    print("\n[4/7] Loading CSV evidence into edge_evidence_v1...")
     n_evidence = load_csv_evidence(engine, dry_run=args.dry_run)
     print(f"  → {n_evidence} evidence rows loaded")
 
-    # Verify
+    # Step 5: Seed action catalog
+    print("\n[5/7] Seeding action_catalog_v1...")
+    n_actions = seed_action_catalog(engine, dry_run=args.dry_run)
+    print(f"  → {n_actions} actions loaded")
+
+    # Step 6: Compile edges
+    print("\n[6/7] Compiling evidence → edges_v1 (IVW aggregation)...")
+    n_compiled = compile_edges(engine, dry_run=args.dry_run)
+    print(f"  → {n_compiled} edges compiled")
+
+    # Step 7: Verify
     if not args.dry_run:
+        print("\n[7/7] Verifying...")
         verify_state(engine)
 
     return 0
