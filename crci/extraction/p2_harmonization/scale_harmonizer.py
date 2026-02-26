@@ -308,9 +308,14 @@ def harmonize_scale(
             span_id=routed.span_id,
             beta=routed.value.value,
             se=se,
+            n_effect=routed.value.n,
             se_source=se_source,
             scale=EffectScale.RAW_PER_SD,
             direction_aligned=False,
+            edge_relation_id=routed.value.edge_relation_id,
+            label_type=routed.value.label_type,
+            ci_lower=routed.value.ci_lower,
+            ci_upper=routed.value.ci_upper,
         )
 
     # Resolve SE first (pass effect type so ratio measures get log-scale SE)
@@ -437,6 +442,35 @@ def harmonize_scale(
             beta = proportion
             output_scale = EffectScale.PROXY_PER_SD
 
+    elif effect_type_reported == EffectTypeReported.F_STATISTIC:
+        # Convert F(1, df_error) to Cohen's d.
+        # Formula: d = 2 * sqrt(F / N)  (balanced groups approximation)
+        # Exact:   d = sqrt(F * (n1+n2) / (n1*n2))  when group sizes known
+        # SE_d ≈ sqrt(4/N + d²/(2*(N-2)))
+        f_val = routed.value.value
+        n = routed.value.n
+        if n is None or n <= 0:
+            n = 28  # REVIEW: paper-level N fallback — should come from context
+            logger.warning(
+                "span_id=%s: F_STATISTIC n not available; using fallback N=%d",
+                routed.span_id, n,
+            )
+        if f_val > 0 and n > 2:
+            beta = 2.0 * math.sqrt(f_val / n)
+            converted_se = math.sqrt(4.0 / n + beta ** 2 / (2.0 * (n - 2)))
+            se_source = SESource.SE_FROM_CI  # Derived from F and N
+            output_scale = EffectScale.SD_SD
+            logger.info(
+                "span_id=%s: F=%.3f, N=%d → d=%.4f, SE_d=%.4f",
+                routed.span_id, f_val, n, beta, converted_se,
+            )
+        else:
+            logger.warning(
+                "span_id=%s: F=%.3f cannot convert (N=%s)",
+                routed.span_id, f_val, n,
+            )
+            output_scale = EffectScale.RAW_PER_SD
+
     else:
         # Unknown/OTHER type — pass through on raw scale
         logger.info(
@@ -450,9 +484,14 @@ def harmonize_scale(
         span_id=routed.span_id,
         beta=beta,
         se=converted_se,
+        n_effect=routed.value.n,
         se_source=se_source,
         scale=output_scale,
         direction_aligned=False,  # S4 handles alignment
+        edge_relation_id=routed.value.edge_relation_id,
+        label_type=routed.value.label_type,
+        ci_lower=routed.value.ci_lower,
+        ci_upper=routed.value.ci_upper,
     )
 
 
@@ -499,7 +538,12 @@ def convert_correlation_to_d(
         span_id=routed.span_id,
         beta=beta,
         se=se,
+        n_effect=routed.value.n,
         se_source=se_source,
         scale=EffectScale.SD_SD,
         direction_aligned=False,
+        edge_relation_id=routed.value.edge_relation_id,
+        label_type=routed.value.label_type,
+        ci_lower=routed.value.ci_lower,
+        ci_upper=routed.value.ci_upper,
     )

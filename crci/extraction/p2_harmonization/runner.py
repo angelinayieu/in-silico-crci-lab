@@ -19,10 +19,41 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from crci.shared.models.enums import Orientation, PlausibilityStatus
+from crci.shared.models.enums import (
+    HarmonizationStatusInMem,
+    Orientation,
+    PlausibilityStatus,
+)
+from crci.shared.models.intermediate_states import (
+    HarmonizedClaim,
+    TypedNumericValue,
+)
 from crci.shared.models.tables import ExtractionRun
 
 logger = logging.getLogger(__name__)
+
+
+class _GroupedClaimAdapter:
+    """Adapts a TypedNumericValue (from group assembler) to the interface
+    that P2 stages expect from ParsedNumeric claims.
+
+    P2 accesses: .span_id, .value (TypedNumericValue), .value_type
+    """
+
+    def __init__(self, tv: TypedNumericValue, idx: int):
+        self.span_id = f"grp_{tv.grouping_id or idx}"
+        self.value = tv  # TypedNumericValue — what check_plausibility expects
+        self.value_type = (tv.label_type or "EFFECT_SIZE").upper()
+        # Carry through for downstream
+        self.edge_relation_id = tv.edge_relation_id
+        self.label_type = tv.label_type
+
+
+def _wrap_typed_as_claims(
+    grouped: list[TypedNumericValue],
+) -> list[_GroupedClaimAdapter]:
+    """Wrap TypedNumericValue records as claim-like objects for P2 stages."""
+    return [_GroupedClaimAdapter(tv, i) for i, tv in enumerate(grouped)]
 
 
 def run_p2_harmonization(
@@ -51,15 +82,54 @@ def run_p2_harmonization(
     paper_id = context.get("paper_id", "unknown")
 
     # Get validated claims from TB result
-    # tb_result is a ConsistencyResult dataclass with .validated attribute
-    tb_result = context.get("tb_result")
-    if tb_result is not None and hasattr(tb_result, "validated"):
-        claims = tb_result.validated
+    # Prefer grouped_evidence (TypedNumericValue[] with multi-field records)
+    # from TB group assembler (1B). Fallback to tb_result.validated
+    # (ParsedNumeric[] — legacy, single-field per record).
+    grouped_evidence = context.get("grouped_evidence")
+    if grouped_evidence is not None and len(grouped_evidence) > 0:
+        # TypedNumericValue objects — already have se, ci, p, n fields
+        # We need to wrap them to have span_id and value_type for P2 steps
+        claims = _wrap_typed_as_claims(grouped_evidence)
+        logger.info(
+            "P2: Using %d grouped evidence records from TB assembler",
+            len(claims),
+        )
     else:
-        # Fallback: try parsed_claims from context
-        claims = context.get("parsed_claims", [])
-        if isinstance(claims, dict):
-            claims = claims.get("valid_claims", [])
+        tb_result = context.get("tb_result")
+        if tb_result is not None and hasattr(tb_result, "validated"):
+            claims = tb_result.validated
+        else:
+            # Fallback: try parsed_claims from context
+            claims = context.get("parsed_claims", [])
+            if isinstance(claims, dict):
+                claims = claims.get("valid_claims", [])
+
+    # ── FILTER: Only process effect-type claims for P2 harmonization ──
+    # Non-effect types (SAMPLE_SIZE, MEAN, SD, etc.) are preserved for context
+    # but should not be harmonized as beta/SE pairs.
+    EFFECT_VALUE_TYPES = {
+        # From numeric_parser _RULE_NP04_TYPES and _RULE_NP08_TYPES
+        "EFFECT_SIZE", "ODDS_RATIO", "HAZARD_RATIO", "RISK_RATIO",
+        "INCIDENCE_RATE_RATIO", "MEAN_DIFFERENCE", "PERCENT_CHANGE",
+        "UNSTD_BETA", "STD_BETA", "CORRELATION",
+        # Allow interaction terms and subgroup effects
+        "INTERACTION_TERM", "SUBGROUP_EFFECT",
+        # F-statistics convert to Cohen's d: d = 2*sqrt(F/N)
+        "F_STATISTIC",
+    }
+    original_count = len(claims)
+    effect_claims = [
+        c for c in claims
+        if getattr(c, "value_type", "").upper() in EFFECT_VALUE_TYPES
+    ]
+    non_effect_count = original_count - len(effect_claims)
+    if non_effect_count > 0:
+        logger.info(
+            "P2: Filtered %d non-effect claims (SAMPLE_SIZE, MEAN, SD, etc.), "
+            "processing %d effect-type claims for harmonization",
+            non_effect_count, len(effect_claims)
+        )
+    claims = effect_claims
 
     logger.info("P2: Harmonizing %d claims for %s", len(claims), paper_id)
 
@@ -110,9 +180,10 @@ def run_p2_harmonization(
     failed_conversions: list[Any] = []
     for claim in passed_claims:
         try:
+            effect_type = _infer_effect_type(claim)
             routed = route_conversion(
                 validated=claim,
-                effect_type_reported="group_diff",  # Default; TB claims lack this metadata
+                effect_type_reported=effect_type,
             )
             converted_list.append(routed)
         except Exception as exc:
@@ -131,12 +202,41 @@ def run_p2_harmonization(
     logger.info("P2-S3: Harmonizing scales")
     from crci.extraction.p2_harmonization.scale_harmonizer import harmonize_scale
 
+    # Extract paper-level N for F→d conversion fallback
+    _paper_n: int | None = None
+    _sample_info = context.get("classified_paper", {}).get("sample_size")
+    if _sample_info is not None:
+        try:
+            _paper_n = int(_sample_info)
+        except (TypeError, ValueError):
+            pass
+    # Also check companion_meta for sample size (meta.json is higher quality)
+    if _paper_n is None:
+        _meta_sample = (context.get("companion_meta") or {}).get("sample", {})
+        _meta_n = _meta_sample.get("n_total")
+        if _meta_n is not None:
+            try:
+                _paper_n = int(_meta_n)
+                logger.info("P2-S3: Using meta.json sample N=%d for F→d conversion", _paper_n)
+            except (TypeError, ValueError):
+                pass
+
     harmonized_list: list[Any] = []
     for routed_item in converted_list:
         try:
+            effect_type = _infer_effect_type(routed_item)
+            # For F_STATISTIC: inject paper-level N if not already set
+            if effect_type == "f_statistic" and hasattr(routed_item, "value"):
+                v = routed_item.value
+                if v.n is None and _paper_n is not None:
+                    v.n = _paper_n
+                    logger.debug(
+                        "P2-S3: Injected paper-level N=%d for F_STATISTIC span %s",
+                        _paper_n, getattr(routed_item, "span_id", "?"),
+                    )
             scaled = harmonize_scale(
                 routed=routed_item,
-                effect_type_reported="group_diff",
+                effect_type_reported=effect_type,
             )
             harmonized_list.append(scaled)
         except Exception as exc:
@@ -150,12 +250,35 @@ def run_p2_harmonization(
     logger.info("P2-S4: Aligning orientation")
     from crci.extraction.p2_harmonization.orientation_aligner import align_orientation
 
+    # Build edge_relation_id → default_effect_direction lookup from DB
+    _edge_direction_cache: dict[str, int] = {}
+    try:
+        from crci.shared.models.tables import EdgeRelationsDefinition
+        edge_rows = session.query(
+            EdgeRelationsDefinition.edge_relation_id,
+            EdgeRelationsDefinition.default_effect_direction,
+        ).all()
+        _edge_direction_cache = {r.edge_relation_id: r.default_effect_direction for r in edge_rows}
+        logger.info("P2-S4: Loaded %d edge directions from DB", len(_edge_direction_cache))
+    except Exception as exc:
+        logger.warning("P2-S4: Could not load edge directions from DB: %s — using defaults", exc)
+
     aligned_list: list[Any] = []
     for scaled_item in harmonized_list:
         try:
+            # Look up DAG orientation from edge_relation_id
+            eid = getattr(scaled_item, "edge_relation_id", None)
+            direction = _edge_direction_cache.get(eid) if eid else None
+            if direction is not None:
+                dag_orientation = Orientation.HIGHER_BETTER if direction == 1 else Orientation.HIGHER_WORSE
+            else:
+                dag_orientation = Orientation.HIGHER_WORSE  # Conservative default
+                if eid:
+                    logger.debug("P2-S4: No direction found for edge %s; defaulting to HIGHER_WORSE", eid)
+
             aligned = align_orientation(
                 scaled=scaled_item,
-                dag_orientation=Orientation.HIGHER_WORSE,  # Default; lookup from DAG later
+                dag_orientation=dag_orientation,
                 reported_direction_positive=True,  # Default assumption
                 orientation_confidence=0.7,  # Moderate default
             )
@@ -223,9 +346,68 @@ def run_p2_harmonization(
 
         family_counts[family.value] = family_counts.get(family.value, 0) + 1
 
-    # Pass ScaledNumeric objects (aligned_list) as harmonized_records.
-    # These have .beta, .se, .se_source, .scale that P3 needs.
-    context["harmonized_records"] = aligned_list
+    # Convert ScaledNumeric → HarmonizedClaim for downstream P3/P4.
+    # P3/P4 operate on HarmonizedClaim (ler_id, harmonized_beta, harmonized_se, etc.).
+    study_id = context.get("paper_id", run.extraction_run_id)
+    profile_id = study_id  # Default until cohort profiling is implemented
+
+    from crci.extraction.evidence_writer import compute_span_hash
+
+    harmonized_claims: list[HarmonizedClaim] = []
+    skipped_missing_edge = 0
+    for record in aligned_list:
+        edge_relation_id = (
+            getattr(record, "edge_relation_id", None)
+            or getattr(record, "edge_id", None)
+            or "UNASSIGNED"
+        )
+        if edge_relation_id == "UNASSIGNED":
+            skipped_missing_edge += 1
+            continue
+
+        beta = getattr(record, "beta", None)
+        se = getattr(record, "se", None)
+        if beta is None:
+            continue
+
+        source_position = getattr(record, "source_position", None)
+        span_hash = compute_span_hash(
+            study_id=study_id,
+            edge_relation_id=edge_relation_id,
+            profile_id=profile_id,
+            beta=float(beta),
+            se=float(se) if se is not None else None,
+            source_position=str(source_position) if source_position else None,
+        )
+        ler_id = f"LER_{study_id}_{span_hash}"
+
+        harmonized_claims.append(
+            HarmonizedClaim(
+                ler_id=ler_id,
+                edge_relation_id=edge_relation_id,
+                profile_id=profile_id,
+                study_id=study_id,
+                harmonized_beta=float(beta),
+                harmonized_se=float(se) if se is not None else None,
+                harmonized_scale=getattr(record, "scale"),
+                harmonization_status=HarmonizationStatusInMem.FULL,
+                quality_rating=getattr(record, "quality_rating", "moderate"),
+                se_source=getattr(record, "se_source"),
+                n_effect=getattr(record, "n_effect", None),
+                parameter_family=getattr(record, "parameter_family", None),
+                canonical_scale=_assign_canonical_scale(record),
+                ci_lower=getattr(record, "ci_lower", None),
+                ci_upper=getattr(record, "ci_upper", None),
+            )
+        )
+
+    if skipped_missing_edge:
+        logger.info(
+            "P2: Skipped %d records missing edge_relation_id (UNASSIGNED)",
+            skipped_missing_edge,
+        )
+
+    context["harmonized_records"] = harmonized_claims
     context["parameter_family_counts"] = family_counts
     logger.info(
         "P2-FA complete: %d records assigned families: %s",
@@ -250,3 +432,93 @@ def run_p2_harmonization(
         logger.info("P2-EW: Persisted %d evidence rows to edge_evidence_v1", evidence_count)
 
     return context
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Helpers
+# ═══════════════════════════════════════════════════════════════
+
+_LABEL_TO_EFFECT_TYPE: dict[str, str] = {
+    "EFFECT_SIZE": "group_diff",
+    "MEAN_DIFFERENCE": "group_diff",
+    "OR": "odds_ratio",
+    "ODDS_RATIO": "odds_ratio",
+    "HR": "hazard_ratio",
+    "HAZARD_RATIO": "hazard_ratio",
+    "RR": "risk_ratio",
+    "RISK_RATIO": "risk_ratio",
+    "IRR": "incidence_rate_ratio",
+    "INCIDENCE_RATE_RATIO": "incidence_rate_ratio",
+    "STD_BETA": "std_beta",
+    "UNSTD_BETA": "unstd_beta",
+    "CORRELATION": "correlation",
+    "PERCENT_CHANGE": "percent_change",
+    "INTERACTION_TERM": "group_diff",
+    "SUBGROUP_EFFECT": "group_diff",
+    "F_STATISTIC": "f_statistic",
+}
+
+
+def _infer_effect_type(claim: Any) -> str:
+    """Infer effect_type_reported from the claim's label_type.
+
+    Checks multiple locations since different intermediate states store
+    label_type in different places:
+      - _GroupedClaimAdapter: .label_type directly
+      - ValidatedNumeric: .value_type
+      - RoutedNumeric: .value.label_type (nested in TypedNumericValue)
+
+    Falls back to 'group_diff' with a logged default.
+    """
+    label_type = getattr(claim, "label_type", None)
+    if label_type is None:
+        label_type = getattr(claim, "value_type", None)
+    # RoutedNumeric wraps TypedNumericValue inside .value
+    if label_type is None:
+        inner = getattr(claim, "value", None)
+        if inner is not None:
+            label_type = getattr(inner, "label_type", None)
+    if label_type is None:
+        logger.debug("P2: No label_type on claim %s; defaulting to group_diff",
+                      getattr(claim, "span_id", "?"))
+        return "group_diff"
+    return _LABEL_TO_EFFECT_TYPE.get(label_type.upper(), "group_diff")
+
+
+# Canonical pooling scale — P4 must only pool records with matching scale.
+_LABEL_TO_CANONICAL_SCALE: dict[str, str] = {
+    "EFFECT_SIZE": "SMD",
+    "MEAN_DIFFERENCE": "SMD",
+    "ODDS_RATIO": "LOG_OR",
+    "OR": "LOG_OR",
+    "HAZARD_RATIO": "LOG_HR",
+    "HR": "LOG_HR",
+    "RISK_RATIO": "LOG_RR",
+    "RR": "LOG_RR",
+    "INCIDENCE_RATE_RATIO": "LOG_RR",
+    "IRR": "LOG_RR",
+    "CORRELATION": "FISHER_Z",
+    "STD_BETA": "RAW",
+    "UNSTD_BETA": "RAW",
+    "PERCENT_CHANGE": "RAW",
+    "INTERACTION_TERM": "SMD",
+    "SUBGROUP_EFFECT": "SMD",
+    "F_STATISTIC": "SMD",  # F→d conversion produces SMD
+}
+
+
+def _assign_canonical_scale(claim: Any) -> str:
+    """Assign canonical pooling scale from label_type.
+
+    Returns CanonicalScale string value (SMD, LOG_OR, etc.).
+    """
+    label_type = getattr(claim, "label_type", None)
+    if label_type is None:
+        label_type = getattr(claim, "value_type", None)
+    if label_type is None:
+        inner = getattr(claim, "value", None)
+        if inner is not None:
+            label_type = getattr(inner, "label_type", None)
+    if label_type is None:
+        return "RAW"
+    return _LABEL_TO_CANONICAL_SCALE.get(label_type.upper(), "RAW")

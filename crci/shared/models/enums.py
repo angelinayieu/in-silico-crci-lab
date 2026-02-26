@@ -529,6 +529,7 @@ class EffectTypeReported(StrEnum):
     RR = "RR"
     HR = "HR"
     GROUP_DIFF = "group_diff"
+    F_STATISTIC = "f_statistic"
     OTHER = "other"
 
 
@@ -539,6 +540,21 @@ class EffectScale(StrEnum):
     PROXY_PER_SD = "PROXY_PER_SD"
     LOGOR_PER_SD = "LOGOR_PER_SD"
     RAW_PER_SD = "RAW_PER_SD"
+
+
+@unique
+class CanonicalScale(StrEnum):
+    """Canonical pooling scale for P4 aggregation.
+
+    P4 must only pool records with matching canonical_scale.
+    This prevents nonsensical pooling of Cohen's d with log-OR.
+    """
+    SMD = "SMD"              # Standardized mean difference (Cohen's d, Hedges' g)
+    LOG_OR = "LOG_OR"        # log odds ratio
+    LOG_HR = "LOG_HR"        # log hazard ratio
+    LOG_RR = "LOG_RR"        # log risk ratio
+    FISHER_Z = "FISHER_Z"    # Fisher-z transformed correlation
+    RAW = "RAW"              # Unstandardised beta, percent change, other
 
 
 @unique

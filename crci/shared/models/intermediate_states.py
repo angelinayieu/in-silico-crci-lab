@@ -158,6 +158,21 @@ class SpanLabel(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, default=0.5)
     source_section: str | None = None
     source_table_id: str | None = None
+    grouping_id: str | None = None  # Links related stats (β + CI + p + N)
+    arm_assignment: str | None = None  # Which study arm (e.g., "testosterone", "placebo")
+
+
+class GroundedSpan(BaseModel):
+    """SpanLabel after ConceptEngine ontology grounding.
+
+    Adds edge_relation_id resolved from edge_ontology_v1 / edge definitions.
+    SYS_EX §515-520 (EX-P1-CE), Master Spec v2.0 §5.7.
+    """
+
+    span: SpanLabel
+    edge_relation_id: str | None = None  # None = UNRESOLVED
+    grounding_confidence: float = 0.0
+    grounding_mode: str = "unresolved"  # exact_match | alias | fuzzy | unresolved
 
 
 class RawAnnotationEmission(BaseModel):
@@ -208,17 +223,20 @@ class ParsedNumeric(BaseModel):
 class TypedNumericValue(BaseModel):
     """Typed numeric value with bound information.
 
-    SYS_EX Trust Boundary — after parsing.
+    SYS_EX Trust Boundary — after parsing and group assembly.
     """
 
     value: float
     bound_type: BoundType = BoundType.EXACT
     original_text: str
+    label_type: str | None = None  # Preserves what the primary value IS (e.g., EFFECT_SIZE, OR)
     se: float | None = None
     ci_lower: float | None = None
     ci_upper: float | None = None
     p_value: float | None = None
     n: int | None = None
+    edge_relation_id: str | None = None  # From ConceptEngine grounding
+    grouping_id: str | None = None  # Trace back to original span group
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -231,6 +249,7 @@ class ValidatedNumeric(BaseModel):
 
     span_id: str
     value: TypedNumericValue
+    value_type: str  # label_type from ParsedNumeric (e.g., EFFECT_SIZE, SAMPLE_SIZE)
     plausibility_status: PlausibilityStatus
     plausibility_note: str | None = None
 
@@ -256,9 +275,13 @@ class ScaledNumeric(BaseModel):
     span_id: str
     beta: float
     se: float | None = None
+    n_effect: int | None = None
     se_source: SESource
     scale: EffectScale
     direction_aligned: bool = False
+    # Edge provenance — carried from TypedNumericValue through P2 chain
+    edge_relation_id: str | None = None
+    label_type: str | None = None
     # v2.0: SE derivation cascade tracking
     se_derivation_level: SEDerivationLevel | None = None
     se_quality_tag: SEQualityTag | None = None
@@ -266,8 +289,13 @@ class ScaledNumeric(BaseModel):
     # v2.0: Conversion provenance (Module 1 R4)
     conversion_formula: str | None = None
     conversion_bias_risk: ConversionBiasRisk | None = None
+    # v2.0: Family-specific freshness (Module 5)
+    parameter_family: str | None = None
     fields_present: list[str] = Field(default_factory=list)
     fields_missing: list[str] = Field(default_factory=list)
+    # CI fields carried through for P3 CI→SE defense-in-depth fallback
+    ci_lower: float | None = None
+    ci_upper: float | None = None
 
 
 class HarmonizedClaim(BaseModel):
@@ -284,6 +312,13 @@ class HarmonizedClaim(BaseModel):
     quality_rating: str = "moderate"
     se_source: SESource = SESource.SE_DIRECT
     n_effect: int | None = None
+    # v2.0: Family-specific freshness (Module 5)
+    parameter_family: str | None = None
+    # Canonical pooling scale — P4 must only pool records with matching scale
+    canonical_scale: str | None = None
+    # CI fields carried from upstream for P3 CI→SE fallback
+    ci_lower: float | None = None
+    ci_upper: float | None = None
 
 
 # ═══════════════════════════════════════════════════════════════
