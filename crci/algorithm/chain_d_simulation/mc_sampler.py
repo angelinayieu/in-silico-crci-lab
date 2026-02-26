@@ -121,8 +121,8 @@ def _sample_edge_weights(
 
         # Formula D1a-EQ1: σ² = SE²_eff
         se_eff = Sigma_eff.get(edge_id, 0.0)
-        if se_eff <= 0.0:
-            # Deterministic edge (no uncertainty)
+        if se_eff <= 0.0 or not np.isfinite(se_eff):
+            # Deterministic edge (no uncertainty) or infinite SE (no evidence)
             beta_draws[:, src, tgt] = mu_e
             continue
 
