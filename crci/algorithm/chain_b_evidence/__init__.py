@@ -16,6 +16,7 @@ from .evidence_compiler import (
     TauSquaredPrior,
     run_b1_through_b6,
 )
+from .evidence_loader import load_evidence_from_db
 from .frozen_state import (
     ContextPriorSpec,
     FrozenModelState,
@@ -41,6 +42,7 @@ __all__ = [
     "SynergyRecord",
     "TauSquaredPrior",
     "assemble_frozen_state",
+    "load_evidence_from_db",
     "run_b1_through_b6",
     "run_chain_b",
     "score_pathway_evidence",

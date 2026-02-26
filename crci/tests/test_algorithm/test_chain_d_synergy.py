@@ -301,7 +301,7 @@ class TestBundleEffectComputation:
         pairwise = {
             ("A", "B"): PairwiseMetrics("A", "B", jpo=0.0, ccs=1.0),
         }
-        gamma = np.full(n_draws, 0.2)
+        gamma = {("A", "B"): np.full(n_draws, 0.2)}
 
         result = _compute_bundle_effect_per_draw(
             ("A", "B"), delta_C, pairwise, gamma, n_draws,
@@ -325,7 +325,11 @@ class TestBundleEffectComputation:
             ("A", "C"): PairwiseMetrics("A", "C", jpo=0.0, ccs=0.0),
             ("B", "C"): PairwiseMetrics("B", "C", jpo=0.0, ccs=0.0),
         }
-        gamma = np.zeros(n_draws)
+        gamma = {
+            ("A", "B"): np.zeros(n_draws),
+            ("A", "C"): np.zeros(n_draws),
+            ("B", "C"): np.zeros(n_draws),
+        }
 
         result = _compute_bundle_effect_per_draw(
             ("A", "B", "C"), delta_C, pairwise, gamma, n_draws,
@@ -378,7 +382,7 @@ class TestGateDG3:
             n_bundles_evaluated=1,
             n_candidates_filtered=0,
         )
-        gamma = np.full(5, 0.1)
+        gamma = {("A", "B"): np.full(5, 0.1)}
         _validate_gate_d_g3(result, gamma)  # should not raise
 
     def test_fails_nan_bundle(self):
@@ -391,7 +395,7 @@ class TestGateDG3:
             n_bundles_evaluated=1,
             n_candidates_filtered=0,
         )
-        gamma = np.full(3, 0.1)
+        gamma = {("A", "B"): np.full(3, 0.1)}
         with pytest.raises(GateViolation, match="D-G3"):
             _validate_gate_d_g3(result, gamma)
 
@@ -402,7 +406,8 @@ class TestGateDG3:
             n_bundles_evaluated=0,
             n_candidates_filtered=0,
         )
-        gamma = np.array([-0.1, 0.2, 0.3])
+        # γ exceeds -γ_cap (0.40) — should fail
+        gamma = {("A", "B"): np.array([-0.5, 0.2, 0.3])}
         with pytest.raises(GateViolation, match="D-G3"):
             _validate_gate_d_g3(result, gamma)
 

@@ -652,3 +652,122 @@ def propagate_effects(
     )
 
     return effect_result
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Fix 1: Joint Bundle Propagation (eliminates superposition double-count)
+# ═══════════════════════════════════════════════════════════════
+
+
+def propagate_joint_bundle(
+    mc_draws: MCDraws,
+    frozen: FrozenModelState,
+    patient_state: PatientState,
+    intervention_node_indices: list[int],
+    cognitive_indices: list[int],
+) -> np.ndarray:
+    """Propagate multiple interventions jointly through the SEM per-draw.
+
+    Instead of computing ΔC_a and ΔC_b independently and combining
+    post-hoc with an overlap discount, this function computes:
+
+        Δθ_joint^(m) = (I − B^(m))⁻¹ · (x_a + x_b + ...)
+
+    Then applies:
+        - D2d: Bundle physiological ceiling (±1.5 SD)
+        - D2e: Composite cognitive scoring with severity weights
+
+    By superposition in a linear SEM, the Δθ is identical to the sum
+    of individual Δθ values. But the ceiling clipping and severity
+    weighting are non-linear, so the joint ΔC ≠ Σ ΔC_individual.
+    This function captures that non-linearity correctly.
+
+    Args:
+        mc_draws: MCDraws from D1.
+        frozen: FrozenModelState (for graph metadata).
+        patient_state: PatientState with Sigma_post for severity weights.
+        intervention_node_indices: List of node indices being intervened on.
+        cognitive_indices: Indices of cognitive domain nodes.
+
+    Returns:
+        delta_C_joint: shape (n_draws,) — composite cognitive score per draw
+                       under the joint intervention.
+    """
+    n_draws = mc_draws.n_draws
+    n_nodes = mc_draws.n_nodes
+    Sigma_post_diag = np.diag(patient_state.Sigma_post)
+
+    # Build joint intervention vector: 1.0 at each intervention node
+    x_joint = np.zeros(n_nodes)
+    for idx in intervention_node_indices:
+        x_joint[idx] = 1.0
+
+    delta_C_joint = np.zeros(n_draws)
+
+    for m in range(n_draws):
+        B_draw = mc_draws.B_draws[m]
+        theta0_draw = mc_draws.theta0_draws[m]
+
+        # D2b: Matrix method for joint intervention vector
+        delta_theta, need_fallback = _propagate_matrix_method(B_draw, x_joint)
+
+        if need_fallback:
+            # D2c: Path enumeration fallback — sum over all source nodes
+            delta_theta = np.zeros(n_nodes)
+            for src_idx in intervention_node_indices:
+                delta_theta += _propagate_path_enumeration(
+                    B_draw, src_idx, 1.0, n_nodes,
+                )
+        else:
+            assert delta_theta is not None
+
+        # D2d: Bundle physiological ceiling (±1.5 SD)
+        delta_theta_clipped, _ = _apply_physiological_ceiling(
+            delta_theta, is_bundle=True,
+        )
+
+        # D2e: Composite cognitive score
+        delta_C_joint[m] = _compute_composite_score(
+            delta_theta_clipped,
+            theta0_draw,
+            Sigma_post_diag,
+            cognitive_indices,
+        )
+
+    return delta_C_joint
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Fix 2: Full-cascade reachability for JPO
+# ═══════════════════════════════════════════════════════════════
+
+
+def compute_reachable_nodes(
+    source_idx: int,
+    B_hat: np.ndarray,
+) -> set[int]:
+    """Compute all nodes reachable from source via nonzero edges in B.
+
+    Uses BFS on the adjacency structure of B_hat.
+    Convention: B[target, source] ≠ 0 means source → target edge.
+
+    Args:
+        source_idx: Index of the source node.
+        B_hat: Mean B matrix (n_nodes × n_nodes).
+
+    Returns:
+        Set of reachable node indices (including source).
+    """
+    n = B_hat.shape[0]
+    visited: set[int] = {source_idx}
+    queue: list[int] = [source_idx]
+
+    while queue:
+        current = queue.pop(0)
+        # B[target, current] ≠ 0 means current → target
+        for target in range(n):
+            if target not in visited and B_hat[target, current] != 0.0:
+                visited.add(target)
+                queue.append(target)
+
+    return visited
