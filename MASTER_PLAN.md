@@ -1,8 +1,28 @@
 # CRCI Master Plan — Thin Slice Implementation
 
 **Created:** 2026-02-26  
+**Last reviewed:** 2026-02-26 (external feedback incorporated — see §Feedback Audit)  
 **Purpose:** Single source of truth for what to build, in what order, with explicit dependencies  
 **Goal:** Produce stable posterior domain draws → enable F4 clinical risk computation
+
+---
+
+## Feedback Audit (2026-02-26)
+
+External review of this plan identified 5 must-fix issues and 4 tightening recommendations.  
+Disposition of each, verified against the actual codebase:
+
+| # | Feedback | Verdict | Action Taken |
+|---|----------|---------|---------------|
+| 1 | Label-type naming inconsistent (`OR` vs `ODDS_RATIO`) | **Plan-only bug.** Code already maps both forms in `_LABEL_TO_EFFECT_TYPE` (P2) and `PRIMARY_TYPES` (group_assembler). AG05 has normalization map `OR` → `ODDS_RATIO`. | Fixed plan examples to use enum-exact strings only. |
+| 2 | Offsets undefined across `focused_text` vs `table_text` | **Valid but non-blocking.** Offsets are provenance metadata, not part of the survival path. | Tracked as hardening task (post-Slice 4). |
+| 3 | Grouping cannot rely on LLM alone — need fallback | **Partially addressed.** `group_assembler.py` handles orphans as standalone, derives Cohen's d from arm pairs. But no proximity-based fallback for co-located spans. | Added proximity fallback to Slice 1.3. |
+| 4 | SE required is too strict — need CI→SE derivation | **CI→SE exists in TB** (`numeric_parser.py` NP-11) but field propagation to P3 may break. P3 itself has no CI→SE fallback. | Added P3-level CI→SE derivation to Slice 1.6. |
+| 5 | No explicit effect normalization contract | **Valid.** TB log-transforms ratios, but no documented canonical scale contract. P4 pools without confirming like-with-like. | Added §1.5b: Effect Scale Contract. |
+| A | Boundary contract tests | **Valid.** | Added §Boundary Contract Tests. |
+| B | Slice-level hard stop when survival = 0 | **`p3_survival_rate` tracked but no halt.** Pipeline continues with empty records. | Added hard stop to Slice 1.6. |
+| C | Remove time estimates | **Agree.** | Removed. |
+| D | Reproducibility metadata | **Valid for LLM runs.** | Added §Reproducibility Metadata. |
 
 ---
 
@@ -116,8 +136,7 @@ F4 risk layer              →      Would produce invalid confident numbers
 ## Slice 1: Fix Data Flow (Evidence Survival)
 
 **Goal:** At least 1 evidence record survives P3 with `SE_eff` populated.  
-**Target Paper:** Cherrier 2013 (RCT with explicit Cohen's d in tables)  
-**Estimated Effort:** 6-8 hours
+**Target Paper:** Cherrier 2013 (RCT with explicit Cohen's d in tables)
 
 ### 1.1 Add `grouping_id` to SpanLabel
 
@@ -174,10 +193,34 @@ class TypedNumericValue(BaseModel):
 
 **QA Metric:** `group_completion_rate` = groups with primary + (SE or CI) / total groups
 
+**Proximity Fallback (new — from feedback #3):**
+
+When `grouping_id` is null (LLM omitted it), the assembler must attempt proximity-based grouping before falling back to standalone:
+
+```python
+def _proximity_fallback_groups(
+    orphan_spans: list[tuple[str, SpanLabel, ParsedNumeric]],
+    char_window: int = 200,
+) -> dict[str, list[str]]:
+    """Group orphan spans by character proximity.
+    
+    Heuristic: spans within `char_window` characters sharing the same
+    source_block (table row, sentence) are likely from the same result.
+    Anchored on primary types.
+    """
+```
+
+Rules:
+1. Primary: group by `grouping_id` when present  
+2. Fallback: group orphans by proximity window + anchor tokens in same sentence/row  
+3. Set `confidence = 0.5` on fallback groups (vs 0.8+ for LLM-grouped)  
+4. Never drop orphans — emit as standalone at minimum  
+
 **Verification:**
-- [ ] `reassemble_groups()` function exists
-- [ ] Called from TB runner
-- [ ] Produces multi-field records
+- [ ] `reassemble_groups()` function exists (YES — 484 lines)
+- [ ] Called from TB runner (YES — line ~99)
+- [ ] Produces multi-field records (YES)
+- [ ] Proximity fallback rescues co-located orphans (NEW — implement)
 
 ---
 
@@ -201,53 +244,122 @@ class TypedNumericValue(BaseModel):
 ### 1.5 Fix P2 Hardcoded Defaults
 
 **File:** `crci/extraction/p2_harmonization/runner.py`  
-**Why:** Lines 131, 162-164 hardcode effect_type and orientation.
+**Current state:** `_LABEL_TO_EFFECT_TYPE` already maps both short and enum-exact forms (`"OR"` AND `"ODDS_RATIO"`) with `_infer_effect_type()` doing the lookup. ✅
 
-**Fix 1:** `effect_type_reported` from `label_type`:
-```python
-_LABEL_TO_EFFECT_TYPE = {
-    "EFFECT_SIZE": "group_diff",
-    "OR": "odds_ratio",
-    "HR": "hazard_ratio",
-    # ...
-}
-```
+**Remaining fixes:**
 
-**Fix 2:** `dag_orientation` from DB lookup:
+**Fix 1:** `dag_orientation` from DB lookup (currently hardcoded):
 ```python
 def _lookup_orientation(session, edge_relation_id):
     # Query edge_ontology_v1 for expected_sign
     # Return Orientation.HIGHER_WORSE or HIGHER_BETTER
 ```
 
+**Fix 2:** `canonical_scale` assignment (see §1.5b):
+```python
+def _assign_canonical_scale(label_type: str) -> str:
+    """Assign canonical pooling scale based on effect type."""
+    if label_type in {"ODDS_RATIO", "HAZARD_RATIO", "RISK_RATIO", "INCIDENCE_RATE_RATIO"}:
+        return "LOG_RATIO"  # Already log-transformed by TB NP-04
+    elif label_type in {"EFFECT_SIZE", "MEAN_DIFFERENCE"}:
+        return "SMD"
+    elif label_type == "CORRELATION":
+        return "FISHER_Z"
+    elif label_type in {"STD_BETA", "UNSTD_BETA"}:
+        return "RAW"
+    return "RAW"
+```
+
 **Verification:**
-- [ ] No hardcoded `"group_diff"` in runner
-- [ ] Orientation lookup queries DB
+- [ ] `_infer_effect_type` uses enum-exact strings ✅ (already implemented)
+- [ ] Orientation lookup queries DB (implement)
+- [ ] `canonical_scale` assigned to every harmonized record (implement)
+
+---
+
+### 1.5b Effect Scale Contract (new — from feedback #5)
+
+**Why:** Chain B expects `beta_pooled` in a consistent scale. P4 must only pool like-with-like.  
+Without an explicit normalization step, pooling Cohen's d with log-OR produces nonsense.
+
+**Contract:**
+
+| Reported Type | Canonical Scale | Transformation | Where |
+|--------------|----------------|----------------|-------|
+| Cohen's d, Hedges' g, SMD | SMD | None (already standardized) | TB |
+| Mean difference | SMD | Divide by pooled SD (requires SD + N) | P2 |
+| OR, aOR | log-OR | `log(OR)`, SE on log scale | TB (already implemented NP-04) |
+| HR, aHR | log-HR | `log(HR)`, SE on log scale | TB (already implemented NP-04) |
+| RR, aRR | log-RR | `log(RR)`, SE on log scale | TB (already implemented NP-04) |
+| Correlation (r) | Fisher-z | `0.5 * log((1+r)/(1-r))` | P2 (implement) |
+| Unstd β | No pooling | Keep separate; do not mix with SMD | P4 grouping |
+
+**Implementation:**
+- P2 must tag each record with `canonical_scale` (enum: `SMD`, `LOG_OR`, `LOG_HR`, `LOG_RR`, `FISHER_Z`, `RAW`)
+- P4 must only pool records with matching `canonical_scale`
+- TB already handles log-transformation for ratio measures; P2 must handle Fisher-z for correlations
+
+**Verification:**
+- [ ] `canonical_scale` field exists on harmonized record
+- [ ] P4 groups by `(edge_relation_id, canonical_scale)`, not just edge_id
+- [ ] Correlations Fisher-z transformed before pooling
 
 ---
 
 ### 1.6 Fix P3 Gate Semantics
 
 **File:** `crci/extraction/p3_heterogeneity/runner.py`  
-**Why:** Silent `continue` on missing SE violates "gates must raise" rule.
+**Why:** P3 gates per-record (correct), but has no CI→SE fallback and no slice-level hard stop.
 
-**Pattern:**
+**Current state (already implemented):**
+- Gate raises `GateViolation("P3-G-SE", ...)` per record when SE is null ✅
+- Caught at loop boundary, appended to `p3_gate_failures` ✅
+- `p3_survival_rate` computed and stored in context ✅
+
+**Fix 1 — CI→SE derivation before gate (from feedback #4):**
+
+P3 currently checks `se_raw = getattr(rec, "se", None)` but does NOT attempt to derive SE from CI when SE is missing. The invariant should be:
+
+> P3 requires either `SE_raw` OR (`CI_LOWER` + `CI_UPPER` + `CI_LEVEL`) sufficient to derive SE.
+
 ```python
-try:
-    if se_raw is None:
-        raise GateViolation("P3-G-SE", f"Record has no SE", context={...})
-    # ... SE_eff computation ...
-except GateViolation as gv:
-    p3_gate_failures.append(gv.context)
-    continue
+# BEFORE the gate check:
+if se_raw is None:
+    ci_lo = getattr(rec, "ci_lower", None) or getattr(rec, "harmonized_ci_lower", None)
+    ci_hi = getattr(rec, "ci_upper", None) or getattr(rec, "harmonized_ci_upper", None)
+    if ci_lo is not None and ci_hi is not None:
+        # NP-11: SE = (upper - lower) / (2 × z)
+        se_raw = (ci_hi - ci_lo) / (2 * config.TB_CI_TO_SE_Z_MULTIPLIER)
+        logger.info(
+            "P3: Derived SE=%.4f from CI [%.4f, %.4f] for %s",
+            se_raw, ci_lo, ci_hi, getattr(rec, 'ler_id', '?'),
+        )
 ```
+
+Note: TB's `numeric_parser.py` already does CI→SE derivation (NP-11), but the derived SE may not propagate through P2 to the harmonized record. This P3 fallback is defense-in-depth.
+
+**Fix 2 — Slice-level hard stop (from feedback B):**
+
+```python
+# After the per-record loop:
+if context["p3_survival_rate"] == 0.0 and len(layered_records) > 0:
+    raise GateViolation(
+        "P3-SLICE-HALT",
+        f"Zero records survived P3 ({len(p3_gate_failures)} failures). "
+        f"Pipeline cannot produce evidence. Halting.",
+        context={"n_in": len(layered_records), "n_failed": len(p3_gate_failures)},
+    )
+```
+
+This prevents P4-P7 from running on empty input and producing false "completed" status.
 
 **QA Metric:** `p3_survival_rate` = calibrated_out / layered_in
 
 **Verification:**
-- [ ] Gate raises per-record
-- [ ] Caught at loop boundary
-- [ ] `p3_survival_rate` in context
+- [ ] Gate raises per-record ✅ (already implemented)
+- [ ] CI→SE fallback attempted before gate (NEW — implement)
+- [ ] Slice-level halt when survival = 0 (NEW — implement)
+- [ ] `p3_survival_rate` in context ✅ (already implemented)
 
 ---
 
@@ -258,30 +370,34 @@ except GateViolation as gv:
 python scripts/run_extraction.py data/manual_uploads/pdfs/cherrier2013.pdf --verbose
 ```
 
-**Expected:**
+**Expected (full gate — all must pass before starting Slice 2):**
 - [ ] Pipeline completes without crash
 - [ ] Log shows `P3-ASM: N/M records survived (X% survival rate)` with N > 0
 - [ ] `qa_metrics.group_completion_rate > 0`
 - [ ] At least 1 record has `SE_eff != None`
+- [ ] At least 1 record has `effect_type_reported` correct (not defaulted)
+- [ ] At least 1 record has `edge_relation_id` present or explicitly unknown
+- [ ] At least 1 record has `canonical_scale` assigned
+- [ ] No `P3-SLICE-HALT` exception raised
 
 ---
 
 ## Slice 2: Edge Deployment
 
 **Goal:** At least 1 compiled edge in `edge_evidence_v1`  
-**Depends:** Slice 1 gate passed  
-**Estimated Effort:** 2-3 hours
+**Depends:** Slice 1 gate passed (tightened — see below)
 
 ### 2.1 Verify P4 Aggregation Flow
 
 **Check:**
 - [ ] `context["calibrated_records"]` has records (from Slice 1)
-- [ ] `group_by_edge_id()` produces non-empty groups
+- [ ] `group_by_edge_id()` groups by `(edge_relation_id, canonical_scale)` — not just edge_id (from feedback #5)
 - [ ] `meta_analyzer.run_ivw()` produces pooled estimates
 - [ ] `edge_writer.write_all_edges()` writes to DB
 
 **If broken:**
 - Records may lack `edge_relation_id` → fix ConceptEngine (1.4)
+- Records may lack `canonical_scale` → fix P2 (1.5b)
 - Records may lack study metadata → check P2 harmonization
 
 ---
@@ -338,8 +454,7 @@ WHERE extraction_run_id = (SELECT MAX(extraction_run_id) FROM extraction_runs);
 ## Slice 3: Evidence → Algorithm Bridge
 
 **Goal:** Chain B produces FrozenModelState with evidence-informed edges  
-**Depends:** Slice 2 gate passed  
-**Estimated Effort:** 3-4 hours
+**Depends:** Slice 2 gate passed
 
 ### 3.1 Build Evidence Loader for Chain B
 
@@ -414,8 +529,7 @@ with get_session() as session:
 ## Slice 4: Full Vertical Integration
 
 **Goal:** End-to-end: Paper → Extraction → Chain B → Chain C → Chain D → Ranking  
-**Depends:** Slice 3 gate passed  
-**Estimated Effort:** 2-3 hours
+**Depends:** Slice 3 gate passed
 
 ### 4.1 Build Integration Test
 
@@ -480,8 +594,7 @@ python -m pytest crci/tests/test_end_to_end/test_vertical_slice.py -v
 ## Slice 5: SR/MA Pipeline Validation (Parallel Track)
 
 **Goal:** Confirm SR papers trigger hop discovery and constituent extraction  
-**Independent of:** Slices 1-4 (can run in parallel)  
-**Estimated Effort:** 2-3 hours
+**Independent of:** Slices 1-4 (can run in parallel)
 
 ### 5.1 End-to-End SR Test
 
@@ -645,6 +758,65 @@ Before implementing F4, verify:
 
 ---
 
+## Slice 1→2 Transition Gate (Tightened)
+
+Do NOT start Slice 2 until Slice 1 produces at least one fully assembled record where **all** of these hold:
+
+- [ ] `effect_type_reported` is correct (not defaulted to `group_diff`)
+- [ ] `SE_eff` is present — either from raw SE or derived from CI
+- [ ] `edge_relation_id` is present — or explicitly `None` with `confidence < 0.5` (not silently defaulted)
+- [ ] `canonical_scale` is assigned
+- [ ] P3 produces `SE_eff` and `p3_survival_rate > 0`
+
+Everything downstream is noise until this is true.
+
+---
+
+## Boundary Contract Tests
+
+Add one test per interface boundary so failures localize instantly:
+
+| Boundary | Test | File |
+|----------|------|------|
+| AG05 → TB | Every span has valid offsets; `label_type ∈ SPAN_LABEL_TYPES`; no duplicate `span_id` | `tests/test_extraction/test_ag05_tb_contract.py` |
+| TB → TypedNumericValue | Every TNV has primary effect measure + at least one precision measure (SE or CI-derived SE) | `tests/test_extraction/test_tb_tnv_contract.py` |
+| P2 → P3 | Every record has `canonical_scale` + orientation metadata or explicit "unknown" (never implicit defaults) | `tests/test_extraction/test_p2_p3_contract.py` |
+| P3 output | `p3_survival_rate > 0` for target paper; no silent empty-list pass-through | `tests/test_extraction/test_p3_survival_contract.py` |
+
+These tests use synthetic data (not LLM), so they run fast and deterministically.
+
+---
+
+## Reproducibility Metadata
+
+Every LLM-based extraction run must capture:
+
+| Field | Source | Stored In |
+|-------|--------|-----------|
+| `llm_model_name` | e.g. `claude-sonnet-4-20250514` | `extraction_runs.metadata_json` |
+| `prompt_hash` | SHA-256 of prompt template text | `extraction_runs.metadata_json` |
+| `code_version` | `git rev-parse HEAD` | `extraction_runs.metadata_json` |
+| `config_fingerprint` | Hash of `shared/config.py` constants used | `extraction_runs.metadata_json` |
+| `seed` | Random seed for any stochastic step | `extraction_runs.metadata_json` |
+
+This turns debugging from "it changed" into "these specific knobs changed."
+
+**Implementation:** Add to `pipeline.py` at run creation time. Non-blocking for Slice 1 (no LLM call in the manual extraction path), but required before any LLM-driven extraction.
+
+---
+
+## Hardening Tasks (Post-Slice 4)
+
+These are valid concerns that don't block the critical path:
+
+| Task | Priority | Why Deferred |
+|------|----------|-------------|
+| Canonical text buffer for offsets | MEDIUM | Offsets are provenance, not survival-path |
+| `source_block` field on spans | MEDIUM | Debugging aid, not data flow |
+| OCR support for scanned PDFs | LOW | Out of scope; use text PDFs |
+
+---
+
 ## Execution Protocol
 
 ### Before Each Slice
@@ -696,4 +868,4 @@ and verify end-to-end data flow.
 
 ---
 
-*Last updated: 2026-02-26*
+*Last updated: 2026-02-26 (post-review revision)*
