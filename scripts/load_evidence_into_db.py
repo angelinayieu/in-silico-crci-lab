@@ -11,6 +11,8 @@ Steps performed:
   A2. Clean up legacy study entries
   A3. Register studies in study_registry_v1  (auto-discovers from DOI→study map)
   A4. Load CSV evidence → edge_evidence_v1   (populates BOTH raw AND harmonized columns)
+  A4b. Load auxiliary family CSVs → node_priors_v1, instrument_evidence_v1,
+       population_norms_v1, temporal_evidence_v1
   A5. Seed action_catalog_v1                  (from seeds/actions.csv)
   A6. Compile evidence → edges_v1             (IVW aggregation per edge)
   A7. Verify final state
@@ -48,6 +50,12 @@ os.environ["DATABASE_URL"] = db_url
 from sqlalchemy import text
 
 from crci.shared.db import init_db, get_session
+from crci.extraction.family_importers import (
+    import_context_prior,
+    import_instrument_evidence,
+    import_population_norm,
+    import_temporal_evidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +240,190 @@ def reseed_edge_definitions(engine, dry_run: bool = False) -> int:
     else:
         logger.info("[DRY RUN] Would insert %d edge definitions", len(rows))
         return len(rows)
+
+
+# ============================================================================
+#  STEP 1b: Reseed biomarker_node_definitions_v1 and instrument_definitions_v1
+#           from authoritative registries
+# ============================================================================
+def reseed_node_and_instrument_definitions(engine, dry_run: bool = False) -> tuple[int, int]:
+    """Reseed biomarker_node_definitions_v1 from NODE_REGISTRY.csv and
+    instrument_definitions_v1 from INSTRUMENT_REGISTRY.csv.
+
+    The registries are the authoritative source with fine-grained IDs
+    (e.g., NODE_COG_PROC_SPEED, INST_TMT_B) that match the manual CSV data.
+    The coarse seed data (nodes.csv, instruments.csv) uses different IDs.
+
+    Returns:
+        Tuple of (nodes_loaded, instruments_loaded).
+    """
+    node_registry = PROJECT_ROOT / "registries" / "NODE_REGISTRY.csv"
+    inst_registry = PROJECT_ROOT / "registries" / "INSTRUMENT_REGISTRY.csv"
+
+    nodes_loaded = 0
+    instruments_loaded = 0
+
+    # ---- Reseed nodes ----
+    if node_registry.exists():
+        with open(node_registry, "r") as f:
+            reader = csv.DictReader(f)
+            node_rows = list(reader)
+
+        logger.info("Read %d nodes from NODE_REGISTRY.csv", len(node_rows))
+
+        # Map NODE_REGISTRY.csv columns → biomarker_node_definitions_v1 columns
+        # node_layer → orientation mapping
+        layer_to_role = {
+            "0": "exogenous",
+            "1": "behavioral",
+            "2": "biomarker",
+            "3": "pathway",
+            "4": "cognitive_outcome",
+            "5": "symptom_outcome",
+        }
+
+        if not dry_run:
+            with engine.begin() as conn:
+                # Clear existing nodes
+                result = conn.execute(text("DELETE FROM biomarker_node_definitions_v1"))
+                logger.info("Cleared %d existing node rows", result.rowcount)
+
+                insert_sql = text("""
+                    INSERT OR IGNORE INTO biomarker_node_definitions_v1 (
+                        node_id, node_label, node_role, orientation,
+                        node_domain, default_state_space, state_update_scale,
+                        allowed_source_types_json,
+                        is_actionable_input_node, active, version,
+                        description
+                    ) VALUES (
+                        :node_id, :node_label, :node_role, :orientation,
+                        :node_domain, :default_state_space, :state_update_scale,
+                        :allowed_source_types_json,
+                        :is_actionable_input_node, :active, :version,
+                        :description
+                    )
+                """)
+
+                for row in node_rows:
+                    node_id = row.get("node_id", "").strip()
+                    if not node_id:
+                        continue
+
+                    layer = row.get("node_layer", "").strip()
+                    is_actionable = 1 if layer in ("0", "1") else 0
+
+                    params = {
+                        "node_id": node_id,
+                        "node_label": row.get("node_label", "").strip() or node_id,
+                        "node_role": layer_to_role.get(layer, "unknown"),
+                        "orientation": row.get("orientation", "").strip() or "HIGHER_BETTER",
+                        "node_domain": row.get("clinical_domain", "").strip() or "general",
+                        "default_state_space": row.get("unit_of_measure", "z").strip() or "z",
+                        "state_update_scale": "z",
+                        "allowed_source_types_json": '["instrument", "measure"]',
+                        "is_actionable_input_node": is_actionable,
+                        "active": int(row.get("active", 1)),
+                        "version": int(row.get("version", 1)),
+                        "description": row.get("description", "").strip() or node_id,
+                    }
+                    conn.execute(insert_sql, params)
+                    nodes_loaded += 1
+
+                logger.info("Inserted %d node definitions from NODE_REGISTRY.csv", nodes_loaded)
+        else:
+            nodes_loaded = len(node_rows)
+            logger.info("[DRY RUN] Would insert %d node definitions", nodes_loaded)
+    else:
+        logger.warning("NODE_REGISTRY.csv not found at %s", node_registry)
+
+    # ---- Reseed instruments ----
+    if inst_registry.exists():
+        with open(inst_registry, "r") as f:
+            reader = csv.DictReader(f)
+            inst_rows = list(reader)
+
+        logger.info("Read %d instruments from INSTRUMENT_REGISTRY.csv", len(inst_rows))
+
+        if not dry_run:
+            with engine.begin() as conn:
+                # Clear existing instruments
+                result = conn.execute(text("DELETE FROM instrument_definitions_v1"))
+                logger.info("Cleared %d existing instrument rows", result.rowcount)
+
+                insert_sql = text("""
+                    INSERT OR IGNORE INTO instrument_definitions_v1 (
+                        instrument_id, instrument_label, maps_to_node_id,
+                        instrument_kind, instrument_method,
+                        time_aggregation, raw_scale_spec,
+                        raw_unit, higher_means_pre_alignment,
+                        direction_rule_id, directionality_after_alignment,
+                        adapter_output_kind, required_fields_json,
+                        active, version, description
+                    ) VALUES (
+                        :instrument_id, :instrument_label, :maps_to_node_id,
+                        :instrument_kind, :instrument_method,
+                        :time_aggregation, :raw_scale_spec,
+                        :raw_unit, :higher_means_pre_alignment,
+                        :direction_rule_id, :directionality_after_alignment,
+                        :adapter_output_kind, :required_fields_json,
+                        :active, :version, :description
+                    )
+                """)
+
+                for row in inst_rows:
+                    inst_id = row.get("instrument_id", "").strip()
+                    if not inst_id:
+                        continue
+
+                    scoring_dir = row.get("scoring_direction", "").strip() or "higher_better"
+                    inst_type = row.get("instrument_type", "").strip() or "unknown"
+                    admin_mode = row.get("administration_mode", "").strip() or "unknown"
+
+                    # Build raw_scale_spec from min/max if available
+                    scale_min = row.get("total_score_range_min", "").strip() or "0"
+                    scale_max = row.get("total_score_range_max", "").strip() or "100"
+                    raw_scale_spec = f"{scale_min}-{scale_max}"
+
+                    # Direction rule from scoring_direction
+                    if scoring_dir == "higher_better":
+                        dir_rule = "DIR_POSITIVE"
+                        dir_post = "higher_better"
+                    elif scoring_dir == "lower_better":
+                        dir_rule = "DIR_REVERSE"
+                        dir_post = "higher_worse"
+                    else:
+                        dir_rule = "DIR_POSITIVE"
+                        dir_post = "higher_better"
+
+                    params = {
+                        "instrument_id": inst_id,
+                        "instrument_label": row.get("instrument_name", "").strip() or inst_id,
+                        "maps_to_node_id": row.get("maps_to_node_id", "").strip() or "NODE_COMP_CRCI",
+                        "instrument_kind": inst_type,
+                        "instrument_method": admin_mode,
+                        "time_aggregation": row.get("time_window_days", "").strip() or "study_window",
+                        "raw_scale_spec": raw_scale_spec,
+                        "raw_unit": row.get("response_type", "").strip() or "score",
+                        "higher_means_pre_alignment": scoring_dir,
+                        "direction_rule_id": dir_rule,
+                        "directionality_after_alignment": dir_post,
+                        "adapter_output_kind": "z",
+                        "required_fields_json": row.get("required_fields_json", "").strip() or '{"total_score": "required"}',
+                        "active": int(row.get("active", 1)),
+                        "version": 1,
+                        "description": row.get("notes", "").strip() or inst_id,
+                    }
+                    conn.execute(insert_sql, params)
+                    instruments_loaded += 1
+
+                logger.info("Inserted %d instrument definitions from INSTRUMENT_REGISTRY.csv", instruments_loaded)
+        else:
+            instruments_loaded = len(inst_rows)
+            logger.info("[DRY RUN] Would insert %d instrument definitions", instruments_loaded)
+    else:
+        logger.warning("INSTRUMENT_REGISTRY.csv not found at %s", inst_registry)
+
+    return nodes_loaded, instruments_loaded
 
 
 # ============================================================================
@@ -561,7 +753,103 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
 
 
 # ============================================================================
-#  STEP 4: Clean up old study entries with wrong IDs
+#  STEP 4b: Load auxiliary family CSVs (context_priors, instrument_evidence,
+#           population_norms, temporal_evidence)
+# ============================================================================
+
+# Map CSV template filename stem → (importer function, target table)
+_FAMILY_IMPORTERS = {
+    "context_priors_template": ("context_prior", import_context_prior),
+    "instrument_evidence_template": ("instrument_evidence", import_instrument_evidence),
+    "population_norms_template": ("population_norm", import_population_norm),
+    "temporal_evidence_template": ("temporal_evidence", import_temporal_evidence),
+}
+
+
+def load_family_csvs(engine, dry_run: bool = False) -> dict[str, int]:
+    """Load auxiliary evidence families from manual CSV templates.
+
+    Scans data/manual_uploads/structured/<doi-slug>/ for each template type
+    and imports rows via the validated family_importers module.
+
+    Returns:
+        Dict mapping family name → number of rows imported.
+    """
+    from sqlalchemy.orm import Session as SASession
+
+    csv_dir = PROJECT_ROOT / "data" / "manual_uploads" / "structured"
+    if not csv_dir.exists():
+        logger.warning("No structured CSV directory at %s", csv_dir)
+        return {}
+
+    results: dict[str, int] = {}
+
+    for template_stem, (family_name, importer_fn) in _FAMILY_IMPORTERS.items():
+        csv_files = sorted(csv_dir.rglob(f"{template_stem}.csv"))
+        if not csv_files:
+            logger.info("No %s.csv files found", template_stem)
+            results[family_name] = 0
+            continue
+
+        family_count = 0
+
+        for csv_path in csv_files:
+            # Derive DOI from parent directory name (e.g., "10.1002_pon.4370")
+            doi_slug = csv_path.parent.name
+            doi = doi_slug.replace("_", "/")
+            study_id = DOI_TO_STUDY.get(doi)
+
+            if not study_id:
+                logger.warning(
+                    "Unknown DOI '%s' (from dir %s) for %s, skipping",
+                    doi, doi_slug, csv_path.name,
+                )
+                continue
+
+            with open(csv_path, "r", newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+
+            if not rows:
+                logger.warning("Empty CSV: %s", csv_path)
+                continue
+
+            logger.info(
+                "Loading %d %s rows from %s (study=%s)",
+                len(rows), family_name, csv_path.name, study_id,
+            )
+
+            if dry_run:
+                logger.info("[DRY RUN] Would import %d %s rows", len(rows), family_name)
+                family_count += len(rows)
+                continue
+
+            # Use ORM session for family importers (they use session.add())
+            with get_session() as session:
+                for row_dict in rows:
+                    # Inject doi for provenance
+                    row_dict["doi"] = doi
+                    try:
+                        importer_fn(session, row_dict, study_id)
+                        family_count += 1
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to import %s row (study=%s): %s",
+                            family_name, study_id, exc,
+                        )
+                # Session auto-commits on exit from context manager
+                logger.info(
+                    "Committed %s rows from %s", family_name, csv_path.name,
+                )
+
+        results[family_name] = family_count
+        logger.info("Total %s rows imported: %d", family_name, family_count)
+
+    return results
+
+
+# ============================================================================
+#  STEP 4 (legacy): Clean up old study entries with wrong IDs
 # ============================================================================
 def cleanup_old_entries(engine, dry_run: bool = False) -> None:
     """Remove legacy study entries with inconsistent IDs."""
@@ -857,7 +1145,9 @@ def reset_evidence(engine) -> None:
     with engine.begin() as conn:
         for table in ["edges_v1", "edge_evidence_v1", "edge_param_builds_v1",
                        "study_annotations_v1", "study_annotations_raw_v1",
-                       "review_tasks", "extraction_runs"]:
+                       "review_tasks", "extraction_runs",
+                       "instrument_evidence_v1", "population_norms_v1",
+                       "temporal_evidence_v1", "node_priors_v1"]:
             try:
                 result = conn.execute(text(f'DELETE FROM "{table}"'))
                 logger.info("Cleared %s: %d rows removed", table, result.rowcount)
@@ -943,6 +1233,21 @@ def verify_state(engine) -> None:
         action_count = result.scalar()
         print(f"\n  action_catalog_v1: {action_count} rows")
 
+        # Auxiliary family tables
+        print("\n  --- Auxiliary Evidence Families ---")
+        for aux_table, label in [
+            ("instrument_evidence_v1", "Instrument Evidence"),
+            ("population_norms_v1", "Population Norms"),
+            ("temporal_evidence_v1", "Temporal Evidence"),
+            ("node_priors_v1", "Context Priors"),
+        ]:
+            try:
+                result = conn.execute(text(f'SELECT COUNT(*) FROM "{aux_table}"'))
+                cnt = result.scalar()
+                print(f"  {label:30s} ({aux_table}): {cnt} rows")
+            except Exception:
+                print(f"  {label:30s} ({aux_table}): TABLE MISSING")
+
         # Coverage summary
         result = conn.execute(text(
             "SELECT COUNT(DISTINCT edge_relation_id) FROM edge_evidence_v1 "
@@ -1000,37 +1305,48 @@ def main() -> int:
         print("  → Tables cleared\n")
 
     # Step 1: Reseed edge definitions
-    print("[1/7] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
+    print("[1/8] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
     n_edges = reseed_edge_definitions(engine, dry_run=args.dry_run)
     print(f"  → {n_edges} edge definitions loaded")
 
+    # Step 1b: Reseed node + instrument definitions from authoritative registries
+    print("\n[1b/8] Reseeding node + instrument definitions from registries...")
+    n_nodes, n_insts = reseed_node_and_instrument_definitions(engine, dry_run=args.dry_run)
+    print(f"  → {n_nodes} node definitions, {n_insts} instrument definitions loaded")
+
     # Step 2: Clean up old entries
-    print("\n[2/7] Cleaning up legacy study entries...")
+    print("\n[2/8] Cleaning up legacy study entries...")
     cleanup_old_entries(engine, dry_run=args.dry_run)
 
     # Step 3: Register studies
-    print("\n[3/7] Registering studies in study_registry_v1...")
+    print("\n[3/8] Registering studies in study_registry_v1...")
     n_studies = register_studies(engine, dry_run=args.dry_run)
     print(f"  → {n_studies} new studies registered")
 
     # Step 4: Load CSV evidence
-    print("\n[4/7] Loading CSV evidence into edge_evidence_v1...")
+    print("\n[4/8] Loading CSV evidence into edge_evidence_v1...")
     n_evidence = load_csv_evidence(engine, dry_run=args.dry_run)
     print(f"  → {n_evidence} evidence rows loaded")
 
+    # Step 4b: Load auxiliary family CSVs
+    print("\n[4b/8] Loading auxiliary family CSVs (context_priors, instrument, norms, temporal)...")
+    family_results = load_family_csvs(engine, dry_run=args.dry_run)
+    for fam, count in family_results.items():
+        print(f"  → {fam}: {count} rows loaded")
+
     # Step 5: Seed action catalog
-    print("\n[5/7] Seeding action_catalog_v1...")
+    print("\n[5/8] Seeding action_catalog_v1...")
     n_actions = seed_action_catalog(engine, dry_run=args.dry_run)
     print(f"  → {n_actions} actions loaded")
 
     # Step 6: Compile edges
-    print("\n[6/7] Compiling evidence → edges_v1 (IVW aggregation)...")
+    print("\n[6/8] Compiling evidence → edges_v1 (IVW aggregation)...")
     n_compiled = compile_edges(engine, dry_run=args.dry_run)
     print(f"  → {n_compiled} edges compiled")
 
     # Step 7: Verify
     if not args.dry_run:
-        print("\n[7/7] Verifying...")
+        print("\n[7/8] Verifying...")
         verify_state(engine)
 
     return 0

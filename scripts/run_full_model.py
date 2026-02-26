@@ -46,18 +46,45 @@ def _print_section(title: str) -> None:
     print(f"{'=' * 60}")
 
 
+# Hardcoded action → primary target node mapping.
+# Used when dose_bridges_v1 table is empty (before full data curation).
+_ACTION_TO_NODE_FALLBACK: dict[str, str] = {
+    "ACT_EXERCISE_AEROBIC": "NODE_BEH_PHYSICAL_ACTIVITY",
+    "ACT_EXERCISE_RESISTANCE": "NODE_BEH_PHYSICAL_ACTIVITY",
+    "ACT_COGNITIVE_TRAINING": "NODE_BEH_COG_ACTIVITY",
+    "ACT_MINDFULNESS": "NODE_BEH_STRESS_MGMT",
+    "ACT_SLEEP_HYGIENE": "NODE_BEH_SLEEP_QUALITY",
+    "ACT_LIGHT_AM": "NODE_BEH_LIGHT_EXPOSURE",
+    "ACT_SOCIAL_ENGAGE": "NODE_BEH_SOCIAL_ENGAGE",
+    "ACT_NUTRITION_ANTI_INFLAM": "NODE_BEH_DIET",
+}
+
+
 def _build_intervention_node_map(
     intervention_set: "InterventionSet",
     graph: "GraphObject",
 ) -> dict[str, int]:
-    """Build action_id → node_index mapping from dose bridges."""
+    """Build action_id → node_index mapping from dose bridges.
+
+    Falls back to _ACTION_TO_NODE_FALLBACK when dose bridges are empty.
+    """
     node_map = {}
     for interv in intervention_set.interventions:
+        # Try dose bridges first
         for bridge in interv.dose_bridges:
             nid = bridge.output_node_id or bridge.maps_to_node_id
             if nid and nid in graph.node_map.node_index:
                 node_map[interv.action_id] = graph.node_map.node_index[nid]
                 break
+        # Fallback to hardcoded mapping
+        if interv.action_id not in node_map:
+            fallback_nid = _ACTION_TO_NODE_FALLBACK.get(interv.action_id)
+            if fallback_nid and fallback_nid in graph.node_map.node_index:
+                node_map[interv.action_id] = graph.node_map.node_index[fallback_nid]
+                logging.getLogger(__name__).info(
+                    "D0: Using fallback node mapping: %s → %s",
+                    interv.action_id, fallback_nid,
+                )
     return node_map
 
 
@@ -269,7 +296,7 @@ def main() -> int:
     from crci.shared.models.pathway_types import PathwayDef
     pathways: list[PathwayDef] = []
     if graph.pathway_map:
-        for pw_def in graph.pathway_map.pathways:
+        for pw_def in graph.pathway_map:
             pathways.append(pw_def)
     logger.info("Using %d pathways from graph", len(pathways))
 
@@ -312,12 +339,16 @@ def main() -> int:
         from crci.algorithm.chain_c_posterior.bayesian_update import RawPosterior
 
         # Create minimal patient state from prior means
+        Sigma_fallback = (
+            np.linalg.inv(loaded_prior.Lambda_prior)
+            if np.linalg.det(loaded_prior.Lambda_prior) > 0
+            else np.eye(loaded_prior.Lambda_prior.shape[0])
+        )
         patient_state = PatientState(
             theta_hat=loaded_prior.mu_prior,
-            Sigma_post=np.linalg.inv(loaded_prior.Lambda_prior)
-                if np.linalg.det(loaded_prior.Lambda_prior) > 0
-                else np.eye(loaded_prior.Lambda_prior.shape[0]),
-            B_eff=frozen.B_adj if hasattr(frozen, 'B_adj') else frozen.B_skeleton,
+            Sigma_post=Sigma_fallback,
+            Lambda_post=loaded_prior.Lambda_prior.copy(),
+            B_eff=frozen.B_hat.copy(),
             modifier_audit=[],
             active_pathways=[],
             observation_log=[],
@@ -651,9 +682,9 @@ def main() -> int:
     try:
         from crci.runtime.pathway_profiler import compute_pathway_profile, PathwayInput
 
-        if graph.pathway_map and graph.pathway_map.pathways:
+        if graph.pathway_map:
             pathway_inputs = []
-            for pw in graph.pathway_map.pathways:
+            for pw in graph.pathway_map:
                 pathway_inputs.append(PathwayInput(
                     pathway_id=pw.pathway_id,
                     pathway_name=getattr(pw, "name", pw.pathway_id),
@@ -691,17 +722,13 @@ def main() -> int:
         composite=composite,
         stability=stability,
         variance=variance,
-        recovery=recovery,
-        overlay=overlay,
-        uncertainty=uncertainty,
-        node_labels=node_labels,
-        risk_estimate=risk_estimate,
-        temporal_risk=temporal_risk,
-        evidence_gap_report=evidence_gap_report,
-        pathway_profile=pathway_profile,
     )
 
-    print(f"  Report generated: {len(result.report.sections)} sections")
+    print(f"  Report generated: run_id={result.run_id}")
+    n_actions = len(result.report.primary_schedule.actions)
+    print(f"  Primary schedule: {n_actions} actions, "
+          f"utility={result.report.primary_schedule.utility_score:.3f}")
+    print(f"  Alternatives: {len(result.report.alternative_schedules)}")
     print(f"  ({time.monotonic() - t0:.2f}s)")
 
     # ══════════════════════════════════════════════════════════

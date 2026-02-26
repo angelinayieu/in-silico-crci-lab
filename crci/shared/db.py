@@ -41,13 +41,18 @@ def create_db_engine(database_url: str | None = None, echo: bool = False) -> Eng
         echo: If True, log all SQL statements.
     """
     url = database_url or get_database_url()
-    engine = create_engine(
-        url,
-        echo=echo,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-    )
+
+    # SQLite doesn't support connection pooling parameters
+    if url.startswith("sqlite"):
+        engine = create_engine(url, echo=echo)
+    else:
+        engine = create_engine(
+            url,
+            echo=echo,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+        )
     logger.info("Database engine created for %s", url.split("@")[-1] if "@" in url else url)
     return engine
 
