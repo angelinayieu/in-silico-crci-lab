@@ -58,6 +58,7 @@ class LLMClient:
         max_retries: int = config.LLM_MAX_RETRIES,
         retry_base_delay: float = config.LLM_RETRY_BASE_DELAY_SECONDS,
         api_key: str | None = None,
+        enable_cache: bool = True,
     ) -> None:
         self.model_id = model_id
         self.max_tokens = max_tokens
@@ -68,6 +69,9 @@ class LLMClient:
         self._total_prompt_tokens = 0
         self._total_completion_tokens = 0
         self._total_calls = 0
+        self._enable_cache = enable_cache
+        self._response_cache: dict[str, str] = {}  # prompt_hash → raw JSON text
+        self._cache_hits = 0
 
     def _get_client(self) -> Any:
         """Lazily initialize the Anthropic client."""
@@ -112,6 +116,22 @@ class LLMClient:
         """
         effective_model = model_id if model_id is not None else self.model_id
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:16]
+
+        # ── Prompt-level response cache ──
+        # If we've seen this exact prompt before in this session, return
+        # the cached response without hitting the API. This prevents
+        # wasted spend when re-running the same paper extraction.
+        cache_key = f"{effective_model}:{prompt_hash}"
+        if self._enable_cache and cache_key in self._response_cache:
+            self._cache_hits += 1
+            logger.info(
+                "LLM CACHE HIT: prompt_hash=%s (hit #%d, $0.00 cost)",
+                prompt_hash,
+                self._cache_hits,
+            )
+            cached_text = self._response_cache[cache_key]
+            return self._parse_and_validate(cached_text, response_schema)
+
         start_time = time.monotonic()
 
         messages = [{"role": "user", "content": prompt}]
@@ -163,6 +183,11 @@ class LLMClient:
 
         # Parse and validate JSON response
         validated = self._parse_and_validate(raw_text, response_schema)
+
+        # Cache successful response for this session
+        if self._enable_cache:
+            self._response_cache[cache_key] = raw_text
+
         return validated
 
     def _call_with_retry(self, kwargs: dict[str, Any], prompt_hash: str) -> Any:

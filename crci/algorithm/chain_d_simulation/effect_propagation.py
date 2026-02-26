@@ -171,12 +171,14 @@ def _propagate_matrix_method(
         Tuple of (delta_theta or None if unstable, used_fallback flag).
     """
     n = B_draw.shape[0]
-    I_minus_B = np.eye(n) - B_draw
+    # Convention: B is stored as B[source, target], so the SEM is
+    # θ = B^T θ + ε  ⟹  (I − B^T) θ = ε  ⟹  Δθ = (I − B^T)⁻¹ x
+    I_minus_BT = np.eye(n) - B_draw.T
 
     # Check condition number — if > 10¹⁰, fall back to path enumeration
-    # Formula: κ(I − B^(m)); if > CONDITION_NUMBER_CRITICAL → fall back to D2c
+    # Formula: κ(I − B^T^(m)); if > CONDITION_NUMBER_CRITICAL → fall back to D2c
     try:
-        cond = np.linalg.cond(I_minus_B)
+        cond = np.linalg.cond(I_minus_BT)
     except np.linalg.LinAlgError:
         return None, True
 
@@ -187,9 +189,9 @@ def _propagate_matrix_method(
         )
         return None, True
 
-    # Formula D2b-EQ1: Δθ = (I − B)⁻¹ · x
+    # Formula D2b-EQ1: Δθ = (I − B^T)⁻¹ · x
     try:
-        delta_theta = np.linalg.solve(I_minus_B, x_intervention)
+        delta_theta = np.linalg.solve(I_minus_BT, x_intervention)
     except np.linalg.LinAlgError:
         return None, True
 
@@ -246,13 +248,13 @@ def _propagate_path_enumeration(
         if depth >= max_depth:
             continue
 
-        # Explore outgoing edges: B[target, current] != 0 means current→target
-        # Convention: B[i,j] = β for edge j→i (source j, target i)
+        # Explore outgoing edges: B[current, target] != 0 means current→target
+        # Convention: B[source, target] = β for edge source→target
         for target in range(n_nodes):
             if target in visited:
                 continue  # no cycles in paths
 
-            beta_edge = B_draw[target, current]
+            beta_edge = B_draw[current, target]
             if beta_edge == 0.0:
                 continue  # excluded or zero-weight edge
 
@@ -749,7 +751,7 @@ def compute_reachable_nodes(
     """Compute all nodes reachable from source via nonzero edges in B.
 
     Uses BFS on the adjacency structure of B_hat.
-    Convention: B[target, source] ≠ 0 means source → target edge.
+    Convention: B[source, target] ≠ 0 means source → target edge.
 
     Args:
         source_idx: Index of the source node.
@@ -764,9 +766,9 @@ def compute_reachable_nodes(
 
     while queue:
         current = queue.pop(0)
-        # B[target, current] ≠ 0 means current → target
+        # B[current, target] ≠ 0 means current → target
         for target in range(n):
-            if target not in visited and B_hat[target, current] != 0.0:
+            if target not in visited and B_hat[current, target] != 0.0:
                 visited.add(target)
                 queue.append(target)
 

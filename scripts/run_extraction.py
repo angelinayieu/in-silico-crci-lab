@@ -49,6 +49,8 @@ def _setup_logging(verbose: bool) -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    # Silence pdfminer DEBUG noise (331K+ lines per run, 99.8% of log volume)
+    logging.getLogger("pdfminer").setLevel(logging.WARNING)
 
 
 def _print_report(run) -> None:

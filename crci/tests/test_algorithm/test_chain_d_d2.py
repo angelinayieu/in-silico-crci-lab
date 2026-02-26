@@ -1,12 +1,15 @@
 """Tests for ALG-D2: Effect Propagation.
 
 Covers:
-    D2b: Matrix method Δθ = (I−B)⁻¹·x with hand-computed examples
+    D2b: Matrix method Δθ = (I−B^T)⁻¹·x with hand-computed examples
     D2c: Path enumeration fallback
     D2d: Physiological ceiling clipping
     D2e: Composite severity-weighted scoring
     D-G2: Gate validation
     Full integration: propagate_effects end-to-end
+
+Convention: B[source, target] — entry B[i,j] = β for edge i→j.
+The SEM equation θ = B^T θ + ε gives Δθ = (I − B^T)⁻¹ x.
 """
 from __future__ import annotations
 
@@ -209,10 +212,13 @@ def _make_patient_state(theta_hat, Sigma_post):
 
 
 class TestMatrixMethod:
-    """D2b: Δθ = (I − B)⁻¹ · x with hand-computed expected values."""
+    """D2b: Δθ = (I − B^T)⁻¹ · x with hand-computed expected values.
+
+    B is stored as B[source, target].
+    """
 
     def test_identity_graph_no_edges(self):
-        """No edges → (I−B)⁻¹ = I → Δθ = x."""
+        """No edges → (I−B^T)⁻¹ = I → Δθ = x."""
         n = 4
         B = np.zeros((n, n))
         x = np.zeros(n)
@@ -227,14 +233,16 @@ class TestMatrixMethod:
     def test_single_edge_chain(self):
         """Chain: 0→1 with β=0.5.
 
-        B = [[0, 0],
-             [0.5, 0]]
-        (I-B) = [[1, 0], [-0.5, 1]]
-        (I-B)⁻¹ = [[1, 0], [0.5, 1]]
+        B[source, target]: B[0,1] = 0.5
+        B = [[0, 0.5],
+             [0, 0  ]]
+        B^T = [[0, 0], [0.5, 0]]
+        (I-B^T) = [[1, 0], [-0.5, 1]]
+        (I-B^T)⁻¹ = [[1, 0], [0.5, 1]]
         x = [1, 0]
         Δθ = [1, 0.5]
         """
-        B = np.array([[0, 0], [0.5, 0]], dtype=float)
+        B = np.array([[0, 0.5], [0, 0]], dtype=float)
         x = np.array([1.0, 0.0])
 
         delta, fallback = _propagate_matrix_method(B, x)
@@ -245,14 +253,15 @@ class TestMatrixMethod:
     def test_two_hop_chain(self):
         """Chain: 0→1→2 with β₀₁=0.5, β₁₂=0.4.
 
-        B = [[0, 0, 0],
-             [0.5, 0, 0],
-             [0, 0.4, 0]]
-        (I-B)⁻¹·x = [1.0, 0.5, 0.2]  (0.5 × 0.4 = 0.2)
+        B[source, target]:
+        B = [[0, 0.5, 0  ],
+             [0, 0,   0.4],
+             [0, 0,   0  ]]
+        (I-B^T)⁻¹·x = [1.0, 0.5, 0.2]  (0.5 × 0.4 = 0.2)
         """
         B = np.zeros((3, 3))
-        B[1, 0] = 0.5  # edge 0→1
-        B[2, 1] = 0.4  # edge 1→2
+        B[0, 1] = 0.5  # edge 0→1 (B[source=0, target=1])
+        B[1, 2] = 0.4  # edge 1→2 (B[source=1, target=2])
         x = np.array([1.0, 0.0, 0.0])
 
         delta, fallback = _propagate_matrix_method(B, x)
@@ -263,7 +272,7 @@ class TestMatrixMethod:
     def test_diamond_graph(self):
         """Diamond: 0→1, 0→2, 1→3, 2→3.
 
-        B[1,0]=0.5, B[2,0]=0.3, B[3,1]=0.4, B[3,2]=0.6
+        B[source, target]: B[0,1]=0.5, B[0,2]=0.3, B[1,3]=0.4, B[2,3]=0.6
         x = [1, 0, 0, 0]
         Expected:
           Δθ₀ = 1.0
@@ -272,10 +281,10 @@ class TestMatrixMethod:
           Δθ₃ = 0.5×0.4 + 0.3×0.6 = 0.20 + 0.18 = 0.38
         """
         B = np.zeros((4, 4))
-        B[1, 0] = 0.5
-        B[2, 0] = 0.3
-        B[3, 1] = 0.4
-        B[3, 2] = 0.6
+        B[0, 1] = 0.5  # edge 0→1
+        B[0, 2] = 0.3  # edge 0→2
+        B[1, 3] = 0.4  # edge 1→3
+        B[2, 3] = 0.6  # edge 2→3
         x = np.array([1.0, 0.0, 0.0, 0.0])
 
         delta, fallback = _propagate_matrix_method(B, x)
@@ -308,25 +317,25 @@ class TestPathEnumeration:
 
     def test_single_edge(self):
         """0→1 with β=0.5, x_source=1.0 → Δθ₁=0.5."""
-        B = np.array([[0, 0], [0.5, 0]], dtype=float)
+        B = np.array([[0, 0.5], [0, 0]], dtype=float)  # B[source=0, target=1]
         delta = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=2)
         np.testing.assert_allclose(delta, [0.0, 0.5], atol=1e-12)
 
     def test_two_hop(self):
         """0→1→2: Δθ₁=0.5, Δθ₂=0.5×0.4=0.2."""
         B = np.zeros((3, 3))
-        B[1, 0] = 0.5
-        B[2, 1] = 0.4
+        B[0, 1] = 0.5  # edge 0→1
+        B[1, 2] = 0.4  # edge 1→2
         delta = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=3)
         np.testing.assert_allclose(delta, [0.0, 0.5, 0.2], atol=1e-12)
 
     def test_diamond_matches_matrix(self):
         """Diamond should give same result as matrix method."""
         B = np.zeros((4, 4))
-        B[1, 0] = 0.5
-        B[2, 0] = 0.3
-        B[3, 1] = 0.4
-        B[3, 2] = 0.6
+        B[0, 1] = 0.5  # edge 0→1
+        B[0, 2] = 0.3  # edge 0→2
+        B[1, 3] = 0.4  # edge 1→3
+        B[2, 3] = 0.6  # edge 2→3
 
         delta_path = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=4)
         # Expected: Δθ₁=0.5, Δθ₂=0.3, Δθ₃=0.5×0.4+0.3×0.6=0.38
@@ -335,8 +344,8 @@ class TestPathEnumeration:
     def test_zero_edge_excluded(self):
         """Edges with β=0 are excluded (structural inclusion=0)."""
         B = np.zeros((3, 3))
-        B[1, 0] = 0.5
-        B[2, 1] = 0.0  # excluded edge
+        B[0, 1] = 0.5  # edge 0→1
+        B[1, 2] = 0.0  # excluded edge
         delta = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=3)
         np.testing.assert_allclose(delta, [0.0, 0.5, 0.0], atol=1e-12)
 
@@ -346,7 +355,7 @@ class TestPathEnumeration:
         n = 10
         B = np.zeros((n, n))
         for i in range(n - 1):
-            B[i + 1, i] = 0.5
+            B[i, i + 1] = 0.5  # edge i→i+1 (B[source=i, target=i+1])
         delta = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=n)
         # Depth 0→1→2→...→7 (7 hops) should be reached
         # Depth 0→1→...→8 (8 hops) should NOT be reached
@@ -357,9 +366,9 @@ class TestPathEnumeration:
         """Path enumeration doesn't revisit nodes (no infinite loops)."""
         # Even with a cycle in B, path enum avoids revisiting
         B = np.zeros((3, 3))
-        B[1, 0] = 0.5
-        B[2, 1] = 0.4
-        B[0, 2] = 0.3  # cycle back to 0
+        B[0, 1] = 0.5  # edge 0→1
+        B[1, 2] = 0.4  # edge 1→2
+        B[2, 0] = 0.3  # cycle back to 0
         delta = _propagate_path_enumeration(B, source_idx=0, x_source=1.0, n_nodes=3)
         # Should terminate without infinite loop
         assert np.all(np.isfinite(delta))
@@ -655,9 +664,9 @@ class TestMatrixVsPathConsistency:
         """0→1→2→3: both methods should match."""
         n = 4
         B = np.zeros((n, n))
-        B[1, 0] = 0.5
-        B[2, 1] = 0.4
-        B[3, 2] = 0.3
+        B[0, 1] = 0.5  # edge 0→1
+        B[1, 2] = 0.4  # edge 1→2
+        B[2, 3] = 0.3  # edge 2→3
         x = np.zeros(n)
         x[0] = 1.0
 
@@ -676,10 +685,10 @@ class TestMatrixVsPathConsistency:
         """Diamond graph: both methods produce matching downstream effects."""
         n = 4
         B = np.zeros((n, n))
-        B[1, 0] = 0.5
-        B[2, 0] = 0.3
-        B[3, 1] = 0.4
-        B[3, 2] = 0.6
+        B[0, 1] = 0.5  # edge 0→1
+        B[0, 2] = 0.3  # edge 0→2
+        B[1, 3] = 0.4  # edge 1→3
+        B[2, 3] = 0.6  # edge 2→3
         x = np.zeros(n)
         x[0] = 1.0
 
@@ -734,10 +743,10 @@ class TestIntegration:
 
         n = 5
         B_hat = np.zeros((n, n))
-        B_hat[1, 0] = 0.6  # E01
-        B_hat[2, 1] = 0.4  # E12
-        B_hat[3, 1] = 0.3  # E13
-        B_hat[4, 1] = 0.2  # E14
+        B_hat[0, 1] = 0.6  # E01: INTERVENTION→PATHWAY (B[source=0, target=1])
+        B_hat[1, 2] = 0.4  # E12: PATHWAY→COG_ATTN (B[source=1, target=2])
+        B_hat[1, 3] = 0.3  # E13: PATHWAY→COG_MEM (B[source=1, target=3])
+        B_hat[1, 4] = 0.2  # E14: PATHWAY→OTHER (B[source=1, target=4])
 
         frozen = _make_frozen(B_hat, graph)
 
@@ -815,9 +824,9 @@ class TestIntegration:
         mc_draws, frozen, patient_state = self._build_test_scenario()
 
         # Make B very large → effects exceed ceiling
-        mc_draws.B_draws[:, 1, 0] = 3.0  # huge edge weight
-        mc_draws.B_draws[:, 2, 1] = 2.0
-        mc_draws.B_draws[:, 3, 1] = 2.0
+        mc_draws.B_draws[:, 0, 1] = 3.0  # huge edge 0→1 (B[source=0, target=1])
+        mc_draws.B_draws[:, 1, 2] = 2.0  # huge edge 1→2
+        mc_draws.B_draws[:, 1, 3] = 2.0  # huge edge 1→3
 
         result = propagate_effects(
             mc_draws=mc_draws,

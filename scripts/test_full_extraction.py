@@ -56,6 +56,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
+# Silence pdfminer DEBUG noise (331K+ lines per run, 99.8% of log volume)
+logging.getLogger("pdfminer").setLevel(logging.WARNING)
 logger = logging.getLogger("extraction_test")
 
 # ═══════════════════════════════════════════════════════════════
