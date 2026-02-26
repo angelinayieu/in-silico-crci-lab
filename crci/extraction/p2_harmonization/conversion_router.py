@@ -61,6 +61,9 @@ _VALID_CONVERSIONS: dict[str, set[str]] = {
         TargetScale.SD_SD,
         TargetScale.PROXY,
     },
+    EffectTypeReported.F_STATISTIC: {
+        TargetScale.SD_SD,
+    },
     EffectTypeReported.OTHER: set(),
 }
 
@@ -79,12 +82,19 @@ def _check_cg1_conversion_target_valid(
 
 def _check_cg2_sufficient_info(
     validated: ValidatedNumeric,
+    effect_type_reported: str | None = None,
 ) -> bool:
     """CG2: Is there sufficient information for conversion?
 
     Requires either SD (for unstandardized effects) or CI (to derive SE).
     A direct SE is also acceptable.
+    F_STATISTIC is special: F value + N is sufficient (SE derived during
+    harmonization, not before), and N has a paper-level fallback.
     """
+    # F_STATISTIC: F→d conversion derives SE internally; only needs F > 0
+    if effect_type_reported == EffectTypeReported.F_STATISTIC:
+        return validated.value.value is not None and validated.value.value > 0
+
     value = validated.value
     has_se = value.se is not None and value.se > 0
     has_ci = (
@@ -127,6 +137,7 @@ def _check_cg3_scale_compatibility(
         EffectTypeReported.UNSTD_BETA,
         EffectTypeReported.GROUP_DIFF,
         EffectTypeReported.PERCENT_CHANGE,
+        EffectTypeReported.F_STATISTIC,
     }
     if effect_type_reported in continuous_types:
         return target_scale not in log_targets
@@ -174,6 +185,8 @@ def _determine_target_scale(
     elif effect_type_reported == EffectTypeReported.PERCENT_CHANGE:
         return TargetScale.SD_SD
     elif effect_type_reported == EffectTypeReported.GROUP_DIFF:
+        return TargetScale.SD_SD
+    elif effect_type_reported == EffectTypeReported.F_STATISTIC:
         return TargetScale.SD_SD
     else:
         return TargetScale.RAW_ORIGINAL
@@ -229,7 +242,7 @@ def route_conversion(
         )
 
     # ── CG2: Sufficient information ──
-    cg2_pass = _check_cg2_sufficient_info(validated)
+    cg2_pass = _check_cg2_sufficient_info(validated, effect_type_reported)
     if not cg2_pass:
         blocked_reasons.append(
             "CG2: insufficient information for conversion "

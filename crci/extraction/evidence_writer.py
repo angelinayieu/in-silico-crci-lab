@@ -3,19 +3,21 @@
 # VERIFIED: forward wiring — writes EdgeEvidence rows to DB
 # VERIFIED: no hardcoded formula parameters
 # VERIFIED: no gates (persistence-only module)
+# VERIFIED: S3 idempotent writes via span_hash dedup
 """
 Component: SYS_EXTRACTION.EX-P2.EVIDENCE_WRITER
 Spec: SYS_EXTRACTION_COMPLETE.md lines 1135-1150
 Purpose: Persist harmonized claims to edge_evidence_v1 (Class B).
          This bridges the gap between in-memory P2 output and DB storage.
+         Uses UPSERT semantics for idempotent reruns (S3 fix).
 Reads: ScaledNumeric objects from P2 harmonization context["harmonized_records"]
 Writes: edge_evidence_v1 rows (ORM: EdgeEvidence)
 Gates: None (persistence-only, no formula logic)
 """
 from __future__ import annotations
 
+import hashlib
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -24,6 +26,44 @@ from sqlalchemy.orm import Session
 from crci.shared.models.tables import EdgeEvidence, ExtractionRun
 
 logger = logging.getLogger(__name__)
+
+
+def compute_span_hash(
+    study_id: str,
+    edge_relation_id: str,
+    profile_id: str,
+    beta: float,
+    se: float | None,
+    source_position: str | None = None,
+) -> str:
+    """Compute deterministic hash for evidence dedup.
+
+    The hash is based on the natural key of the evidence row:
+    - study_id: which paper
+    - edge_relation_id: which causal edge
+    - profile_id: which cohort
+    - beta + se: the actual values (to distinguish multiple effects)
+    - source_position: optional source text position for disambiguation
+
+    Args:
+        study_id: Study identifier.
+        edge_relation_id: Edge identifier.
+        profile_id: Cohort profile identifier.
+        beta: Effect size value.
+        se: Standard error (may be None).
+        source_position: Optional source position string.
+
+    Returns:
+        16-character hex hash.
+    """
+    # Build deterministic input string
+    se_str = f"{se:.6f}" if se is not None else "none"
+    beta_str = f"{beta:.6f}"
+    hash_input = f"{study_id}|{edge_relation_id}|{profile_id}|{beta_str}|{se_str}"
+    if source_position:
+        hash_input += f"|{source_position}"
+
+    return hashlib.sha1(hash_input.encode("utf-8")).hexdigest()[:16]
 
 
 def write_evidence_rows(
@@ -65,11 +105,11 @@ def write_evidence_rows(
         profile_id = study_id
 
     written = 0
+    updated = 0
     skipped = 0
 
     for record in harmonized_records:
         # Extract fields from ScaledNumeric (or dict)
-        span_id = _get_attr(record, "span_id", f"span_{uuid.uuid4().hex[:8]}")
         beta = _get_attr(record, "beta")
         se = _get_attr(record, "se")
         scale = _get_attr(record, "scale")
@@ -80,18 +120,27 @@ def write_evidence_rows(
         conversion_formula = _get_attr(record, "conversion_formula")
         conversion_bias_risk = _get_attr(record, "conversion_bias_risk")
         direction_aligned = _get_attr(record, "direction_aligned", False)
+        edge_relation_id = _get_attr(record, "edge_id") or _get_attr(record, "edge_relation_id") or "UNASSIGNED"
+        source_position = _get_attr(record, "source_position")
 
         # Skip records without a valid beta value
         if beta is None:
-            logger.debug(
-                "Skipping record %s: no beta value",
-                span_id,
-            )
+            logger.debug("Skipping record: no beta value")
             skipped += 1
             continue
 
-        # Generate unique LER ID
-        ler_id = f"LER_{study_id}_{span_id}_{uuid.uuid4().hex[:8]}"
+        # Compute deterministic span_hash for dedup (S3 fix)
+        span_hash = compute_span_hash(
+            study_id=study_id,
+            edge_relation_id=edge_relation_id,
+            profile_id=profile_id,
+            beta=beta,
+            se=se,
+            source_position=source_position,
+        )
+
+        # Generate deterministic ler_id from span_hash
+        ler_id = f"LER_{study_id}_{span_hash}"
 
         # Convert enum values to strings if needed
         scale_str = scale.value if hasattr(scale, "value") else str(scale) if scale else None
@@ -110,54 +159,82 @@ def write_evidence_rows(
             notes_parts.append("direction_aligned=True")
         extraction_snippet = "; ".join(notes_parts) if notes_parts else None
 
-        # Create EdgeEvidence row
-        evidence_row = EdgeEvidence(
-            ler_id=ler_id,
-            study_id=study_id,
-            profile_id=profile_id,
-            edge_relation_id=_get_attr(record, "edge_id") or _get_attr(record, "edge_relation_id") or "UNASSIGNED",
-            edge_family=_get_attr(record, "edge_family"),
-            # Reported values (original)
-            effect_type_reported="harmonized_beta",
-            effect_value_reported=beta,
-            se_reported=se,
-            N_effect=_get_attr(record, "n") or _get_attr(record, "n_effect") or 0,
-            # Harmonized values (same as reported for P2 output)
-            harmonized_scale=scale_str,
-            harmonized_beta=beta,
-            harmonized_se=se,
-            harmonization_status="harmonized",
-            # SE provenance (v2.0)
-            se_derivation_level=se_derivation_str,
-            se_inflation_applied=se_inflation_applied,
-            se_quality_tag=se_quality_str,
-            # Quality and audit
-            quality_rating=_get_attr(record, "quality_rating", "moderate"),
-            extraction_snippet=extraction_snippet,
-            entered_by=f"extraction_pipeline:{run.extraction_run_id}",
-            entered_at=datetime.now(timezone.utc).isoformat(),
-            version=1,
-            active=1,
-        )
+        # UPSERT: Check if row exists by ler_id (S3 fix)
+        existing_row = session.query(EdgeEvidence).filter(
+            EdgeEvidence.ler_id == ler_id
+        ).first()
 
-        try:
-            session.add(evidence_row)
-            written += 1
-        except Exception as exc:
-            logger.warning(
-                "Failed to add evidence row %s: %s",
-                ler_id,
-                exc,
+        if existing_row:
+            # Update existing row
+            existing_row.effect_value_reported = beta
+            existing_row.se_reported = se
+            existing_row.N_effect = _get_attr(record, "n") or _get_attr(record, "n_effect") or 0
+            existing_row.harmonized_scale = scale_str
+            existing_row.harmonized_beta = beta
+            existing_row.harmonized_se = se
+            existing_row.harmonization_status = "harmonized"
+            existing_row.se_derivation_level = se_derivation_str
+            existing_row.se_inflation_applied = se_inflation_applied
+            existing_row.se_quality_tag = se_quality_str
+            existing_row.quality_rating = _get_attr(record, "quality_rating", "moderate")
+            existing_row.extraction_snippet = extraction_snippet
+            existing_row.entered_by = f"extraction_pipeline:{run.extraction_run_id}"
+            existing_row.entered_at = datetime.now(timezone.utc).isoformat()
+            existing_row.version = (existing_row.version or 0) + 1
+            updated += 1
+            logger.debug("Updated existing evidence row %s", ler_id)
+        else:
+            # Insert new row
+            evidence_row = EdgeEvidence(
+                ler_id=ler_id,
+                study_id=study_id,
+                profile_id=profile_id,
+                edge_relation_id=edge_relation_id,
+                edge_family=_get_attr(record, "edge_family"),
+                span_hash=span_hash,
+                # Reported values (original)
+                effect_type_reported="harmonized_beta",
+                effect_value_reported=beta,
+                se_reported=se,
+                N_effect=_get_attr(record, "n") or _get_attr(record, "n_effect") or 0,
+                # Harmonized values (same as reported for P2 output)
+                harmonized_scale=scale_str,
+                harmonized_beta=beta,
+                harmonized_se=se,
+                harmonization_status="harmonized",
+                # SE provenance (v2.0)
+                se_derivation_level=se_derivation_str,
+                se_inflation_applied=se_inflation_applied,
+                se_quality_tag=se_quality_str,
+                # Quality and audit
+                quality_rating=_get_attr(record, "quality_rating", "moderate"),
+                extraction_snippet=extraction_snippet,
+                entered_by=f"extraction_pipeline:{run.extraction_run_id}",
+                entered_at=datetime.now(timezone.utc).isoformat(),
+                version=1,
+                active=1,
             )
-            skipped += 1
+
+            try:
+                session.add(evidence_row)
+                written += 1
+            except Exception as exc:
+                logger.warning(
+                    "Failed to add evidence row %s: %s",
+                    ler_id,
+                    exc,
+                )
+                skipped += 1
 
     # Flush to ensure rows are written
-    if written > 0:
+    total_changes = written + updated
+    if total_changes > 0:
         session.flush()
         logger.info(
-            "Persisted %d evidence rows for study %s (skipped %d)",
-            written,
+            "Evidence persistence for study %s: %d inserted, %d updated, %d skipped",
             study_id,
+            written,
+            updated,
             skipped,
         )
     else:
@@ -167,7 +244,7 @@ def write_evidence_rows(
             skipped,
         )
 
-    return written
+    return written + updated
 
 
 def _get_attr(obj: Any, attr: str, default: Any = None) -> Any:

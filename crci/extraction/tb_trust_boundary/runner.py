@@ -48,15 +48,34 @@ def run_tb_trust_boundary(
     logger.info("TB-S1: Parsing numeric claims for %s", paper_id)
     from crci.extraction.tb_trust_boundary.numeric_parser import parse_spans
 
-    # Extract SpanLabel objects from P1 agent outputs (passed via context)
+    # Prefer grounded_spans (GroundedSpan[]) from ConceptEngine (carry edge linkage).
+    # Fall back to raw all_span_labels (SpanLabel[]).
+    grounded_spans = context.get("grounded_spans", [])
     span_labels = context.get("all_span_labels", [])
+
+    # For parse_spans, we need raw SpanLabel objects
+    # (GroundedSpan wraps SpanLabel — extract the inner span for parsing)
+    from crci.shared.models.intermediate_states import GroundedSpan as _GS
+    if grounded_spans:
+        raw_for_parsing = [
+            gs.span if isinstance(gs, _GS) else gs for gs in grounded_spans
+        ]
+        # Keep grounded_spans for group_assembler (carries edge_relation_id)
+        assembly_input = grounded_spans
+    elif span_labels:
+        raw_for_parsing = span_labels
+        assembly_input = span_labels
+    else:
+        raw_for_parsing = []
+        assembly_input = []
 
     # Also check PaperMap candidate_spans as fallback
     paper_map = context.get("paper_map")
-    if not span_labels and paper_map and hasattr(paper_map, "candidate_spans"):
-        span_labels = paper_map.candidate_spans
+    if not raw_for_parsing and paper_map and hasattr(paper_map, "candidate_spans"):
+        raw_for_parsing = list(paper_map.candidate_spans)
+        assembly_input = raw_for_parsing
 
-    parsed_numerics = parse_spans(span_labels)
+    parsed_numerics = parse_spans(raw_for_parsing)
 
     # Separate valid (parsed successfully) from failed
     # ParseStatus enum: CLEAN = successfully parsed, AMBIGUOUS = partial, FAILED = rejected
@@ -65,12 +84,31 @@ def run_tb_trust_boundary(
 
     context["parsed_claims"] = valid_claims
     context["failed_claims"] = failed_claims
-    context["total_spans"] = len(span_labels)
+    context["total_spans"] = len(raw_for_parsing)
 
     logger.info(
         "TB-S1 complete: %d claims parsed from %d span labels",
         len(valid_claims),
-        len(span_labels),
+        len(raw_for_parsing),
+    )
+
+    # ── TB-S1b: Span Group Assembly ──
+    # Reassemble individually-parsed spans sharing a grouping_id into
+    # multi-field TypedNumericValue records ({β, SE, CI, p, N}).
+    logger.info("TB-S1b: Assembling span groups")
+    from crci.extraction.tb_trust_boundary.group_assembler import reassemble_groups
+
+    grouped_evidence, assembly_qa = reassemble_groups(
+        span_labels=assembly_input,
+        parsed=valid_claims,
+    )
+    context["grouped_evidence"] = grouped_evidence
+    context.setdefault("qa_metrics", {}).update(assembly_qa)
+
+    logger.info(
+        "TB-S1b complete: %d grouped evidence records from %d valid claims",
+        len(grouped_evidence),
+        len(valid_claims),
     )
 
     # ── TB-S2: Consistency Checker ──

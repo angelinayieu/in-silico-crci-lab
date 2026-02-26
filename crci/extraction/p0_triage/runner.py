@@ -58,12 +58,33 @@ def run_p0_triage(
     """
     pdf_path = Path(context["pdf_path"])
 
+    # ── P0-S0: Load companion meta.json (if available) ──
+    # BUG-008 fix: meta.json carries target_edges, DOI, instruments, etc.
+    companion_meta = _load_companion_meta(pdf_path)
+    if companion_meta:
+        context["companion_meta"] = companion_meta
+        logger.info(
+            "P0-S0: Loaded companion meta.json: %d keys, target_edges=%s",
+            len(companion_meta),
+            companion_meta.get("target_edges", []),
+        )
+    else:
+        context["companion_meta"] = {}
+
     # ── P0-S1: PDF Ingestion ──
     logger.info("P0-S1: Ingesting PDF %s", pdf_path.name)
     from crci.extraction.p0_triage.pdf_ingestion import ingest_pdf
 
     ingested = ingest_pdf(pdf_path)
     context["ingested_paper"] = ingested
+
+    # Merge meta.json metadata into ingested metadata (meta.json takes priority)
+    if companion_meta:
+        pdf_meta = ingested.get("metadata", {})
+        for key in ("doi", "pmid", "title", "authors", "year", "journal"):
+            if companion_meta.get(key) and not pdf_meta.get(key):
+                pdf_meta[key] = companion_meta[key]
+        ingested["metadata"] = pdf_meta
 
     logger.info(
         "P0-S1 complete: quality=%s, pages=%d, tables=%s, figures=%s",
@@ -212,3 +233,41 @@ def run_p0_triage(
     session.flush()
 
     return context
+
+
+def _load_companion_meta(pdf_path: Path) -> dict[str, Any] | None:
+    """Load companion .meta.json file alongside the PDF.
+
+    Checks two locations:
+    1. pdf_path.with_suffix('.meta.json') — e.g., cherrier2013.meta.json
+    2. data/manual_uploads/structured/{stem}/meta.json
+
+    Returns:
+        Parsed JSON dict, or None if no meta.json found.
+    """
+    import json
+
+    # Location 1: sibling .meta.json
+    meta_path = pdf_path.with_suffix(".meta.json")
+    if meta_path.exists():
+        try:
+            with open(meta_path) as f:
+                data = json.load(f)
+            logger.info("P0-S0: Found companion meta.json at %s", meta_path)
+            return data
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("P0-S0: Failed to parse %s: %s", meta_path, exc)
+
+    # Location 2: structured upload directory
+    structured_dir = pdf_path.parent.parent / "structured" / pdf_path.stem
+    structured_meta = structured_dir / "meta.json"
+    if structured_meta.exists():
+        try:
+            with open(structured_meta) as f:
+                data = json.load(f)
+            logger.info("P0-S0: Found companion meta.json at %s", structured_meta)
+            return data
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("P0-S0: Failed to parse %s: %s", structured_meta, exc)
+
+    return None

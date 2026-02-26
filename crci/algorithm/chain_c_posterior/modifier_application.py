@@ -452,8 +452,10 @@ def _detect_pathway_activations(
         # Threshold: use per-pathway or mode default
         if sensitive_mode:
             threshold = config.C4_PATHWAY_ACTIVATION_THRESHOLD_SENSITIVE
-        else:
+        elif pw.activation_threshold is not None:
             threshold = pw.activation_threshold
+        else:
+            threshold = config.C4_PATHWAY_ACTIVATION_THRESHOLD_DEFAULT
 
         is_active = activation_score > threshold
 

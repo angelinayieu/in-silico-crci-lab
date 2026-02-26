@@ -161,14 +161,13 @@ def load_pathway_registry(
 
             pathway_id = row["pathway_id"].strip()
 
-            entry_nodes = _parse_json_list(row.get("entry_node_ids_json", "[]"))
-            exit_nodes = _parse_json_list(row.get("exit_node_ids_json", "[]"))
-            intermediate_nodes = _parse_json_list(
+            entry_nodes = tuple(_parse_json_list(row.get("entry_node_ids_json", "[]")))
+            exit_nodes = tuple(_parse_json_list(row.get("exit_node_ids_json", "[]")))
+            intermediate_nodes = tuple(_parse_json_list(
                 row.get("intermediate_node_ids_json", "[]")
-            )
-            component_nodes = _parse_json_list(
-                row.get("component_nodes_json", "[]")
-            )
+            ))
+            # component_nodes is now a computed @property on PathwayDef —
+            # no need to parse or pass it. The CSV column is ignored.
 
             # Find edges belonging to this pathway
             pathway_edge_ids: list[str] = []
@@ -191,7 +190,7 @@ def load_pathway_registry(
 
             # Parse B6.5 fields (EXTENSION: pathway evidence scoring)
             se_multiplier = float(row.get("se_multiplier", 1.0))
-            edge_count_registry = int(row.get("edge_count", 0))
+            expected_edge_count = int(row.get("edge_count", 0))
             status = row.get("status", "connected").strip()
 
             pw = PathwayDef(
@@ -201,15 +200,15 @@ def load_pathway_registry(
                 entry_node_ids=entry_nodes,
                 exit_node_ids=exit_nodes,
                 intermediate_node_ids=intermediate_nodes,
-                component_nodes=component_nodes,
-                edge_ids=pathway_edge_ids,
+                edge_ids=tuple(pathway_edge_ids),
                 is_complete=is_complete,
                 activation_threshold=activation_threshold,
                 is_sensitive=is_sensitive,
                 se_multiplier=se_multiplier,
-                edge_count_registry=edge_count_registry,
+                expected_edge_count=expected_edge_count,
                 status=status,
             )
+            pw.validate()  # Fail fast on bad registry data
             pathways.append(pw)
 
     incomplete = [p for p in pathways if not p.is_complete]

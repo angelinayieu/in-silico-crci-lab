@@ -127,6 +127,17 @@ class LLMClient:
         response = self._call_with_retry(kwargs, prompt_hash)
         latency_ms = (time.monotonic() - start_time) * 1000
 
+        # Check for output truncation
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason == "max_tokens":
+            logger.warning(
+                "LLM response TRUNCATED (max_tokens=%d reached): "
+                "model=%s prompt_hash=%s — increase LLM_DEFAULT_MAX_TOKENS",
+                self.max_tokens,
+                effective_model,
+                prompt_hash,
+            )
+
         # Extract text content from response
         raw_text = ""
         for block in response.content:
@@ -284,8 +295,8 @@ class LLMClient:
         Handles:
         1. Trailing commas before } or ] (most common LLM error)
         2. Truncated JSON (unclosed brackets/braces) — closes them
-        3. Unescaped newlines inside string values
-        4. Single quotes instead of double quotes (rare)
+        3. Truncated arrays of objects — finds last complete object
+        4. Unescaped newlines inside string values
 
         Returns:
             Repaired JSON string, or None if repair is not attempted
@@ -298,68 +309,101 @@ class LLMClient:
         repaired = text
 
         # 1. Remove trailing commas before } or ]
-        #    Matches: ,\s*} or ,\s*]  (with optional whitespace/newlines)
         repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
 
-        # 2. Fix truncated JSON — close unclosed brackets/braces
-        #    This handles the max_tokens cutoff case
+        # Quick check: already valid?
+        try:
+            json.loads(repaired)
+            return repaired
+        except json.JSONDecodeError:
+            pass
+
+        # 2. Truncated array of objects — find the last complete object
+        #    This handles the common case where LLM max_tokens cuts off
+        #    mid-JSON while generating an array of span objects.
+        #    Strategy: walk backwards from the end to find the last "},"
+        #    that closes a complete array element, then close the array.
         open_braces = repaired.count("{") - repaired.count("}")
         open_brackets = repaired.count("[") - repaired.count("]")
 
         if open_braces > 0 or open_brackets > 0:
-            # Check if we're inside a string (truncated mid-value)
-            # Simple heuristic: if the text ends mid-string, close the string
-            stripped = repaired.rstrip()
+            # Try to find the last complete object in the outermost array
+            # by searching backwards for "},\n" or "}\n" patterns
+            # that indicate a complete array element boundary
+            last_complete = -1
+            depth = 0
+            in_str = False
+            i = 0
+            while i < len(repaired):
+                ch = repaired[i]
+                if ch == "\\" and in_str:
+                    i += 2
+                    continue
+                if ch == '"':
+                    in_str = not in_str
+                if not in_str:
+                    if ch == "{":
+                        depth += 1
+                    elif ch == "}":
+                        depth -= 1
+                        # depth==1 means we just closed an object at
+                        # the top-level array (inside outer {spans:[...]})
+                        # depth==0 means we closed the outermost object
+                        if depth <= 1 and i > 0:
+                            last_complete = i
+                i += 1
 
-            # Count unescaped quotes to see if we're inside a string
+            if last_complete > 0:
+                # Truncate at the last complete object
+                candidate = repaired[:last_complete + 1]
+                # Remove any trailing comma
+                candidate = candidate.rstrip().rstrip(",")
+                # Close remaining open brackets and braces
+                remaining_brackets = candidate.count("[") - candidate.count("]")
+                remaining_braces = candidate.count("{") - candidate.count("}")
+                candidate += "]" * remaining_brackets + "}" * remaining_braces
+                try:
+                    json.loads(candidate)
+                    logger.info(
+                        "JSON truncation repair: salvaged %d/%d chars "
+                        "by finding last complete object",
+                        last_complete + 1, len(repaired),
+                    )
+                    return candidate
+                except json.JSONDecodeError:
+                    pass
+
+            # Fallback: close any open strings, then brackets/braces
+            stripped = repaired.rstrip()
             in_string = False
             i = 0
             while i < len(stripped):
                 ch = stripped[i]
                 if ch == "\\" and in_string:
-                    i += 2  # skip escaped char
+                    i += 2
                     continue
                 if ch == '"':
                     in_string = not in_string
                 i += 1
 
             if in_string:
-                # Close the open string, then add null value if key
                 repaired = stripped + '"'
-                # If the last complete structure was a key, add : null
-                after_close = repaired.rstrip()
-                # Check if this looks like a key (preceded by { or ,)
-                pre = after_close[:-1].rstrip()
+                pre = repaired[:-1].rstrip()
                 if pre and pre[-1] in ("{", ","):
-                    repaired = after_close + ": null"
+                    repaired = repaired + ": null"
 
-            # Remove any trailing comma before we close structures
             repaired = repaired.rstrip().rstrip(",")
-
-            # Close brackets/braces in reverse order of opening
-            # Recalculate after potential string fix
             open_braces = repaired.count("{") - repaired.count("}")
             open_brackets = repaired.count("[") - repaired.count("]")
             repaired += "]" * open_brackets + "}" * open_braces
 
-        # 3. Fix unescaped control characters inside strings
-        #    (newlines, tabs that aren't \n or \t)
-        # This is a conservative fix — only inside JSON string values
-        def _fix_control_chars(m: re.Match) -> str:
-            s = m.group(0)
-            # Replace bare newlines/tabs inside strings with escaped versions
-            s = s.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
-            return s
-
-        # Only apply to content between quotes (rough heuristic)
         try:
             json.loads(repaired)
-            return repaired  # Already valid after trailing comma / truncation fix
+            return repaired
         except json.JSONDecodeError:
             pass
 
-        # 4. Last resort: try to extract the largest valid JSON object
-        #    by finding the outermost { } or [ ]
+        # 3. Last resort: extract the largest valid JSON object
         if repaired.lstrip().startswith("{"):
             brace_depth = 0
             last_valid_end = -1

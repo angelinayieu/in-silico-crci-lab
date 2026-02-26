@@ -188,6 +188,7 @@ def _check_plausibility(
     return ValidatedNumeric(
         span_id=pv.span_id,
         value=typed_value,
+        value_type=pv.value_type,  # Preserve label_type for P2 filtering
         plausibility_status=plausibility_status,
         plausibility_note="; ".join(notes) if notes else None,
     )

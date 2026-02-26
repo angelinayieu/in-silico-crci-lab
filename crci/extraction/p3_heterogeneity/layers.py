@@ -517,7 +517,11 @@ def apply_all_layers(
 
         # L1: Study design multiplier
         study_design = getattr(rec, "study_design", "unclassified")
-        n_total = getattr(rec, "n_total", None) or getattr(rec, "sample_size", None)
+        n_total = (
+            getattr(rec, "n_total", None)
+            or getattr(rec, "sample_size", None)
+            or getattr(rec, "n_effect", None)
+        )
         m_design, l1_notes = layer_1_study_design(study_design, n_total=n_total)
         notes.extend(l1_notes)
 

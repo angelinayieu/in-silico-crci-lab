@@ -20,7 +20,12 @@ from .frozen_state import (
     ContextPriorSpec,
     FrozenModelState,
     SynergyRecord,
+    assemble_frozen_state,
     run_chain_b,
+)
+from .pathway_evidence_scorer import (
+    PathwayEvidenceScore,
+    score_pathway_evidence,
 )
 
 __all__ = [
@@ -31,9 +36,12 @@ __all__ = [
     "FrozenModelState",
     "HeterogeneityAdjustedEdge",
     "InclusionProbEdge",
+    "PathwayEvidenceScore",
     "PooledEdge",
     "SynergyRecord",
     "TauSquaredPrior",
+    "assemble_frozen_state",
     "run_b1_through_b6",
     "run_chain_b",
+    "score_pathway_evidence",
 ]

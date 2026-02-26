@@ -1123,7 +1123,7 @@ DB_DEFAULT_BATCH_SIZE: int = 500
 LLM_MAX_RETRIES: int = 3
 LLM_RETRY_BASE_DELAY_SECONDS: float = 2.0
 LLM_DEFAULT_MODEL: str = "claude-sonnet-4-20250514"
-LLM_DEFAULT_MAX_TOKENS: int = 4096
+LLM_DEFAULT_MAX_TOKENS: int = 16384
 
 # LLM cost estimation (approx. Claude Sonnet per 1M tokens)
 LLM_PROMPT_COST_PER_M: float = 3.0

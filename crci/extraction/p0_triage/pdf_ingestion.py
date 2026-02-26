@@ -126,13 +126,16 @@ def ingest_pdf(pdf_path: str | Path) -> dict[str, Any]:
             )
 
         # Extract text from all pages
+        # Use x_tolerance=1 for better word separation in academic papers,
+        # and detect two-column layouts to extract columns in reading order.
         page_texts: list[str] = []
         tables_detected: list[dict[str, Any]] = []
         total_chars = 0
         non_empty_pages = 0
+        two_col_pages = 0
 
         for page_idx, page in enumerate(pdf.pages):
-            page_text = page.extract_text() or ""
+            page_text = _extract_page_text(page)
             page_texts.append(page_text)
 
             if page_text.strip():
@@ -213,6 +216,62 @@ def ingest_pdf(pdf_path: str | Path) -> dict[str, Any]:
 
     finally:
         pdf.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Two-column layout detection and column-separated extraction
+# ═══════════════════════════════════════════════════════════════
+
+# Minimum words per column half to consider a page as two-column
+_MIN_COLUMN_WORDS: int = 20
+
+# x_tolerance for pdfplumber text extraction (lower = more aggressive spacing)
+# Default pdfplumber is 3; we use 1 for better word separation in academic papers
+_X_TOLERANCE: int = 1
+
+
+def _is_two_column(page: Any) -> bool:
+    """Detect if a page uses a two-column layout.
+
+    Heuristic: split at the horizontal midpoint and check if both
+    halves contain substantial text (>= _MIN_COLUMN_WORDS words).
+    """
+    mid = page.width / 2
+    try:
+        left = page.crop((0, 0, mid, page.height))
+        right = page.crop((mid, 0, page.width, page.height))
+
+        left_text = (left.extract_text(x_tolerance=_X_TOLERANCE) or "").strip()
+        right_text = (right.extract_text(x_tolerance=_X_TOLERANCE) or "").strip()
+
+        left_words = len(left_text.split())
+        right_words = len(right_text.split())
+
+        return left_words >= _MIN_COLUMN_WORDS and right_words >= _MIN_COLUMN_WORDS
+    except Exception:
+        return False
+
+
+def _extract_page_text(page: Any) -> str:
+    """Extract text from a single page, handling two-column layouts.
+
+    For two-column pages: extracts left column then right column
+    to produce proper reading-order text.
+    For single-column pages: extracts normally.
+
+    Always uses x_tolerance=1 for better word separation in academic papers.
+    """
+    if _is_two_column(page):
+        mid = page.width / 2
+        left = page.crop((0, 0, mid, page.height))
+        right = page.crop((mid, 0, page.width, page.height))
+
+        left_text = left.extract_text(x_tolerance=_X_TOLERANCE) or ""
+        right_text = right.extract_text(x_tolerance=_X_TOLERANCE) or ""
+
+        return left_text + "\n\n" + right_text
+
+    return page.extract_text(x_tolerance=_X_TOLERANCE) or ""
 
 
 def _assess_quality(

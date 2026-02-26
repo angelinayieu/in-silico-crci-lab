@@ -702,14 +702,33 @@ Before implementing F4, verify:
 │  SLICE 1    │────▶│  SLICE 2    │────▶│  SLICE 3    │────▶│  SLICE 4    │
 │  Data Flow  │     │  Edge Deploy│     │  Alg Bridge │     │  Vertical   │
 │  P0→P3      │     │  P4→P7      │     │  Chain B    │     │  Integration│
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                                                                    │
-                                                                    ▼
-                                                           ┌─────────────┐
-                                                           │  SLICE 6    │
-                                                           │  F4 Risk    │
-                                                           │  (BLOCKED)  │
-                                                           └─────────────┘
+└──────┬──────┘     └─────────────┘     └─────────────┘     └─────────────┘
+       │                                                            │
+       ▼                                                            ▼
+┌──────────────┐                                           ┌─────────────┐
+│  SLICE R1    │                                           │  SLICE 6    │
+│  Subtype Enum│                                           │  F4 Risk    │
+│  + Mode Sel  │                                           │  (BLOCKED)  │
+└──────┬───────┘                                           └─────────────┘
+       │
+  ┌────┴──────┐
+  ▼           ▼
+┌───────┐  ┌───────┐
+│  R2   │  │  R3   │  (parallel after R1)
+│ Gates │  │ MA    │
+│       │  │ Life  │
+└───┬───┘  └───┬───┘
+    └─────┬────┘
+          ▼
+    ┌───────────┐
+    │  R4: Agg  │  (after Slice 2 + R1)
+    │ Amendments│
+    └─────┬─────┘
+          ▼
+    ┌───────────┐
+    │  R5: LLM  │  (hardening — any time)
+    │ Guardrails│
+    └───────────┘
 ```
 
 ---
@@ -802,6 +821,967 @@ Every LLM-based extraction run must capture:
 This turns debugging from "it changed" into "these specific knobs changed."
 
 **Implementation:** Add to `pipeline.py` at run creation time. Non-blocking for Slice 1 (no LLM call in the manual extraction path), but required before any LLM-driven extraction.
+
+---
+
+## Routing Slices: Paper-Type Routing Gap Remediation
+
+**Origin:** Audit of the Paper-Type Routing & Directed Acquisition Protocol against
+the current codebase. The audit identified 5 gap categories. These slices close them.
+
+**Relationship to Slices 1–6:** These routing slices (R1–R5) are **parallel** with the
+critical-path data flow slices. R1 should be done after Slice 1 (it changes classification
+behavior, which affects downstream routing). R2–R3 can proceed alongside Slice 2–4.
+R4 requires Slice 2 (edge evidence must exist for aggregation amendments). R5 is
+hardening and can be done at any time.
+
+```
+┌───────────────────────────────────────┐
+│  SLICE R1: Subtype Enum + Mode Select │ ← after Slice 1 data flow works
+│  Gate: PaperSubtype covers all spec   │
+│        subtypes; mode_selection routes │
+│        correctly for all 30+ subtypes │
+└──────────────┬────────────────────────┘
+               │
+      ┌────────┴────────┐
+      ▼                 ▼
+┌───────────┐   ┌────────────────┐
+│ SLICE R2  │   │  SLICE R3      │  ← parallel, after R1
+│ Enforce-  │   │  MA Product    │
+│ ment Gates│   │  Lifecycle     │
+└─────┬─────┘   └───────┬────────┘
+      │                 │
+      └────────┬────────┘
+               ▼
+      ┌────────────────┐
+      │  SLICE R4      │  ← after Slice 2 + R1
+      │  Aggregation   │
+      │  Amendments    │
+      └────────┬───────┘
+               ▼
+      ┌────────────────┐
+      │  SLICE R5      │  ← hardening, any time
+      │  LLM Guardrail │
+      │  Enforcement   │
+      └────────────────┘
+```
+
+### Vocabulary Alignment
+
+The Paper-Type Routing Protocol uses the Master Spec §4.1 taxonomy. Our codebase
+uses `PaperSubtype` in `enums.py` with a different taxonomy (intervention-oriented
+rather than design-oriented). The hop_discoverer already references spec subtypes
+as raw strings (`"pairwise_ma"`, `"nma"`, etc.) but they don't exist in the enum.
+
+**Principle:** Extend the existing `PaperSubtype` enum. Keep all current values for
+backward compatibility. Add new values using the same naming convention (UPPER_CASE
+member name, lowercase_with_underscores string value). The table below maps external
+reference names to our codebase names:
+
+| Spec / External Name | Codebase Enum Member | String Value | Action |
+|---|---|---|---|
+| `pairwise_ma` | `PaperSubtype.PAIRWISE_MA` | `"pairwise_ma"` | **ADD** |
+| `nma` | `PaperSubtype.NMA` | `"nma"` | **ADD** |
+| `ipdma` | `PaperSubtype.IPDMA` | `"ipdma"` | **ADD** |
+| `dose_response_ma` | `PaperSubtype.DOSE_RESPONSE_MA` | `"dose_response_ma"` | **ADD** |
+| `umbrella_review` | `PaperSubtype.UMBRELLA_REVIEW` | `"umbrella_review"` | **ADD** |
+| `mega_analysis` | `PaperSubtype.MEGA_ANALYSIS` | `"mega_analysis"` | **ADD** |
+| `scoping_review` | `PaperSubtype.SCOPING_REVIEW` | `"scoping_review"` | **ADD** |
+| `factorial_rct` | `PaperSubtype.FACTORIAL_RCT` | `"factorial_rct"` | **ADD** |
+| `pilot_rct` | `PaperSubtype.PILOT_RCT` | `"pilot_rct"` | **ADD** |
+| `crossover_rct` | `PaperSubtype.CROSSOVER_RCT` | `"crossover_rct"` | **ADD** |
+| `standard_rct` | `PaperSubtype.STANDARD_RCT` | `"standard_rct"` | **ADD** |
+| `prospective_cohort` | `PaperSubtype.PROSPECTIVE_COHORT` | `"prospective_cohort"` | **ADD** |
+| `retrospective_cohort` | `PaperSubtype.RETROSPECTIVE_COHORT` | `"retrospective_cohort"` | **ADD** |
+| `computational_model` | `PaperSubtype.COMPUTATIONAL_MODEL` | `"computational_model"` | **ADD** |
+| `methods_paper` | `PaperSubtype.METHODS_PAPER` | `"methods_paper"` | **ADD** |
+| `practice_guideline` | `PaperSubtype.GUIDELINE` | `"guideline"` | **EXISTS** (keep as-is) |
+| `narrative_review` | `PaperSubtype.REVIEW_NARRATIVE` | `"review_narrative"` | **EXISTS** (keep as-is) |
+| `ema_eld` | `PaperSubtype.INTENSIVE_LONGITUDINAL` | `"intensive_longitudinal"` | **EXISTS** (keep as-is) |
+| `animal_model` | `PaperSubtype.MECHANISTIC_ANIMAL` | `"mechanistic_animal"` | **EXISTS** (keep as-is) |
+| `in_vitro` | `PaperSubtype.MECHANISTIC_IN_VITRO` | `"mechanistic_in_vitro"` | **ADD** (distinct from `EvidenceBasisExtended.IN_VITRO`) |
+| `case_report` | `PaperSubtype.CASE_REPORT` | `"case_report"` | **EXISTS** |
+| `qualitative` | `PaperSubtype.QUALITATIVE` | `"qualitative"` | **EXISTS** |
+
+**Key decisions:**
+- Existing subtypes (`RCT_EXERCISE`, `RCT_COGNITIVE`, etc.) are NOT renamed. They
+  remain valid and the classifier can still output them. Mode selection will map
+  coarse RCT subtypes the same as `STANDARD_RCT` unless the new fine-grained subtype
+  is assigned.
+- `ExtractionMode.MINIMAL` is added (4th level) to support umbrella_review,
+  case_report, qualitative, and in-vitro paper types.
+- The identifier mapping between old and new is documented in hop_discoverer's
+  `_MA_SR_SUBTYPES` set — which already references the new names as strings. After
+  R1, it can reference enum members directly.
+
+---
+
+### Slice R1: Extend PaperSubtype + Mode Selection
+
+**Goal:** Every paper type in the spec taxonomy has a `PaperSubtype` enum member
+and a deterministic routing rule in `mode_selection.py`.
+
+**Gate:** All 30+ subtypes classified correctly → extraction mode assigned → mode
+matches spec table (DEEP/STANDARD/SHALLOW/MINIMAL).
+
+#### R1.1 Add MINIMAL to ExtractionMode
+
+**File:** `crci/shared/models/enums.py`
+
+```python
+class ExtractionMode(StrEnum):
+    MINIMAL = "MINIMAL"
+    SHALLOW = "SHALLOW"
+    STANDARD = "STANDARD"
+    DEEP = "DEEP"
+```
+
+**Why:** The spec defines 4 extraction depths, but the enum only has 3. MINIMAL
+(AG01 only + reference scan) is needed for umbrella reviews, case reports,
+qualitative studies, in-vitro, and narrative reviews.
+
+**Verification:**
+- [ ] `ExtractionMode.MINIMAL` member exists
+- [ ] No existing code breaks (search all uses of `ExtractionMode`)
+
+#### R1.2 Add Fine-Grained Subtypes to PaperSubtype
+
+**File:** `crci/shared/models/enums.py`
+
+Add 15 new members to `PaperSubtype` (see Vocabulary Alignment table above).
+Place them after the existing 27, grouped by design family with comments:
+
+```python
+    # ─── Fine-grained MA subtypes (Master Spec §4.1) ────────
+    PAIRWISE_MA = "pairwise_ma"
+    NMA = "nma"
+    IPDMA = "ipdma"
+    DOSE_RESPONSE_MA = "dose_response_ma"
+    UMBRELLA_REVIEW = "umbrella_review"
+    MEGA_ANALYSIS = "mega_analysis"
+    SCOPING_REVIEW = "scoping_review"
+    # ─── Fine-grained RCT subtypes ──────────────────────────
+    STANDARD_RCT = "standard_rct"
+    FACTORIAL_RCT = "factorial_rct"
+    PILOT_RCT = "pilot_rct"
+    CROSSOVER_RCT = "crossover_rct"
+    # ─── Fine-grained observational subtypes ─────────────────
+    PROSPECTIVE_COHORT = "prospective_cohort"
+    RETROSPECTIVE_COHORT = "retrospective_cohort"
+    # ─── Fine-grained mechanistic/other ──────────────────────
+    MECHANISTIC_IN_VITRO = "mechanistic_in_vitro"
+    COMPUTATIONAL_MODEL = "computational_model"
+    METHODS_PAPER = "methods_paper"
+```
+
+**Verification:**
+- [ ] 42+ members total in PaperSubtype (27 existing + 15 new)
+- [ ] `_VALID_SUBTYPES` set in `paper_type_classifier.py` auto-updates (uses enum iteration)
+- [ ] `hop_discoverer._MA_SR_SUBTYPES` can now reference enum values instead of strings
+
+#### R1.3 Update Mode Selection Routing Table
+
+**File:** `crci/extraction/p0_triage/mode_selection.py`
+
+Extend `_SUBTYPE_TO_MODE` dict with new subtypes. The routing must match the
+Master Spec §4.5 table exactly:
+
+```python
+_SUBTYPE_TO_MODE: dict[PaperSubtype, ExtractionMode] = {
+    # ─── DEEP: RCTs ─────────────────────────────────────────
+    PaperSubtype.RCT_EXERCISE: ExtractionMode.DEEP,
+    PaperSubtype.RCT_COGNITIVE: ExtractionMode.DEEP,
+    PaperSubtype.RCT_PHARMACOLOGICAL: ExtractionMode.DEEP,
+    PaperSubtype.RCT_MULTIMODAL: ExtractionMode.DEEP,
+    PaperSubtype.STANDARD_RCT: ExtractionMode.DEEP,     # NEW
+    PaperSubtype.FACTORIAL_RCT: ExtractionMode.DEEP,    # NEW — + synergy agents
+
+    # ─── DEEP: Meta-analyses ────────────────────────────────
+    PaperSubtype.META_ANALYSIS: ExtractionMode.DEEP,
+    PaperSubtype.PAIRWISE_MA: ExtractionMode.DEEP,      # NEW
+    PaperSubtype.NMA: ExtractionMode.DEEP,               # NEW
+    PaperSubtype.IPDMA: ExtractionMode.DEEP,             # NEW
+    PaperSubtype.DOSE_RESPONSE_MA: ExtractionMode.DEEP,  # NEW
+    PaperSubtype.MEGA_ANALYSIS: ExtractionMode.DEEP,     # NEW
+
+    # ─── DEEP: Other intensive designs ───────────────────────
+    PaperSubtype.DOSE_RESPONSE_STUDY: ExtractionMode.DEEP,
+    PaperSubtype.LONGITUDINAL_FOLLOWUP: ExtractionMode.DEEP,
+    PaperSubtype.INTENSIVE_LONGITUDINAL: ExtractionMode.DEEP,  # PROMOTED (ema_eld)
+
+    # ─── STANDARD: Observational with cognitive outcomes ─────
+    PaperSubtype.PILOT_RCT: ExtractionMode.STANDARD,    # NEW — quality capped
+    PaperSubtype.CROSSOVER_RCT: ExtractionMode.STANDARD, # NEW — + period check
+    PaperSubtype.SYSTEMATIC_REVIEW: ExtractionMode.STANDARD,
+    PaperSubtype.LONGITUDINAL_COHORT: ExtractionMode.STANDARD,
+    PaperSubtype.PROSPECTIVE_COHORT: ExtractionMode.STANDARD,   # NEW
+    PaperSubtype.RETROSPECTIVE_COHORT: ExtractionMode.STANDARD, # NEW
+    PaperSubtype.CROSS_SECTIONAL: ExtractionMode.STANDARD,
+    PaperSubtype.MECHANISTIC_HUMAN: ExtractionMode.STANDARD,
+    PaperSubtype.IMAGING_STRUCTURAL: ExtractionMode.STANDARD,
+    PaperSubtype.IMAGING_FUNCTIONAL: ExtractionMode.STANDARD,
+    PaperSubtype.DOSE_RESPONSE: ExtractionMode.STANDARD,
+    PaperSubtype.PSYCHOMETRIC_VALIDATION: ExtractionMode.STANDARD,
+    PaperSubtype.NORMATIVE_COHORT: ExtractionMode.STANDARD,
+    PaperSubtype.MECHANISTIC_ANIMAL: ExtractionMode.STANDARD,
+
+    # ─── SHALLOW: Designs with limited extractable evidence ──
+    PaperSubtype.SCOPING_REVIEW: ExtractionMode.SHALLOW,         # NEW
+    PaperSubtype.BIOMARKER_DISCOVERY: ExtractionMode.SHALLOW,
+    PaperSubtype.SAFETY_REPORT: ExtractionMode.SHALLOW,
+    PaperSubtype.COMPUTATIONAL_MODEL: ExtractionMode.SHALLOW,    # NEW
+    PaperSubtype.METHODS_PAPER: ExtractionMode.SHALLOW,          # NEW
+    PaperSubtype.GUIDELINE: ExtractionMode.SHALLOW,
+
+    # ─── MINIMAL: No evidence rows, reference/ontology only ──
+    PaperSubtype.UMBRELLA_REVIEW: ExtractionMode.MINIMAL,        # NEW — BLOCKS numeric
+    PaperSubtype.REVIEW_NARRATIVE: ExtractionMode.MINIMAL,       # DEMOTED (was SHALLOW)
+    PaperSubtype.CASE_REPORT: ExtractionMode.MINIMAL,            # DEMOTED
+    PaperSubtype.QUALITATIVE: ExtractionMode.MINIMAL,            # DEMOTED
+    PaperSubtype.MECHANISTIC_IN_VITRO: ExtractionMode.MINIMAL,   # NEW — sign-direction only
+    PaperSubtype.EDITORIAL: ExtractionMode.SHALLOW,
+    PaperSubtype.PROTOCOL: ExtractionMode.SHALLOW,
+
+    PaperSubtype.OTHER: ExtractionMode.STANDARD,
+}
+```
+
+**Changes from current code:**
+- `INTENSIVE_LONGITUDINAL` promoted STANDARD → DEEP (Master Spec: ema_eld = DEEP)
+- `REVIEW_NARRATIVE` demoted SHALLOW → MINIMAL (narrative reviews don't produce evidence)
+- `CASE_REPORT` demoted SHALLOW → MINIMAL (no evidence rows allowed)
+- `QUALITATIVE` demoted SHALLOW → MINIMAL (no evidence rows allowed)
+- `MECHANISTIC_ANIMAL` promoted SHALLOW → STANDARD (Master Spec: animal_model = STANDARD)
+
+**Verification:**
+- [ ] Every `PaperSubtype` member has an entry in `_SUBTYPE_TO_MODE`
+- [ ] Routing matches Master Spec §4.5 table
+- [ ] Unit test covers all enum members
+
+#### R1.4 Update MA Plan Builder
+
+**File:** `crci/extraction/p1_extraction/ma_multi_product.py`
+
+Currently `build_ma_extraction_plan()` checks if subtype is in
+`{"meta_analysis", "systematic_review"}`. Update to include new MA subtypes:
+
+```python
+ma_subtypes = {
+    PaperSubtype.META_ANALYSIS.value,
+    PaperSubtype.SYSTEMATIC_REVIEW.value,
+    PaperSubtype.PAIRWISE_MA.value,        # NEW
+    PaperSubtype.NMA.value,                 # NEW
+    PaperSubtype.IPDMA.value,              # NEW
+    PaperSubtype.DOSE_RESPONSE_MA.value,   # NEW
+    PaperSubtype.MEGA_ANALYSIS.value,      # NEW
+    PaperSubtype.UMBRELLA_REVIEW.value,    # NEW (limited products)
+}
+```
+
+For `UMBRELLA_REVIEW`: build plan with ONLY `INCLUDED_STUDY_LIST` product.
+Block `POOLED_ESTIMATE`, `FOREST_PLOT_ENTRIES`, `SUBGROUP_MODERATOR`.
+
+For `NMA` and `DOSE_RESPONSE_MA`: skip keyword detection (type already known).
+
+**Verification:**
+- [ ] Each MA subtype produces the correct product set
+- [ ] Umbrella review plan has 0 evidence-producing products
+- [ ] NMA plan includes `NMA_PAIRWISE_MATRIX` without relying on keyword heuristic
+
+#### R1.5 Update hop_discoverer Allowlist
+
+**File:** `crci/retrieval/hop_discoverer.py`
+
+Replace string literals with enum references:
+
+```python
+_MA_SR_SUBTYPES: set[str] = {
+    PaperSubtype.META_ANALYSIS.value,
+    PaperSubtype.SYSTEMATIC_REVIEW.value,
+    PaperSubtype.PAIRWISE_MA.value,
+    PaperSubtype.NMA.value,
+    PaperSubtype.IPDMA.value,
+    PaperSubtype.DOSE_RESPONSE_MA.value,
+    PaperSubtype.MEGA_ANALYSIS.value,
+    # Umbrella reviews: yes — their included MAs should be acquired
+    PaperSubtype.UMBRELLA_REVIEW.value,
+}
+```
+
+**Verification:**
+- [ ] No raw string literals remain for MA subtypes
+- [ ] Hop discovery triggered for all MA-family subtypes
+
+#### R1.6 Update Paper-Type Classifier Prompt
+
+**File:** `crci/llm/prompts/ptc_prompt.txt` (or inline fallback in
+`paper_type_classifier.py`)
+
+The LLM prompt must list all 42+ valid subtypes so the classifier can output
+fine-grained types. Group by family for the LLM's benefit.
+
+**Verification:**
+- [ ] Prompt lists every `PaperSubtype` value
+- [ ] Inline fallback also updated
+- [ ] `_validate_subtype()` in classifier already handles case/underscore normalization ✅
+
+#### R1 Validation
+
+```bash
+python -c "
+from crci.shared.models.enums import PaperSubtype, ExtractionMode
+from crci.extraction.p0_triage.mode_selection import _SUBTYPE_TO_MODE
+missing = [p for p in PaperSubtype if p not in _SUBTYPE_TO_MODE]
+assert not missing, f'PaperSubtypes without routing: {missing}'
+print(f'All {len(PaperSubtype)} subtypes routed.')
+# Verify spec alignment:
+assert _SUBTYPE_TO_MODE[PaperSubtype.UMBRELLA_REVIEW] == ExtractionMode.MINIMAL
+assert _SUBTYPE_TO_MODE[PaperSubtype.PAIRWISE_MA] == ExtractionMode.DEEP
+assert _SUBTYPE_TO_MODE[PaperSubtype.PILOT_RCT] == ExtractionMode.STANDARD
+assert _SUBTYPE_TO_MODE[PaperSubtype.CASE_REPORT] == ExtractionMode.MINIMAL
+print('Spec alignment verified.')
+"
+```
+
+---
+
+### Slice R2: Per-Subtype Enforcement Gates
+
+**Goal:** Paper-type-specific quality caps, identification demotions, and evidence
+row blocking are enforced in code — not just documented.
+
+**Gate:** For each rule below, a unit test proves the enforcement triggers.
+
+**Depends:** R1 (subtypes must exist before gates can reference them).
+
+#### R2.1 Umbrella Review Numeric Block
+
+**Where:** `crci/extraction/tb_trust_boundary/runner.py` + MA plan builder (R1.4)
+
+**Rule:** When `paper_subtype` is `UMBRELLA_REVIEW`, ALL
+`edge_evidence_v1` row creation is blocked. Only `study_registry_v1` (B1) and
+`ontology_links_v1` (B5) writes are allowed.
+
+**Implementation:**
+1. MA plan builder (R1.4) already restricts products for umbrella reviews.
+2. Add defense-in-depth in `evidence_writer.py`: if paper subtype is
+   `UMBRELLA_REVIEW`, raise `GateViolation("R2-G1", "Umbrella review numeric
+   extraction blocked")` on any attempt to write an evidence row.
+
+**Verification:**
+- [ ] Test: attempt to write evidence row for umbrella review → `GateViolation`
+- [ ] Test: umbrella review extraction produces 0 evidence rows, ≥1 registry row
+
+#### R2.2 MINIMAL-Mode Evidence Row Block (Generalized)
+
+**Where:** `crci/extraction/evidence_writer.py`
+
+**Rule:** Papers with `ExtractionMode.MINIMAL` must never produce
+`edge_evidence_v1` rows. This covers: `UMBRELLA_REVIEW`, `REVIEW_NARRATIVE`,
+`CASE_REPORT`, `QUALITATIVE`, `MECHANISTIC_IN_VITRO`.
+
+**Implementation:**
+
+```python
+# In evidence_writer.py — before ANY row insert:
+_EVIDENCE_BLOCKED_SUBTYPES: set[str] = {
+    PaperSubtype.UMBRELLA_REVIEW.value,
+    PaperSubtype.REVIEW_NARRATIVE.value,
+    PaperSubtype.CASE_REPORT.value,
+    PaperSubtype.QUALITATIVE.value,
+    PaperSubtype.MECHANISTIC_IN_VITRO.value,
+}
+
+def _check_evidence_row_allowed(paper_subtype: str, mode: str):
+    if paper_subtype in _EVIDENCE_BLOCKED_SUBTYPES:
+        raise GateViolation(
+            "R2-G2",
+            f"Evidence rows blocked for paper subtype '{paper_subtype}'. "
+            f"Only registry and ontology writes permitted.",
+        )
+```
+
+**Note on `SYSTEMATIC_REVIEW`:** The spec says systematic reviews without
+quantitative pooling should not produce evidence rows. However, some systematic
+reviews DO report vote counts or direction-of-effect summaries. Our existing
+`SYSTEMATIC_REVIEW` subtype is kept at STANDARD mode (not MINIMAL) because the
+pipeline already handles vote counts via `harmonization_status = blocked`. We do
+NOT add it to the blocked set — the trust boundary and P3 gates already filter
+appropriately.
+
+**Verification:**
+- [ ] Test: MINIMAL-mode paper produces 0 evidence rows
+- [ ] Test: SYSTEMATIC_REVIEW **can** produce vote-count rows (not blocked)
+
+#### R2.3 Pilot RCT Quality Cap
+
+**Where:** `crci/extraction/p2_harmonization/runner.py` (or a new
+`quality_caps.py` module)
+
+**Rule:** When `paper_subtype` is `PILOT_RCT`, `quality_rating` is capped at
+`moderate` regardless of design quality score. Rationale: N < 50, typically
+underpowered.
+
+**Implementation:**
+
+```python
+def _apply_subtype_quality_caps(
+    quality_rating: str,
+    paper_subtype: str,
+) -> str:
+    """Cap quality rating based on study design limitations."""
+    if paper_subtype == PaperSubtype.PILOT_RCT.value:
+        _QUALITY_ORDER = ["weak", "moderate", "strong"]
+        if quality_rating == "strong":
+            logger.info(
+                "R2-CAP: pilot_rct quality capped moderate←strong. "
+                "Reason: N < 50, insufficient power."
+            )
+            return "moderate"
+    return quality_rating
+```
+
+Called during P2 harmonization after quality is assessed.
+
+**Verification:**
+- [ ] Test: pilot RCT with strong quality → capped to moderate
+- [ ] Test: pilot RCT with weak quality → stays weak (cap is upper-bound)
+
+#### R2.4 Cross-Sectional Identification Demotion
+
+**Where:** `crci/extraction/p2_harmonization/runner.py`
+
+**Rule:** When `paper_subtype` is `CROSS_SECTIONAL`, `identification_status`
+is always `not_identified` regardless of statistical adjustment.
+
+**Implementation:**
+
+```python
+def _apply_subtype_identification_rules(
+    identification_status: str,
+    paper_subtype: str,
+) -> str:
+    """Enforce design-based identification limits."""
+    if paper_subtype == PaperSubtype.CROSS_SECTIONAL.value:
+        if identification_status != IdentificationStatus.NOT_IDENTIFIED.value:
+            logger.info(
+                "R2-ID: cross_sectional identification demoted to not_identified←%s. "
+                "Reason: single-timepoint design cannot establish causation.",
+                identification_status,
+            )
+            return IdentificationStatus.NOT_IDENTIFIED.value
+    if paper_subtype == PaperSubtype.RETROSPECTIVE_COHORT.value:
+        if identification_status == IdentificationStatus.IDENTIFIED.value:
+            logger.info(
+                "R2-ID: retrospective_cohort identification capped at "
+                "partially_identified←identified."
+            )
+            return IdentificationStatus.PARTIALLY_IDENTIFIED.value
+    return identification_status
+```
+
+**Verification:**
+- [ ] Test: cross-sectional study → always `not_identified`
+- [ ] Test: retrospective cohort → capped at `partially_identified`
+
+#### R2.5 NMA Indirect Identification Demotion
+
+**Where:** `crci/extraction/p2_harmonization/runner.py` or `evidence_writer.py`
+
+**Rule:** NMA-derived rows with `meta_source_flag = NMA_MIXED` always have
+`identification_status = partially_identified`.
+
+**Implementation:** Applied when setting fields on evidence rows extracted from NMAs.
+
+**Verification:**
+- [ ] Test: NMA mixed estimate → `partially_identified`
+
+#### R2 Validation
+
+```bash
+python -m pytest tests/test_extraction/test_routing_gates.py -v
+```
+
+Tests cover:
+- Umbrella numeric block
+- MINIMAL-mode evidence block
+- Pilot quality cap
+- Cross-sectional identification demotion
+- Retrospective identification cap
+- NMA identification demotion
+
+---
+
+### Slice R3: MA Product Lifecycle & Forest Plot Superseding
+
+**Goal:** Forest plot entries are automatically deactivated when their corresponding
+primary study is independently extracted. Subgroup estimate correlation is documented
+and warn-logged.
+
+**Gate:** Forest plot row with `meta_source_flag = FOREST_PLOT_ENTRY` gets
+`active = 0` when same study's primary extraction arrives.
+
+**Depends:** R1 (MA subtypes needed for product routing).
+
+#### R3.1 Forest Plot Auto-Supersede
+
+**Where:** `crci/extraction/evidence_writer.py` (or a new `supersede_checker.py`)
+
+**When:** A new `edge_evidence_v1` row is inserted with `meta_source_flag = NULL`
+(i.e., primary study evidence), check if any existing rows match the same
+`study_id` with `meta_source_flag = FOREST_PLOT_ENTRY`:
+
+```python
+def _supersede_forest_plot_entries(
+    session: Session,
+    study_id: str,
+    edge_relation_id: str,
+):
+    """Deactivate forest plot entries when full primary extraction arrives.
+
+    Spec §3.4: Forest plot entries exist only as placeholders.
+    When the full paper is extracted, the placeholder is superseded.
+    """
+    updated = session.execute(
+        update(EdgeEvidence)
+        .where(
+            EdgeEvidence.study_id == study_id,
+            EdgeEvidence.edge_relation_id == edge_relation_id,
+            EdgeEvidence.meta_source_flag == MetaSourceFlag.FOREST_PLOT_ENTRY.value,
+        )
+        .values(active=0)
+    )
+    if updated.rowcount > 0:
+        logger.info(
+            "R3-SUPERSEDE: deactivated %d forest plot entries for study %s "
+            "edge %s — replaced by full primary extraction.",
+            updated.rowcount, study_id, edge_relation_id,
+        )
+```
+
+Called from `evidence_writer.write_evidence_row()` when `meta_source_flag is None`.
+
+**Verification:**
+- [ ] Test: insert FOREST_PLOT_ENTRY row → insert primary row → forest plot `active = 0`
+- [ ] Test: insert primary row without existing forest plot → no error / no-op
+
+#### R3.2 Subgroup Correlation Warning
+
+**Where:** `crci/extraction/p4_aggregation/evidence_grouper.py`
+
+**When:** Multiple subgroup estimates from the SAME parent MA exist for the
+SAME edge. These are correlated and must NOT be IVW-pooled together.
+
+**Implementation:**
+
+```python
+def _check_subgroup_correlation(claims: list[HarmonizedClaim]) -> list[str]:
+    """Warn if subgroup estimates from same MA are being pooled together.
+
+    Subgroup estimates from the same MA share systematic biases.
+    They should inform different scope slices, not be pooled.
+    """
+    warnings = []
+    # Group by parent_meta_study_id
+    ma_subgroups: dict[str, list[str]] = defaultdict(list)
+    for claim in claims:
+        if (hasattr(claim, 'meta_source_flag') and
+                claim.meta_source_flag == MetaSourceFlag.SUBGROUP_ESTIMATE.value and
+                hasattr(claim, 'parent_meta_study_id') and
+                claim.parent_meta_study_id):
+            ma_subgroups[claim.parent_meta_study_id].append(claim.ler_id)
+
+    for ma_id, ler_ids in ma_subgroups.items():
+        if len(ler_ids) > 1:
+            warnings.append(
+                f"R3-CORR: {len(ler_ids)} subgroup estimates from same MA "
+                f"{ma_id} for this edge. These are correlated — do not IVW-pool."
+            )
+            logger.warning(warnings[-1])
+    return warnings
+```
+
+Phase 1 action: warn-log only. Phase 2: exclude from IVW pooling.
+
+**Verification:**
+- [ ] Test: 2 subgroup estimates from same MA → warning emitted
+- [ ] Test: 2 subgroup estimates from DIFFERENT MAs → no warning
+
+#### R3.3 IPD-MA Product Skeleton
+
+**Where:** `crci/extraction/p1_extraction/ma_multi_product.py`
+
+Add `MAProductType.IPD_INTERACTION` for IPD-MA papers. Not fully implemented
+(extraction logic deferred), but the product type and routing stub exist:
+
+```python
+# Add to MAProductType enum:
+IPD_INTERACTION = "ipd_interaction"
+
+# In build_ma_extraction_plan, for IPDMA subtype:
+if subtype_str == PaperSubtype.IPDMA.value:
+    products.append(MAProduct(
+        product_type=MAProductType.IPD_INTERACTION,
+        meta_source_flag=MetaSourceFlag.POOLED_ESTIMATE,
+        priority=7,
+        is_mandatory=False,
+        description="Individual-level interaction coefficients (IPD-MA only)",
+    ))
+```
+
+**Verification:**
+- [ ] IPDMA plan includes `IPD_INTERACTION` product
+- [ ] Product agents map exists (even if agents not yet implemented)
+
+---
+
+### Slice R4: Aggregation Pipeline Amendments
+
+**Goal:** MA heterogeneity parameters pass through to Layer 3, and dose-response
+point rows are compiled into Emax curves.
+
+**Gate:** For an edge with MA-derived evidence that includes `heterogeneity_json`,
+the aggregation pipeline uses the published I²/τ² rather than re-estimating.
+
+**Depends:** Slice 2 (edge evidence must exist), R1 (MA subtypes).
+
+#### R4.1 Heterogeneity Passthrough
+
+**Where:** `crci/extraction/p4_aggregation/meta_analyzer.py`
+
+**When:** The DCR decision is `USE_MA_POOLED` and the MA row has populated
+`heterogeneity_json`, pass through the published values:
+
+```python
+def _use_published_heterogeneity(
+    ma_claim: HarmonizedClaim,
+) -> dict | None:
+    """Extract published heterogeneity from MA claim when available.
+
+    When the aggregation pipeline uses an MA pooled estimate (DCR decision),
+    we should use the MA's published I²/τ² rather than re-estimating from
+    constituent studies. Re-estimation from a mix of MA-pooled and primary
+    estimates is methodologically incoherent.
+    """
+    het_json = getattr(ma_claim, 'heterogeneity_json', None)
+    if het_json and isinstance(het_json, dict):
+        logger.info(
+            "R4-HET: Using published heterogeneity from MA %s: I²=%.2f, τ²=%.4f",
+            ma_claim.study_id,
+            het_json.get('I2', -1),
+            het_json.get('tau2', -1),
+        )
+        return het_json
+    return None
+```
+
+Wire into `meta_analyzer.analyze_edge()`: when the input includes an MA row with
+heterogeneity data AND the DCR decision chose the MA, skip τ² estimation and use
+the published values.
+
+**Verification:**
+- [ ] Test: MA with `heterogeneity_json` → pipeline uses published I²/τ²
+- [ ] Test: primary-only evidence → pipeline estimates τ² normally
+- [ ] Published I² stored in `PooledEstimate` output for downstream consumption
+
+#### R4.2 NMA Three-Way Overlap Detection
+
+**Where:** `crci/extraction/p4_aggregation/double_counting.py`
+
+**When:** Both a pairwise MA and an NMA cover the same edge comparison.
+
+**Implementation:** Phase 1 — detection + warn-log:
+
+```python
+def _detect_nma_pairwise_overlap(
+    ma_claims: list[HarmonizedClaim],
+    edge_relation_id: str,
+) -> list[str]:
+    """Detect if both NMA and pairwise MA claims exist for same edge.
+
+    Phase 1: warn and log. Phase 2: implement preference rules.
+    """
+    nma_claims = [c for c in ma_claims
+                  if getattr(c, 'meta_source_flag', None) == MetaSourceFlag.NMA_MIXED.value]
+    pw_claims = [c for c in ma_claims
+                 if getattr(c, 'meta_source_flag', None) == MetaSourceFlag.POOLED_ESTIMATE.value]
+
+    warnings = []
+    if nma_claims and pw_claims:
+        msg = (
+            f"R4-NMA3: Edge {edge_relation_id} has both NMA mixed estimate(s) "
+            f"({len(nma_claims)}) and pairwise MA pooled estimate(s) "
+            f"({len(pw_claims)}). Three-way overlap possible. "
+            f"Manual review recommended."
+        )
+        warnings.append(msg)
+        logger.warning(msg)
+    return warnings
+```
+
+**Verification:**
+- [ ] Test: NMA + pairwise MA for same edge → warning emitted
+- [ ] No crash; conservative behavior (keeps both, logs warning)
+
+#### R4.3 Dose-Response Point Compilation Wiring
+
+**Where:** `crci/extraction/p7_compilers/dose_response_compiler.py` (EXISTS)
+
+**Current state:** The compiler exists but the pipeline path from
+`DOSE_RESPONSE_POINT` rows in `edge_evidence_v1` → Emax curve fitting is not
+explicitly triggered.
+
+**Fix:** In P7 runner, query for `DOSE_RESPONSE_POINT` rows per edge and
+pass to the dose-response compiler:
+
+```python
+# In p7_compilers/runner.py:
+dr_rows = session.execute(
+    select(EdgeEvidence).where(
+        EdgeEvidence.meta_source_flag == MetaSourceFlag.DOSE_RESPONSE_POINT.value,
+        EdgeEvidence.active == 1,
+    )
+).scalars().all()
+
+if dr_rows:
+    from crci.extraction.p7_compilers.dose_response_compiler import compile_dose_response
+    dr_results = compile_dose_response(dr_rows)
+    context["dose_response_compilations"] = dr_results
+```
+
+**Verification:**
+- [ ] Test: `DOSE_RESPONSE_POINT` rows exist → compiler invoked
+- [ ] Test: compiler produces Emax/Hill parameters
+- [ ] No crash when 0 dose-response rows exist
+
+---
+
+### Slice R5: LLM Guardrail Enforcement
+
+**Goal:** The 8 universal guardrails (UG-01 through UG-08) and key paper-type
+guardrails (MG/PG) have code enforcement — not just documentation.
+
+**Gate:** Each guardrail has a code-level check that either blocks, flags, or
+transforms the violating extraction.
+
+**Depends:** None (can run in parallel with any slice). Implementation in the
+trust boundary and P1 runner.
+
+**Philosophy:** Guardrails are defense-in-depth. Some are already partially
+enforced (UG-01, UG-02, UG-04). The goal is to close gaps and make enforcement
+explicit with guardrail IDs in log messages.
+
+#### R5.1 UG-05: No Extraction from Figures
+
+**Where:** `crci/extraction/tb_trust_boundary/runner.py`
+
+**Current state:** `missingness_provenance.py` references `guardrail_blocked` for
+figure-only sources, but no code checks provenance for figure-only values.
+
+**Implementation:**
+
+```python
+def _check_figure_only(span: SpanLabel) -> bool:
+    """UG-05: Block values sourced only from figures/images.
+
+    LLMs cannot reliably extract numbers from plots. If the source
+    snippet references a figure, block the span.
+    """
+    snippet = (span.extraction_snippet or "").lower()
+    figure_markers = ["figure ", "fig.", "fig ", "plot ", "graph "]
+    # Only block if source is EXCLUSIVELY a figure reference
+    if any(m in snippet for m in figure_markers):
+        if not any(t in snippet for t in ["table", "results section", "text"]):
+            return True
+    return False
+```
+
+When triggered: set `parse_status = AMBIGUOUS`, `blocked_reason = "UG-05:
+source_is_figure_only"`.
+
+**Verification:**
+- [ ] Test: span with `extraction_snippet="Figure 3"` → blocked
+- [ ] Test: span with `extraction_snippet="Table 2 (see also Figure 3)"` → NOT blocked
+
+#### R5.2 UG-08: Sensitivity Analysis Flagging
+
+**Where:** `crci/extraction/p1_extraction/agents/ag05_stats_label.py` or
+`crci/extraction/tb_trust_boundary/runner.py`
+
+**Implementation:**
+
+```python
+_SENSITIVITY_MARKERS = frozenset({
+    "sensitivity analysis", "sensitivity analyses",
+    "robustness check", "supplementary analysis",
+    "leave-one-out", "trim and fill", "trim-and-fill",
+})
+
+def _flag_sensitivity_analysis(span: SpanLabel) -> bool:
+    """UG-08: Flag values from sensitivity/supplementary analyses."""
+    snippet = (span.extraction_snippet or "").lower()
+    return any(m in snippet for m in _SENSITIVITY_MARKERS)
+```
+
+When triggered: append `[SENSITIVITY_ANALYSIS]` to notes, apply lower weight
+in aggregation.
+
+**Verification:**
+- [ ] Test: span from "sensitivity analysis" section → flagged
+- [ ] Test: primary result → not flagged
+
+#### R5.3 MG-04: Umbrella Review Numeric Rejection at Trust Boundary
+
+**Where:** `crci/extraction/tb_trust_boundary/runner.py`
+
+This is defense-in-depth behind R2.1 (which blocks at the plan level).
+
+**Implementation:** If `paper_subtype == UMBRELLA_REVIEW` and the TB receives
+numeric spans that would produce evidence rows, reject them with
+guardrail code `MG-04`.
+
+**Verification:**
+- [ ] Test: umbrella review with numeric spans → all rejected by TB
+- [ ] Cross-validates with R2.1 (belt + suspenders)
+
+#### R5.4 PG-01: RCT Randomization Language Verification
+
+**Where:** `crci/extraction/p2_harmonization/runner.py`
+
+**Implementation:**
+
+```python
+_RCT_SUBTYPES = {
+    PaperSubtype.RCT_EXERCISE.value,
+    PaperSubtype.RCT_COGNITIVE.value,
+    PaperSubtype.RCT_PHARMACOLOGICAL.value,
+    PaperSubtype.RCT_MULTIMODAL.value,
+    PaperSubtype.STANDARD_RCT.value,
+    PaperSubtype.FACTORIAL_RCT.value,
+    PaperSubtype.CROSSOVER_RCT.value,
+    PaperSubtype.PILOT_RCT.value,
+}
+
+def _verify_rct_randomization(
+    paper_subtype: str,
+    canonical_text: str | None,
+) -> str:
+    """PG-01: Verify RCT papers describe randomization.
+
+    If randomization language absent, demote identification_status.
+    """
+    if paper_subtype not in _RCT_SUBTYPES:
+        return IdentificationStatus.IDENTIFIED.value
+
+    text = (canonical_text or "").lower()[:10000]
+    randomization_terms = [
+        "randomized", "randomised", "random assignment",
+        "random allocation", "randomly assigned", "randomly allocated",
+    ]
+    if any(term in text for term in randomization_terms):
+        return IdentificationStatus.IDENTIFIED.value
+
+    logger.info(
+        "PG-01: RCT paper lacks randomization language. "
+        "Demoting identification_status to partially_identified."
+    )
+    return IdentificationStatus.PARTIALLY_IDENTIFIED.value
+```
+
+**Verification:**
+- [ ] Test: RCT text with "randomly assigned" → identified
+- [ ] Test: RCT text without any randomization language → partially_identified
+
+#### R5.5 PG-04: Animal Model Species Documentation
+
+**Where:** `crci/extraction/p1_extraction/agents/ag03_cohort.py` (or P2)
+
+**Implementation:** When `paper_subtype` is `MECHANISTIC_ANIMAL`, the cohort
+agent must extract species, strain, sex, and model. If missing, append note:
+`[PG-04: species not documented]`.
+
+Phase 1: warn-log only. Phase 2: make species extraction mandatory field for
+animal studies.
+
+**Verification:**
+- [ ] Test: animal study with species in text → species recorded
+- [ ] Test: animal study without species → warning logged
+
+#### R5.6 MG-02: Random-Effects Default for MAs
+
+**Where:** `crci/extraction/p1_extraction/ma_multi_product.py` or AG05 prompt
+
+**Current state:** The spec says "if both fixed and random models reported,
+extract random-effects as primary." Not currently enforced — LLM picks whatever
+it finds first.
+
+**Implementation:**
+
+```python
+# In MA product extraction post-processing:
+def _enforce_random_effects_default(
+    pooled_row: dict,
+    notes: str,
+) -> dict:
+    """MG-02: When both RE and FE reported, use RE as primary.
+
+    Record FE estimate in notes for sensitivity comparison.
+    """
+    if pooled_row.get("model_reported") == "fixed_effects":
+        if "random" in (notes or "").lower() and "fixed" in (notes or "").lower():
+            logger.info(
+                "MG-02: Both RE and FE reported. Using RE as primary."
+            )
+            # Swap is handled by the LLM prompt instruction;
+            # this is defense-in-depth.
+    return pooled_row
+```
+
+Primary enforcement is in the AG05 prompt. Code check is defense-in-depth.
+
+**Verification:**
+- [ ] AG05 prompt instructs RE preference when both reported ✅ (verify)
+- [ ] Notes field records FE estimate when both available
+
+#### R5 Validation
+
+```bash
+python -m pytest tests/test_extraction/test_guardrails.py -v
+```
+
+New test file covering UG-05, UG-08, MG-04, PG-01, PG-04, MG-02.
+
+---
+
+### Routing Slices: Files Modified Summary
+
+| Slice | File | Change |
+|-------|------|--------|
+| R1.1 | `crci/shared/models/enums.py` | Add `MINIMAL` to `ExtractionMode` |
+| R1.2 | `crci/shared/models/enums.py` | Add 15 new `PaperSubtype` members |
+| R1.3 | `crci/extraction/p0_triage/mode_selection.py` | Extend routing table, handle `MINIMAL` mode |
+| R1.4 | `crci/extraction/p1_extraction/ma_multi_product.py` | Add MA subtypes to plan builder, umbrella block |
+| R1.5 | `crci/retrieval/hop_discoverer.py` | Replace string literals with enum refs |
+| R1.6 | `crci/llm/prompts/ptc_prompt.txt` | Update classifier prompt with all subtypes |
+| R2.1 | `crci/extraction/evidence_writer.py` | Umbrella review evidence block gate |
+| R2.2 | `crci/extraction/evidence_writer.py` | MINIMAL-mode evidence block gate |
+| R2.3 | `crci/extraction/p2_harmonization/runner.py` | Pilot RCT quality cap |
+| R2.4 | `crci/extraction/p2_harmonization/runner.py` | Cross-sectional ID demotion |
+| R2.5 | `crci/extraction/p2_harmonization/runner.py` | NMA identification demotion |
+| R3.1 | `crci/extraction/evidence_writer.py` | Forest plot auto-supersede |
+| R3.2 | `crci/extraction/p4_aggregation/evidence_grouper.py` | Subgroup correlation warning |
+| R3.3 | `crci/extraction/p1_extraction/ma_multi_product.py` | IPD-MA product skeleton |
+| R4.1 | `crci/extraction/p4_aggregation/meta_analyzer.py` | Heterogeneity passthrough |
+| R4.2 | `crci/extraction/p4_aggregation/double_counting.py` | NMA three-way overlap detection |
+| R4.3 | `crci/extraction/p7_compilers/runner.py` | Dose-response point compilation wiring |
+| R5.1 | `crci/extraction/tb_trust_boundary/runner.py` | UG-05 figure-only block |
+| R5.2 | `crci/extraction/tb_trust_boundary/runner.py` | UG-08 sensitivity analysis flag |
+| R5.3 | `crci/extraction/tb_trust_boundary/runner.py` | MG-04 umbrella numeric rejection |
+| R5.4 | `crci/extraction/p2_harmonization/runner.py` | PG-01 RCT randomization check |
+| R5.5 | `crci/extraction/p1_extraction/agents/ag03_cohort.py` | PG-04 animal species doc |
+| R5.6 | `crci/extraction/p1_extraction/ma_multi_product.py` | MG-02 RE default |
+| Tests | `tests/test_extraction/test_routing_gates.py` | **NEW** — R2 enforcement tests |
+| Tests | `tests/test_extraction/test_guardrails.py` | **NEW** — R5 guardrail tests |
 
 ---
 

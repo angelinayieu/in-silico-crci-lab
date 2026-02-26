@@ -94,6 +94,7 @@ class SpanLabelResponse(BaseModel):
         confidence: float = Field(ge=0.0, le=1.0, default=0.5)
         grouping_id: str | None = None
         context: str | None = None
+        arm_assignment: str | None = None  # Study arm (e.g., "testosterone", "placebo")
 
     spans: list[ExtractedSpan] = Field(default_factory=list)
 

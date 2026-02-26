@@ -69,8 +69,14 @@ def check_plausibility(
     warnings: list[str] = []
     status = PlausibilityStatus.PASS
 
-    # Check 1: |beta| <= PLAUSIBILITY_BETA_MAX
-    if abs(value.value) > PLAUSIBILITY_BETA_MAX:
+    # Determine if this is a raw test statistic (not an effect size).
+    # F-statistics can naturally exceed the beta bound (e.g., F=10.2)
+    # and should not be checked against PLAUSIBILITY_BETA_MAX.
+    _label = (value.label_type or "").upper()
+    _is_test_statistic = _label in {"F_STATISTIC", "CHI_SQUARE", "T_STATISTIC"}
+
+    # Check 1: |beta| <= PLAUSIBILITY_BETA_MAX (skip for raw test statistics)
+    if not _is_test_statistic and abs(value.value) > PLAUSIBILITY_BETA_MAX:
         note = (
             f"span_id={span_id}: |beta|={abs(value.value):.4f} exceeds "
             f"PLAUSIBILITY_BETA_MAX={PLAUSIBILITY_BETA_MAX}"
@@ -173,6 +179,7 @@ def check_plausibility(
     return ValidatedNumeric(
         span_id=span_id,
         value=value,
+        value_type=(value.label_type or "EFFECT_SIZE").upper(),
         plausibility_status=status,
         plausibility_note=plausibility_note,
     )

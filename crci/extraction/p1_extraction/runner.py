@@ -214,6 +214,34 @@ def run_p1_extraction(
         len(all_raw_annotations), len(all_span_labels),
     )
 
+    # ── P1-CE: ConceptEngine — ontology grounding ──
+    # Map spans to edge_relation_ids using DB edge definitions.
+    # Must run AFTER agents (needs span_labels) and BEFORE TB (needs grounding).
+    logger.info("P1-CE: Running ConceptEngine ontology grounding")
+    try:
+        from crci.extraction.p1_extraction.concept_engine import ConceptEngine
+
+        ce = ConceptEngine(session)
+        grounded_spans = ce.ground_spans(all_span_labels, context)
+        context["grounded_spans"] = grounded_spans
+
+        n_resolved = sum(
+            1 for gs in grounded_spans if gs.edge_relation_id is not None
+        )
+        logger.info(
+            "P1-CE complete: %d/%d spans grounded to edges",
+            n_resolved,
+            len(grounded_spans),
+        )
+        context.setdefault("qa_metrics", {})["unmapped_edge_rate"] = (
+            (len(grounded_spans) - n_resolved) / len(grounded_spans)
+            if grounded_spans
+            else 0.0
+        )
+    except Exception as exc:
+        logger.error("P1-CE: ConceptEngine failed: %s", exc)
+        context["grounded_spans"] = []
+
     # ── P1-REC: Reconciliation ──
     logger.info("P1-REC: Reconciling cross-agent annotations")
     from crci.extraction.p1_extraction.reconciliation import reconcile_annotations

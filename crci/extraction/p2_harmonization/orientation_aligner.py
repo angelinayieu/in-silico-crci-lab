@@ -99,6 +99,8 @@ def align_orientation(
             se_source=scaled.se_source,
             scale=scaled.scale,
             direction_aligned=True,  # magnitude_only is still "aligned"
+            edge_relation_id=scaled.edge_relation_id,
+            label_type=scaled.label_type,
         )
 
     # ── Determine if sign flip is needed ──
@@ -127,6 +129,8 @@ def align_orientation(
         se_source=scaled.se_source,
         scale=scaled.scale,
         direction_aligned=True,
+        edge_relation_id=scaled.edge_relation_id,
+        label_type=scaled.label_type,
     )
 
 

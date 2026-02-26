@@ -706,7 +706,7 @@ class TestFrozenModelState:
                 w_scope=1.0, w_fresh=1.0,
             ),
         }
-        B_hat = build_b_hat_matrix(graph, adjusted, {})
+        B_hat = build_b_hat_matrix(graph, adjusted)
         assert B_hat.shape == (5, 5)
         # E01: N0→N1, node_index N0=0, N1=1
         assert B_hat[0, 1] == pytest.approx(-0.3)
@@ -725,7 +725,7 @@ class TestFrozenModelState:
                 w_scope=0.3, w_fresh=0.7,
             ),
         }
-        B_hat = build_b_hat_matrix(graph, adjusted, {})
+        B_hat = build_b_hat_matrix(graph, adjusted)
         assert B_hat[0, 1] == 0.0
 
     def test_lambda_prior_positive_definite(self):

@@ -50,7 +50,44 @@ def run_p4b_publication_bias(
 
     from crci.extraction.p4b_publication_bias.publication_bias import assess_publication_bias
 
-    bias_results = assess_publication_bias(pooled, session=session)
+    # Extract study-level betas/SEs from resolved evidence groups (set by P4)
+    resolved_groups = context.get("resolved_groups", [])
+
+    bias_results = []
+    for pe in pooled:
+        # Find the resolved group matching this pooled estimate
+        study_betas: list[float] = []
+        study_ses: list[float] = []
+
+        for rg in resolved_groups:
+            eid = getattr(rg, "edge_relation_id", None)
+            if eid == pe.edge_relation_id:
+                claims = getattr(rg, "claims", [])
+                study_betas = [
+                    float(getattr(c, "harmonized_beta", 0.0))
+                    for c in claims
+                ]
+                study_ses = [
+                    float(getattr(c, "harmonized_se", None) or 0.01)
+                    for c in claims
+                ]
+                break
+
+        if len(study_betas) < 2:
+            logger.info(
+                "P4B: Skipping edge %s — k=%d < 2 for bias assessment",
+                pe.edge_relation_id,
+                len(study_betas),
+            )
+            continue
+
+        try:
+            result = assess_publication_bias(pe, study_betas, study_ses)
+            bias_results.append(result)
+        except Exception as exc:
+            logger.warning("P4B: bias assessment failed for %s: %s",
+                           pe.edge_relation_id, exc)
+
     context["bias_results"] = bias_results
 
     logger.info(

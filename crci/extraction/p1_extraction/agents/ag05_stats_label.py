@@ -10,7 +10,7 @@ Spec: SYS_EXTRACTION_COMPLETE.md lines 473-480 (AG5 StatsLabelAgent)
       SYS_EXTRACTION_COMPLETE.md lines 387-396 (SpanLabel schema, 40 label types)
       SYS_EXTRACTION_COMPLETE.md lines 2203-2210 (AG5 detail)
 Formulas: None
-Reads: PaperMap.sections[results, tables] + PaperMap.candidate_spans (from canonical_reader.py)
+Reads: PaperMap.sections[results, tables, abstract, discussion] + PaperMap.candidate_spans (from canonical_reader.py)
 Writes: AgentOutput with SpanLabel[] (consumed by tb_trust_boundary/numeric_parser.py)
 Gates: P1-G2 (partial) — at least 1 SpanLabel must be produced
 *** CRITICAL — highest-impact extraction agent ***
@@ -91,14 +91,43 @@ SPAN_LABEL_TYPES: list[str] = [
     "SUBGROUP_EFFECT",      # 39. Subgroup-specific effect
     # Temporal
     "FOLLOW_UP_DURATION",   # 40. Follow-up duration (weeks, months)
-    # AG05-EXT: Subgroup interaction labels (SYS_EXTRACTION_ADDENDUM Part 4)
-    "SUBGROUP_VARIABLE",    # 41. What defines the subgroup
-    "SUBGROUP_VALUE",       # 42. Specific subgroup value
-    "INTERACTION_EFFECT",   # 43. Interaction beta (subgroup × treatment)
-    "INTERACTION_SE",       # 44. SE of interaction
-    "INTERACTION_P",        # 45. p-value for interaction test
-    "SUBGROUP_N",           # 46. Sample size for subgroup
+    # NOTE: AG05-EXT labels removed per 40-type contract.
+    # Subgroup/interaction values use existing types:
+    #   INTERACTION_TERM (38), SE (13), P_VALUE (15), SUBGROUP_EFFECT (39), SAMPLE_SIZE_ARM (24)
+    # Subgroup variable/value encoded in context string.
 ]
+
+# ═══════════════════════════════════════════════════════════════
+#  Labels that REQUIRE anchor tokens for valid classification
+# ═══════════════════════════════════════════════════════════════
+
+ANCHOR_REQUIRED_LABELS: set[str] = {
+    # Primary effect measures
+    "EFFECT_SIZE", "UNSTD_BETA", "STD_BETA", "ODDS_RATIO",
+    "HAZARD_RATIO", "RISK_RATIO", "INCIDENCE_RATE_RATIO",
+    "MEAN_DIFFERENCE", "PERCENT_CHANGE", "CORRELATION",
+    # Test statistics
+    "F_STATISTIC", "T_STATISTIC", "CHI_SQUARE", "Z_STATISTIC",
+    # Heterogeneity
+    "I_SQUARED", "TAU_SQUARED", "Q_STATISTIC",
+    # Model fit
+    "R_SQUARED", "AIC", "BIC",
+}
+
+# Magnitude sanity bounds per label type
+MAGNITUDE_BOUNDS: dict[str, tuple[float | None, float | None]] = {
+    "EFFECT_SIZE": (-5.0, 5.0),        # Cohen's d rarely |d| > 3
+    "STD_BETA": (-5.0, 5.0),           # Standardized beta rarely |β| > 2
+    "UNSTD_BETA": (-1000.0, 1000.0),   # Unstandardized can be larger
+    "CORRELATION": (-1.0, 1.0),         # r ∈ [-1, 1] strictly
+    "R_SQUARED": (0.0, 1.0),            # R² ∈ [0, 1]
+    "I_SQUARED": (0.0, 100.0),          # I² is a percentage
+    "ODDS_RATIO": (0.001, 1000.0),      # OR typically 0.01-100
+    "HAZARD_RATIO": (0.001, 1000.0),    # HR typically 0.01-100
+    "RISK_RATIO": (0.001, 1000.0),      # RR typically 0.01-100
+    "ATTRITION_RATE": (0.0, 100.0),     # Percentage
+    "PERCENT_CHANGE": (-1000.0, 1000.0), # Percentage can be large
+}
 
 
 class StatsLabelAgent(BaseAgent):
@@ -109,7 +138,7 @@ class StatsLabelAgent(BaseAgent):
     the RAW INPUT to the trust boundary. If AG05 misses a beta or
     misparses a CI, that evidence is LOST.
 
-    Reads: PaperMap.sections[results, tables] + PaperMap.candidate_spans
+    Reads: PaperMap.sections[results, tables, abstract, discussion] + PaperMap.candidate_spans
     Outputs: SpanLabel[]{label_type, value, char_start, char_end,
                          confidence, source_section, source_table_id}
 
@@ -132,7 +161,9 @@ class StatsLabelAgent(BaseAgent):
 
     @property
     def target_sections(self) -> list[str]:
-        return ["results", "tables", "abstract"]
+        # Many papers (esp. short RCTs) report key statistics in
+        # the Discussion section or combined Results/Discussion sections.
+        return ["results", "tables", "abstract", "discussion"]
 
     @property
     def response_schema(self) -> type[BaseModel]:
@@ -226,6 +257,38 @@ class StatsLabelAgent(BaseAgent):
             # Try to parse numeric value from span text
             numeric_value = self._try_parse_numeric(extracted_span.span_text)
 
+            # ── SPANLABEL SANITIZER: Apply deterministic disambiguation rules ──
+            sanitized_label, sanitized_confidence, sanitize_reason = self._sanitize_span_label(
+                label_type=label_type,
+                numeric_value=numeric_value,
+                span_text=extracted_span.span_text,
+                context=getattr(extracted_span, "context", "") or "",
+                confidence=extracted_span.confidence,
+            )
+            if sanitized_label is None:
+                # Span rejected by sanitizer
+                logger.info(
+                    "AG05-SANITIZER: Rejecting span for paper_id=%s. "
+                    "Reason: %s. Original: label=%s, value=%r",
+                    paper_map.paper_id,
+                    sanitize_reason,
+                    label_type,
+                    extracted_span.span_text[:50],
+                )
+                continue
+            if sanitized_label != label_type:
+                logger.info(
+                    "AG05-SANITIZER: Relabeled span for paper_id=%s. "
+                    "%s → %s. Reason: %s. Value=%r",
+                    paper_map.paper_id,
+                    label_type,
+                    sanitized_label,
+                    sanitize_reason,
+                    extracted_span.span_text[:50],
+                )
+            label_type = sanitized_label
+            confidence = sanitized_confidence
+
             # Determine source section
             source_section = self._determine_source_section(
                 paper_map, char_start
@@ -244,9 +307,11 @@ class StatsLabelAgent(BaseAgent):
                     numeric_value=numeric_value,
                     char_start=char_start,
                     char_end=char_end,
-                    confidence=extracted_span.confidence,
+                    confidence=confidence,
                     source_section=source_section,
                     source_table_id=source_table_id,
+                    grouping_id=getattr(extracted_span, "grouping_id", None),
+                    arm_assignment=getattr(extracted_span, "arm_assignment", None),
                 )
             )
 
@@ -344,20 +409,18 @@ class StatsLabelAgent(BaseAgent):
             "DF_RESIDUAL": "DF",
             "DEGREES_OF_FREEDOM": "DF",
             "N_PER_ARM": "SAMPLE_SIZE_ARM",
-            # AG05-EXT: Subgroup interaction normalization
-            "MODERATOR": "SUBGROUP_VARIABLE",
-            "MODERATOR_VARIABLE": "SUBGROUP_VARIABLE",
-            "SUBGROUP_MODERATOR": "SUBGROUP_VARIABLE",
-            "SUBGROUP_LEVEL": "SUBGROUP_VALUE",
-            "SUBGROUP_CATEGORY": "SUBGROUP_VALUE",
-            "INTERACTION_BETA": "INTERACTION_EFFECT",
-            "INTERACTION_B": "INTERACTION_EFFECT",
-            "INTERACTION_COEFF": "INTERACTION_EFFECT",
-            "INTERACTION_STANDARD_ERROR": "INTERACTION_SE",
-            "INTERACTION_PVALUE": "INTERACTION_P",
-            "INTERACTION_P_VALUE": "INTERACTION_P",
-            "N_SUBGROUP": "SUBGROUP_N",
-            "SUBGROUP_SAMPLE_SIZE": "SUBGROUP_N",
+            # Subgroup interaction normalization (mapped to existing 40 types)
+            "MODERATOR": "INTERACTION_TERM",
+            "MODERATOR_VARIABLE": "INTERACTION_TERM",
+            "INTERACTION_BETA": "INTERACTION_TERM",
+            "INTERACTION_B": "INTERACTION_TERM",
+            "INTERACTION_COEFF": "INTERACTION_TERM",
+            "INTERACTION_SE": "SE",
+            "INTERACTION_PVALUE": "P_VALUE",
+            "INTERACTION_P_VALUE": "P_VALUE",
+            "N_SUBGROUP": "SAMPLE_SIZE_ARM",
+            "SUBGROUP_SAMPLE_SIZE": "SAMPLE_SIZE_ARM",
+            "SUBGROUP_N": "SAMPLE_SIZE_ARM",
         }
         return normalization_map.get(raw_type, raw_type)
 
@@ -453,3 +516,102 @@ class StatsLabelAgent(BaseAgent):
         for sl in span_labels:
             counts[sl.label_type] = counts.get(sl.label_type, 0) + 1
         return counts
+
+    # ═══════════════════════════════════════════════════════════════
+    #  SPANLABEL SANITIZER — Deterministic rule-based validation
+    # ═══════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _sanitize_span_label(
+        label_type: str,
+        numeric_value: float | None,
+        span_text: str,
+        context: str,
+        confidence: float,
+    ) -> tuple[str | None, float, str]:
+        """Apply deterministic disambiguation rules to SpanLabel.
+
+        This is the "Trust Boundary mindset" applied BEFORE TB routing.
+        Catches impossible label/value pairs that would cause TB rejection
+        or lost evidence yield.
+
+        Returns:
+            tuple of (new_label_type | None, new_confidence, reason)
+            If new_label_type is None, the span should be rejected.
+        """
+        import re
+
+        reason = "passed"
+
+        # ── RULE 1: Year detection ──
+        # 4-digit integers in [1900, 2100] are YEARS, never effect sizes
+        if numeric_value is not None:
+            val = numeric_value
+            if val == int(val) and 1900 <= val <= 2100:
+                # Check if context has anchor tokens that override
+                anchor_pattern = r'(?:d\s*=|g\s*=|smd|cohen|hedges|β\s*=|beta\s*=|or\s*=|hr\s*=|rr\s*=|r\s*=|ρ\s*=)'
+                if not re.search(anchor_pattern, context.lower()):
+                    if label_type in ANCHOR_REQUIRED_LABELS:
+                        # Could be a year being mislabeled
+                        return None, confidence, f"year_detected ({int(val)})"
+
+        # ── RULE 2: Sample size detection ──
+        # Integers ≥ 10 with n=/N=/participants → SAMPLE_SIZE
+        if numeric_value is not None:
+            val = numeric_value
+            if val == int(val) and val >= 10:
+                sample_pattern = r'(?:n\s*=|N\s*=|participants|subjects|patients|sample|enrolled)'
+                if re.search(sample_pattern, span_text + " " + context, re.IGNORECASE):
+                    if label_type in ANCHOR_REQUIRED_LABELS:
+                        return "SAMPLE_SIZE", confidence * 0.9, "sample_size_context_detected"
+
+        # ── RULE 3: Naked integers without anchors → likely SAMPLE_SIZE ──
+        if numeric_value is not None:
+            val = numeric_value
+            if val == int(val) and val >= 10 and label_type in ANCHOR_REQUIRED_LABELS:
+                # Check for anchor tokens
+                anchor_pattern = r'(?:d\s*=|g\s*=|smd|cohen|hedges|β\s*=|beta\s*=|b\s*=|or\s*=|hr\s*=|rr\s*=|irr\s*=|r\s*=|ρ\s*=|f\s*=|t\s*=|χ²\s*=|chi|z\s*=|i²\s*=|i2\s*=|tau|q\s*=|r²\s*=|r2\s*=|aic|bic)'
+                combined_text = (span_text + " " + context).lower()
+                if not re.search(anchor_pattern, combined_text):
+                    # Large naked integer without anchor → likely sample size
+                    if val >= 50:
+                        return "SAMPLE_SIZE", confidence * 0.7, "naked_integer_no_anchor"
+
+        # ── RULE 4: Magnitude sanity checks ──
+        if numeric_value is not None and label_type in MAGNITUDE_BOUNDS:
+            min_val, max_val = MAGNITUDE_BOUNDS[label_type]
+            if min_val is not None and numeric_value < min_val:
+                if label_type == "CORRELATION":
+                    return None, confidence, f"correlation_out_of_range ({numeric_value})"
+                elif label_type in {"ODDS_RATIO", "HAZARD_RATIO", "RISK_RATIO"}:
+                    # Negative OR/HR/RR impossible
+                    if numeric_value < 0:
+                        return None, confidence, f"negative_ratio ({numeric_value})"
+                else:
+                    # Reduce confidence for out-of-range effect sizes
+                    confidence = confidence * 0.5
+                    reason = f"below_min_bound ({numeric_value} < {min_val})"
+
+            if max_val is not None and numeric_value > max_val:
+                if label_type == "CORRELATION":
+                    return None, confidence, f"correlation_out_of_range ({numeric_value})"
+                elif label_type == "I_SQUARED":
+                    return None, confidence, f"i_squared_out_of_range ({numeric_value})"
+                elif label_type == "R_SQUARED":
+                    return None, confidence, f"r_squared_out_of_range ({numeric_value})"
+                elif label_type in {"EFFECT_SIZE", "STD_BETA"}:
+                    # Extreme effect size → likely wrong label
+                    return "SAMPLE_SIZE", confidence * 0.5, f"extreme_value_relabeled ({numeric_value})"
+                else:
+                    confidence = confidence * 0.5
+                    reason = f"above_max_bound ({numeric_value} > {max_val})"
+
+        # ── RULE 5: CI integrity check ──
+        # No numeric check here (would need both bounds), but flag if single bound confidence
+        if label_type in {"CI_LOWER", "CI_UPPER"}:
+            # CI bounds should typically be within reasonable ranges
+            if numeric_value is not None and abs(numeric_value) > 1000:
+                confidence = confidence * 0.7
+                reason = "ci_extreme_value"
+
+        return label_type, confidence, reason

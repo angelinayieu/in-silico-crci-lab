@@ -5,6 +5,14 @@
 # VERIFIED: no hardcoded formula parameters — all from config.py
 # VERIFIED: gates [B-G6] raise on failure
 # VERIFIED: B6 SE multiplier applied to Sigma_eff in assemble_frozen_state (spec lines 1393-1408)
+# VERIFIED: S4 — FrozenModelState frozen=True (cut-boundary integrity)
+# VERIFIED: S4 — _compute_frozen_hash covers B̂, Σ_eff, P_incl, Λ_prior, active_pathway_ids
+# VERIFIED: S4 — IEEE-754 double encoding for deterministic float hashing
+# VERIFIED: S4 — context_specs stored on FrozenModelState for ALG-C1 access
+# VERIFIED: S4 — build_b_hat_matrix: unused chain_direct_results param removed
+# VERIFIED: S4 — synergy gamma clamped symmetrically to [-cap, +cap]
+# VERIFIED: S5 — score_pathway_evidence wired into run_chain_b (after B6, before B7 assembly)
+# VERIFIED: S5 — pathway scoring conditional on graph.pathway_map non-empty
 """
 Component: SYS_ALGORITHM.ALG-B.B7
 Spec: SYS_ALGORITHM_COMPLETE.md lines 1414-1428
@@ -24,7 +32,7 @@ import csv
 import hashlib
 import json
 import logging
-import math
+import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -44,6 +52,7 @@ from .evidence_compiler import (
     TauSquaredPrior,
     run_b1_through_b6,
 )
+from .pathway_evidence_scorer import PathwayEvidenceScore, score_pathway_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +92,15 @@ class ContextPriorSpec:
     node_prior_sds: dict[str, float]     # node_id → σ_prior
 
 
-@dataclass
+@dataclass(frozen=True)
 class FrozenModelState:
     """Complete output of ALG-B — crosses the cut boundary to runtime.
 
-    This object is FROZEN: never modified by runtime patient data.
+    This object is FROZEN (dataclass frozen=True): attribute rebinding is
+    prohibited after construction. Consumers must treat all internal
+    containers (dicts, ndarrays) as immutable. The integrity hash covers
+    all deterministic state, so any mutation would invalidate it.
+
     It contains all build-time parameters needed by ALG-C, D, E, F.
 
     Fields match spec SYS_ALG lines 1188-1216:
@@ -99,6 +112,7 @@ class FrozenModelState:
         AV_scores:       Alignment validity for chain+direct edges
         tau_sq_estimates: Per-edge heterogeneity variance
         synergy_records: Pairwise interaction data
+        context_specs:   Context prior specifications (means + SDs per node)
     """
 
     # B7a: Parameterized edge weight matrix — ℝ^{n_nodes × n_nodes}
@@ -128,11 +142,31 @@ class FrozenModelState:
     # Reference to source GraphObject (not serialized in hash)
     graph: GraphObject
 
+    # B7b context specifications — stored so ALG-C1 (prior_loader) can
+    # access per-node prior means and SDs without a separate parameter.
+    # Tuple for immutability.  Empty when no context specs are provided.
+    context_specs: tuple[ContextPriorSpec, ...] = ()
+
+    # B6.5 output: Pathway evidence scoring (EXTENSION)
+    # Dict mapping pathway_id → PathwayEvidenceScore.
+    # Empty dict when pathway scoring is not run (e.g., no pathway_map).
+    pathway_evidence_scores: dict[str, PathwayEvidenceScore] = field(
+        default_factory=dict,
+    )
+    # Active pathway IDs (pathways with adequate evidence density).
+    # Included in the integrity hash so that two FrozenModelStates with
+    # different active sets hash differently.
+    active_pathway_ids: tuple[str, ...] = ()
+
     # Metadata
     n_edges_parameterized: int = 0
     n_edges_blocked: int = 0
     n_contexts: int = 0
     sha256_hash: str = ""
+
+    def __hash__(self) -> int:
+        """Hash by SHA-256 integrity hash (pre-computed at construction)."""
+        return hash(self.sha256_hash)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -143,7 +177,6 @@ class FrozenModelState:
 def build_b_hat_matrix(
     graph: GraphObject,
     adjusted_edges: dict[str, HeterogeneityAdjustedEdge],
-    chain_direct_results: dict[str, ChainDirectResult],
 ) -> np.ndarray:
     """B7a: Fill B̂[source, target] = μ_e for each parameterized edge.
 
@@ -155,7 +188,6 @@ def build_b_hat_matrix(
     Args:
         graph: GraphObject from Chain A.
         adjusted_edges: HeterogeneityAdjustedEdges from B2.
-        chain_direct_results: ChainDirectResults from B6.
 
     Returns:
         B̂ matrix of shape (n_nodes, n_nodes).
@@ -317,9 +349,12 @@ def load_synergy_registry(
                 joint_probability_offset=float(row.get("JPO", 0.0)),
                 combined_cognitive_score=float(row.get("CCS", 0.0)),
                 source_trial=row.get("source_trial", "").strip(),
-                gamma=min(
-                    float(row.get("gamma", 0.0)),
-                    config.SYNERGY_GAMMA_CAP_DEFAULT,
+                gamma=max(
+                    -config.SYNERGY_GAMMA_CAP_DEFAULT,
+                    min(
+                        float(row.get("gamma", 0.0)),
+                        config.SYNERGY_GAMMA_CAP_DEFAULT,
+                    ),
                 ),
             )
             records.append(rec)
@@ -337,25 +372,53 @@ def _compute_frozen_hash(
     B_hat: np.ndarray,
     Sigma_eff: dict[str, float],
     P_inclusion: dict[str, float],
+    Lambda_prior: dict[str, np.ndarray] | None = None,
+    active_pathway_ids: tuple[str, ...] | None = None,
 ) -> str:
     """Compute SHA-256 integrity hash for FrozenModelState.
 
-    Includes B̂ matrix, SE_eff vector, and P_inclusion vector.
+    Covers ALL deterministic state that affects runtime inference:
+        - B̂ matrix (edge weights)
+        - Sigma_eff (effective SEs)
+        - P_inclusion (structural inclusion probabilities)
+        - Lambda_prior (context-matched precision matrices)
+        - active_pathway_ids (pathway filtering)
+
+    Floats are encoded as IEEE-754 big-endian doubles via struct.pack
+    for deterministic, platform-independent hashing (no str() rounding).
+
+    Lambda_prior and active_pathway_ids are optional for backward
+    compatibility with existing 3-arg callers in tests.
     """
     hasher = hashlib.sha256()
 
-    # Hash B̂ matrix
-    hasher.update(B_hat.tobytes())
+    # Hash B̂ matrix (contiguous C-order float64)
+    hasher.update(np.ascontiguousarray(B_hat, dtype=np.float64).tobytes())
 
-    # Hash Sigma_eff (sorted by edge_id for determinism)
+    # Hash Sigma_eff (sorted by edge_id for determinism, IEEE-754 doubles)
     for edge_id in sorted(Sigma_eff.keys()):
         hasher.update(edge_id.encode())
-        hasher.update(str(Sigma_eff[edge_id]).encode())
+        hasher.update(struct.pack(">d", Sigma_eff[edge_id]))
 
-    # Hash P_inclusion
+    # Hash P_inclusion (sorted, IEEE-754 doubles)
     for edge_id in sorted(P_inclusion.keys()):
         hasher.update(edge_id.encode())
-        hasher.update(str(P_inclusion[edge_id]).encode())
+        hasher.update(struct.pack(">d", P_inclusion[edge_id]))
+
+    # Hash Lambda_prior (sorted by context key, contiguous matrix bytes)
+    if Lambda_prior:
+        for ctx_key in sorted(Lambda_prior.keys()):
+            hasher.update(ctx_key.encode())
+            hasher.update(
+                np.ascontiguousarray(
+                    Lambda_prior[ctx_key], dtype=np.float64,
+                ).tobytes()
+            )
+
+    # Hash active_pathway_ids (EXTENSION — Issue #7)
+    if active_pathway_ids:
+        for pid in sorted(active_pathway_ids):
+            hasher.update(pid.encode())
 
     return hasher.hexdigest()
 
@@ -366,15 +429,18 @@ def assemble_frozen_state(
     adjusted_edges: dict[str, HeterogeneityAdjustedEdge],
     prior_specs: dict[str, EdgePriorSpec],
     inclusion_probs: dict[str, InclusionProbEdge],
-    tau_sq_priors: dict[str, TauSquaredPrior],
     chain_direct_results: dict[str, ChainDirectResult],
     synergy_records: list[SynergyRecord] | None = None,
     context_specs: list[ContextPriorSpec] | None = None,
+    pathway_evidence_scores: dict[str, PathwayEvidenceScore] | None = None,
+    # DEPRECATED — kept for backward compat, ignored.
+    tau_sq_priors: dict[str, TauSquaredPrior] | None = None,
 ) -> FrozenModelState:
     """B7d: Assemble the complete FrozenModelState.
 
     Combines: B̂ + Σ_eff + Λ_prior(×33) + P_inclusion +
-    prior_audit + AV_scores + τ² + synergy
+    prior_audit + AV_scores + τ² + synergy +
+    pathway_evidence_scores (EXTENSION B6.5)
 
     This object crosses THE CUT BOUNDARY.
     It is FROZEN: never modified by runtime patient data.
@@ -389,6 +455,9 @@ def assemble_frozen_state(
         chain_direct_results: B6 outputs.
         synergy_records: B7c synergy data (optional).
         context_specs: B7b context specifications (optional).
+        pathway_evidence_scores: B6.5 output (optional, EXTENSION).
+            Dict mapping pathway_id → PathwayEvidenceScore.
+            If None, pathway scoring was not run (no pathway_map).
 
     Returns:
         Complete FrozenModelState.
@@ -399,7 +468,7 @@ def assemble_frozen_state(
     logger.info("── B7: Context-Matched Prior Assembly ──")
 
     # B7a: Build B̂ matrix
-    B_hat = build_b_hat_matrix(graph, adjusted_edges, chain_direct_results)
+    B_hat = build_b_hat_matrix(graph, adjusted_edges)
 
     # B7b: Compile context-matched precision matrices
     Lambda_prior = compile_context_priors(graph, B_hat, context_specs)
@@ -451,8 +520,33 @@ def assemble_frozen_state(
         if ae.aggregation_method == "BLOCKED"
     )
 
-    # Compute integrity hash
-    sha256_hash = _compute_frozen_hash(B_hat, Sigma_eff, P_incl)
+    # B6.5: Pathway evidence scoring (EXTENSION)
+    pw_scores: dict[str, PathwayEvidenceScore] = {}
+    active_pw_ids: tuple[str, ...] = ()
+    if pathway_evidence_scores is not None:
+        pw_scores = pathway_evidence_scores
+        active_pw_ids = tuple(
+            sorted(pid for pid, s in pw_scores.items() if s.is_adequate)
+        )
+        n_excluded = sum(1 for s in pw_scores.values() if not s.is_adequate)
+        for pid, s in pw_scores.items():
+            if not s.is_adequate:
+                logger.info(
+                    "B6.5: Pathway %s excluded — ED %.3f below threshold %.2f",
+                    pid, s.evidence_density, config.MIN_PATHWAY_EVIDENCE_DENSITY,
+                )
+        logger.info(
+            "B7d: Pathway evidence — %d active, %d excluded",
+            len(active_pw_ids), n_excluded,
+        )
+
+    # Compute integrity hash (covers all deterministic state)
+    sha256_hash = _compute_frozen_hash(
+        B_hat, Sigma_eff, P_incl, Lambda_prior, active_pw_ids,
+    )
+
+    # Store context_specs as immutable tuple for ALG-C1 access
+    ctx_specs_tuple = tuple(context_specs) if context_specs else ()
 
     frozen = FrozenModelState(
         B_hat=B_hat,
@@ -464,6 +558,9 @@ def assemble_frozen_state(
         tau_sq_estimates=tau_sq_estimates,
         synergy_records=synergy_records,
         graph=graph,
+        context_specs=ctx_specs_tuple,
+        pathway_evidence_scores=pw_scores,
+        active_pathway_ids=active_pw_ids,
         n_edges_parameterized=n_param,
         n_edges_blocked=n_blocked,
         n_contexts=len(Lambda_prior),
@@ -599,6 +696,17 @@ def run_chain_b(
     # B7c: Load synergy records
     synergy_records = load_synergy_registry(synergy_registry_path)
 
+    # B6.5: Pathway evidence scoring (EXTENSION)
+    # Only run when the graph contains pathways; skip for minimal/test graphs.
+    pw_scores: dict[str, PathwayEvidenceScore] | None = None
+    if graph.pathway_map:
+        pw_scores = score_pathway_evidence(graph.pathway_map, evidence_records)
+        logger.info(
+            "B6.5 complete: %d pathways scored, %d adequate",
+            len(pw_scores),
+            sum(1 for s in pw_scores.values() if s.is_adequate),
+        )
+
     # B7: Assemble FrozenModelState
     frozen = assemble_frozen_state(
         graph=graph,
@@ -606,10 +714,10 @@ def run_chain_b(
         adjusted_edges=adjusted_edges,
         prior_specs=prior_specs,
         inclusion_probs=inclusion_probs,
-        tau_sq_priors=tau_sq_priors,
         chain_direct_results=chain_direct_results,
         synergy_records=synergy_records,
         context_specs=context_specs,
+        pathway_evidence_scores=pw_scores,
     )
 
     return frozen

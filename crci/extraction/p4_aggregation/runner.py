@@ -53,6 +53,11 @@ def run_p4_aggregation(
     paper_id = context.get("paper_id", "unknown")
     calibrated = context.get("calibrated_records", [])
 
+    # ── Bridge: Adapt ScaledNumeric (P2/P3 output) → HarmonizedClaim (P4 input) ──
+    # P2 produces ScaledNumeric objects; P4 expects HarmonizedClaim.
+    # Convert if needed.
+    calibrated = _adapt_to_harmonized_claims(calibrated, paper_id)
+
     logger.info("P4: Aggregating %d calibrated records for %s", len(calibrated), paper_id)
 
     if not calibrated:
@@ -110,7 +115,10 @@ def run_p4_aggregation(
     # ── P4-DCR: Double counting resolution ──
     from crci.extraction.p4_aggregation.double_counting import resolve_double_counting
 
-    resolved_groups = resolve_double_counting(groups, session=session)
+    resolved_groups: list[Any] = []
+    for grp in groups:
+        resolved = resolve_double_counting(grp, session=session)
+        resolved_groups.append(resolved)
     logger.info(
         "P4-DCR: %d groups after double-counting resolution",
         len(resolved_groups),
@@ -139,6 +147,7 @@ def run_p4_aggregation(
     pooled_estimates = [r.pooled_estimate for r in ma_results]
     context["pooled_estimates"] = pooled_estimates
     context["meta_analysis_results"] = ma_results
+    context["resolved_groups"] = resolved_groups  # P4B needs study-level betas/SEs
     logger.info("P4-MA: %d pooled estimates computed", len(pooled_estimates))
 
     # ── P4-ESC: Verification escalation (Module 2) ──
@@ -185,15 +194,14 @@ def run_p4_aggregation(
         eid = getattr(group, "edge_relation_id", None)
         if eid:
             claims = getattr(group, "claims", [])
-            has_rct = any(
-                getattr(c, "study_design", "").lower() in ("rct", "large_rct")
-                for c in claims
-            )
+            designs = [getattr(c, "study_design", "").lower() for c in claims]
+            n_rcts = sum(1 for d in designs if d in ("rct", "large_rct"))
+            best = "rct" if n_rcts > 0 else ("cohort" if any(d == "cohort" for d in designs) else "other")
             edge_contexts[eid] = EdgeContext(
                 edge_relation_id=eid,
                 k=len(claims),
-                has_rct=has_rct,
-                study_designs=[getattr(c, "study_design", "") for c in claims],
+                n_rcts=n_rcts,
+                best_design=best,
             )
 
     prior_specs, prior_logs = select_priors_for_all_edges(
@@ -364,3 +372,61 @@ def _build_escalation_records(
             ))
         return records
     return []
+
+
+def _adapt_to_harmonized_claims(
+    records: list[Any],
+    paper_id: str,
+) -> list[Any]:
+    """Bridge ScaledNumeric (P2/P3 output) to HarmonizedClaim (P4 input).
+
+    P2 produces ScaledNumeric objects; P4's evidence_grouper expects
+    HarmonizedClaim with ler_id, edge_relation_id, etc. This adapter
+    converts when needed, passing through objects that are already
+    HarmonizedClaim.
+    """
+    from crci.shared.models.intermediate_states import (
+        HarmonizedClaim,
+        ScaledNumeric,
+    )
+    from crci.shared.models.enums import HarmonizationStatusInMem
+
+    adapted: list[Any] = []
+    for rec in records:
+        if isinstance(rec, HarmonizedClaim):
+            adapted.append(rec)
+        elif isinstance(rec, ScaledNumeric):
+            adapted.append(HarmonizedClaim(
+                ler_id=rec.span_id,
+                edge_relation_id=rec.edge_relation_id or "UNKNOWN_EDGE",
+                profile_id=paper_id,
+                study_id=paper_id,
+                harmonized_beta=rec.beta,
+                harmonized_se=rec.se,
+                harmonized_scale=rec.scale,
+                harmonization_status=HarmonizationStatusInMem.FULL,
+                quality_rating="moderate",
+                se_source=rec.se_source,
+                n_effect=None,
+            ))
+        else:
+            # Duck-type: try to adapt via attribute access
+            adapted.append(HarmonizedClaim(
+                ler_id=getattr(rec, "span_id", getattr(rec, "ler_id", str(id(rec)))),
+                edge_relation_id=getattr(rec, "edge_relation_id", "UNKNOWN_EDGE"),
+                profile_id=paper_id,
+                study_id=paper_id,
+                harmonized_beta=getattr(rec, "beta", getattr(rec, "harmonized_beta", 0.0)),
+                harmonized_se=getattr(rec, "se", getattr(rec, "harmonized_se", None)),
+                harmonized_scale=getattr(rec, "scale", getattr(rec, "harmonized_scale", "RAW_PER_SD")),
+                harmonization_status=HarmonizationStatusInMem.FULL,
+                quality_rating="moderate",
+                se_source=getattr(rec, "se_source", "SE_UNKNOWN"),
+                n_effect=getattr(rec, "n_effect", None),
+            ))
+    if len(adapted) != len(records):
+        logger.warning(
+            "P4 bridge: adapted %d/%d records to HarmonizedClaim",
+            len(adapted), len(records),
+        )
+    return adapted
