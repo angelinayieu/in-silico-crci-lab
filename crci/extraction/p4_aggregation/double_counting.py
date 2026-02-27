@@ -68,6 +68,13 @@ def resolve_double_counting(
     """
     primary_claims, ma_claims = _partition_claims(grouped.claims)
 
+    # R4.2: Detect NMA / pairwise overlap (warn-log only, Phase 1)
+    nma_warnings = detect_nma_pairwise_overlap(
+        grouped.claims, grouped.edge_relation_id
+    )
+    for warning in nma_warnings:
+        logger.warning(warning)
+
     # Edge case: No MA rows present → decision = N/A, pass through all claims
     if not ma_claims:
         logger.debug(

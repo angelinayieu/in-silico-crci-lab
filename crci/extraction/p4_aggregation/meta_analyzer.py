@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from crci.shared import config
-from crci.shared.models.enums import AggregationMethod, AnnotationCategory
+from crci.shared.models.enums import AggregationMethod, AnnotationCategory, MetaSourceFlag
 from crci.shared.models.intermediate_states import (
     GateViolation,
     HarmonizedClaim,
@@ -597,6 +597,46 @@ def _select_single_best(claims: list[HarmonizedClaim]) -> HarmonizedClaim:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  R4.1: PUBLISHED HETEROGENEITY PASSTHROUGH
+# ═══════════════════════════════════════════════════════════════
+
+
+def _use_published_heterogeneity(
+    claims: list[HarmonizedClaim],
+) -> dict | None:
+    """Extract published heterogeneity from MA claim when available.
+
+    When the aggregation pipeline uses an MA pooled estimate (DCR decision),
+    we should use the MA's published I²/τ² rather than re-estimating from
+    constituent studies. Re-estimation from a mix of MA-pooled and primary
+    estimates is methodologically incoherent.
+
+    Args:
+        claims: Claims for a single edge (after DCR resolution).
+
+    Returns:
+        Heterogeneity dict with I2, tau2, prediction_interval keys,
+        or None if no published heterogeneity available.
+    """
+    for claim in claims:
+        if (
+            claim.meta_source_flag == MetaSourceFlag.POOLED_ESTIMATE.value
+            and claim.heterogeneity_json
+            and isinstance(claim.heterogeneity_json, dict)
+        ):
+            het = claim.heterogeneity_json
+            logger.info(
+                "R4-HET: Using published heterogeneity from MA %s: "
+                "I²=%.2f%%, τ²=%.4f",
+                claim.study_id,
+                het.get("I2", -1),
+                het.get("tau2", -1),
+            )
+            return het
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
 #  CORE META-ANALYSIS: pool_evidence
 # ═══════════════════════════════════════════════════════════════
 
@@ -726,6 +766,9 @@ def pool_evidence(
             se_pooled,
         )
     else:
+        # R4.1: Check for published heterogeneity from MA claim
+        published_het = _use_published_heterogeneity(valid_claims)
+
         # k>=2: Run IVW fixed-effects first to get beta_FE
         # Formula P4-1: beta_IVW = sum(beta_i / SE_i^2) / sum(1 / SE_i^2)
         beta_fe, se_fe, weights_fe = compute_ivw_fixed(betas, ses)
@@ -736,6 +779,21 @@ def pool_evidence(
 
         # Formula P4-2: tau^2 via DerSimonian-Laird
         tau_sq = compute_tau_squared_dl(betas, ses, beta_fe)
+
+        # R4.1: Override with published heterogeneity when available
+        if published_het:
+            if "I2" in published_het:
+                i_sq = float(published_het["I2"])
+                logger.info(
+                    "R4-HET: Overriding computed I²=%.2f%% with published I²=%.2f%%",
+                    compute_i_squared(q, effective_k), i_sq,
+                )
+            if "tau2" in published_het:
+                tau_sq = float(published_het["tau2"])
+                logger.info(
+                    "R4-HET: Overriding computed τ²=%.4f with published τ²=%.4f",
+                    compute_tau_squared_dl(betas, ses, beta_fe), tau_sq,
+                )
 
         # Check for sign conflict among HIGH-quality
         sign_conflict = _has_sign_conflict_among_high_quality(valid_claims)

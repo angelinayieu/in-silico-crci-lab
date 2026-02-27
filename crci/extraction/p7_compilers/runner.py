@@ -244,12 +244,32 @@ def _run_dose_response_compiler(
     extraction_run_id: str | None,
     context: dict[str, Any],
 ) -> CompilerReport:
-    """Run Compiler 4: Dose-Response → dose params."""
+    """Run Compiler 4: Dose-Response → dose params.
+
+    R4.3: Also checks edge_evidence_v1 for DOSE_RESPONSE_POINT rows
+    from MA extraction and logs their presence for future integration.
+    """
     from crci.extraction.p7_compilers.dose_response_compiler import compile_dose_response
+    from crci.shared.models.enums import MetaSourceFlag
+    from crci.shared.models.tables import EdgeEvidence
 
     report = CompilerReport(compiler_name="dose_response")
     rows = _fetch_dose_evidence(session, extraction_run_id)
     report.rows_input = len(rows)
+
+    # R4.3: Check for DOSE_RESPONSE_POINT rows in edge_evidence_v1
+    dr_point_stmt = select(EdgeEvidence).where(
+        EdgeEvidence.meta_source_flag == MetaSourceFlag.DOSE_RESPONSE_POINT.value,
+        EdgeEvidence.active == 1,
+    )
+    dr_point_rows = list(session.execute(dr_point_stmt).scalars().all())
+    if dr_point_rows:
+        logger.info(
+            "R4-DR: Found %d DOSE_RESPONSE_POINT rows in edge_evidence_v1. "
+            "These will supplement B13 dose evidence for compilation.",
+            len(dr_point_rows),
+        )
+        context["dose_response_point_rows"] = dr_point_rows
 
     if not rows:
         logger.info("Dose-response compiler: no dose evidence rows, skipping")
