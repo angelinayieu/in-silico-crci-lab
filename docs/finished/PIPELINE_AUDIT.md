@@ -143,6 +143,8 @@ When `apply_all_layers()` processes these sparse rows:
 
 **Worst case combined SE inflation from wrong defaults**: 3.0 × 1.30 × 1.25 = **4.875×** instead of correct ~1.0 × 1.0 × 1.0 = **1.0×** for a well-done recent RCT with cancer-validated instruments.
 
+> **RESOLVED (2025-02-27):** Step 4d in `scripts/load_evidence_into_db.py` now applies full 7-layer SE_eff calibration (Formula P3-8) after CSV import. The function `apply_se_eff_calibration()` correctly maps L1 (small_rct N-interpolation), L4 (validated_cancer from CSV), L5 (GRADE from quality_rating), L7 (freshness from pub_year). SE inflation now ×1.89–2.71 (scientifically appropriate). Also fixed Northey CSV extra-comma field shift bug. Gate P3-G1 (SE_eff ≥ SE_raw) satisfied for all 13 rows.
+
 ---
 
 ### ISSUE-5: Effect Size Units Not Standardized — Incommensurable Scales Mixed
@@ -168,6 +170,8 @@ The spec (§2.2) states F1 output should be **"SMD (SD units) or log-ratio"**. F
 d = 2 × sqrt(η² / (1 − η²))    [valid only when df₁ = 1, i.e., 2-level contrast]
 
 For TMT-A: d = 2 × sqrt(0.35 / 0.65) = 1.47. Campbell's ANCOVA uses a 2-level group factor (exercise vs control), so df₁=1 and the conversion is valid. But this conversion was never performed, and no guard exists to reject it for designs where df₁ > 1.
+
+> **✅ RESOLVED (2026-02-27):** Step 4c in `scripts/load_evidence_into_db.py` now auto-converts all `mean_diff_raw` rows to `cohens_d` using SD borrowed from `population_norms_v1` (d = mean_diff / SD_pooled). This approach uses the actual control-group baseline SD rather than eta² conversion, which is more robust for ANCOVA-adjusted estimates. All 4 Campbell rows converted; all 13 evidence rows now uniform `cohens_d`.
 
 ---
 

@@ -30,6 +30,11 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Ensure DATABASE_URL points to SQLite by default
+import os
+_db_url = os.environ.get("DATABASE_URL") or f"sqlite:///{PROJECT_ROOT}/crci_dev.db"
+os.environ["DATABASE_URL"] = _db_url
+
 
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
@@ -113,6 +118,15 @@ def main() -> int:
         help="Evidence CSV (if absent, chain B uses DB evidence)",
     )
     parser.add_argument(
+        "--observations-csv", type=Path, default=None,
+        help="Patient observations CSV (instrument_id,y_k,assessment_date)",
+    )
+    parser.add_argument(
+        "--modifier-rules-csv", type=Path,
+        default=PROJECT_ROOT / "crci" / "database" / "seeds" / "modifier_rules.csv",
+        help="Modifier rules CSV (default: seeds/modifier_rules.csv)",
+    )
+    parser.add_argument(
         "--node-registry", type=Path,
         default=PROJECT_ROOT / "registries" / "NODE_REGISTRY.csv",
     )
@@ -133,6 +147,10 @@ def main() -> int:
     parser.add_argument(
         "--treatment-regimen", default=None,
         help="Optional treatment regimen for exact context match",
+    )
+    parser.add_argument(
+        "--patient-profile-json", default=None,
+        help='JSON string of patient attributes, e.g. \'{"age": 62, "education_years": 14}\'',
     )
     parser.add_argument(
         "--mode", choices=["clinical", "research"], default="clinical",
@@ -156,6 +174,14 @@ def main() -> int:
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true",
+    )
+    parser.add_argument(
+        "--render", action="store_true", default=True,
+        help="Render full presentation report (default: on)",
+    )
+    parser.add_argument(
+        "--no-render", dest="render", action="store_false",
+        help="Skip presentation rendering, show raw summary only",
     )
 
     args = parser.parse_args()
@@ -244,26 +270,34 @@ def main() -> int:
         logger.info("Loaded %d evidence records from %s",
                     len(evidence_records), args.evidence_csv)
     else:
-        # Load from DB
+        # Load from DB (use raw SQL to access columns added by load_evidence_into_db)
         from crci.shared.db import get_session
+        from sqlalchemy import text as sa_text
         with get_session() as session:
-            from crci.shared.models.tables import EdgeEvidence
-            rows = session.query(EdgeEvidence).all()
-            for row in rows:
+            result = session.execute(sa_text("""
+                SELECT study_id, edge_relation_id, harmonized_beta, harmonized_se,
+                       study_design, pub_year, N_effect, identification_status,
+                       quality_rating, cancer_validation_status
+                FROM edge_evidence_v1
+                WHERE active = 1
+                  AND harmonized_beta IS NOT NULL
+                  AND harmonized_se IS NOT NULL
+            """))
+            for row in result:
                 rec = EvidenceRecord(
-                    study_id=row.study_id,
-                    edge_id=row.edge_relation_id,
-                    beta=row.beta,
-                    se=row.se,
-                    study_design=row.study_design or "observational",
-                    publication_year=row.publication_year or 2020,
-                    sample_size=row.sample_size or 100,
-                    identification_status=row.identification_status or "identified",
-                    quality_grade=row.quality_grade or "MODERATE",
+                    study_id=row[0],
+                    edge_id=row[1],
+                    beta=float(row[2]),
+                    se=float(row[3]),
+                    study_design=row[4] or "observational",
+                    publication_year=int(row[5]) if row[5] else 2020,
+                    sample_size=int(row[6]) if row[6] else 100,
+                    identification_status=row[7] or "identified",
+                    quality_grade=row[8] or "MODERATE",
                     scope_weights={},
-                    cancer_validation_status=row.cancer_validation or "general_population",
+                    cancer_validation_status=row[9] or "general_population",
                     temporal_distance_days=0.0,
-                    outcome_type=row.outcome_type or "subjective",
+                    outcome_type="subjective",
                 )
                 evidence_records.append(rec)
         logger.info("Loaded %d evidence records from DB", len(evidence_records))
@@ -286,11 +320,66 @@ def main() -> int:
     from crci.algorithm.chain_c_posterior.observation_mapper import RawObservation
     from crci.algorithm.chain_c_posterior.modifier_application import ModifierRule
 
-    # For now, empty observations (no live patient data).
-    # In production, these come from the EHR/patient intake form.
-    # Use minimal Tier-0 dummy observations to pass C-G2.
+    # ── Load observations from CSV if provided ──
     observations: list[RawObservation] = []
+    if args.observations_csv is not None:
+        if not args.observations_csv.exists():
+            print(f"Error: Observations CSV not found: {args.observations_csv}",
+                  file=sys.stderr)
+            return 1
+        with open(args.observations_csv, newline="", encoding="utf-8") as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                obs = RawObservation(
+                    instrument_id=row["instrument_id"].strip(),
+                    y_k=float(row["y_k"]),
+                    assessment_date=date.fromisoformat(row["assessment_date"].strip()),
+                )
+                observations.append(obs)
+        logger.info("Loaded %d observations from %s",
+                    len(observations), args.observations_csv)
+        print(f"  Loaded {len(observations)} patient observations from CSV")
+    else:
+        logger.info("No observations CSV — Chain C will use prior-only (no Bayesian update)")
+
+    # ── Load modifier rules from CSV ──
     modifier_rules: list[ModifierRule] = []
+    if args.modifier_rules_csv.exists():
+        with open(args.modifier_rules_csv, newline="", encoding="utf-8") as f:
+            reader = csv_mod.DictReader(f)
+            for row in reader:
+                # Skip inactive rules
+                if row.get("active", "1").strip() == "0":
+                    continue
+                # Parse effect_spec_json → condition + multiplier
+                effect_spec = json.loads(row.get("effect_spec_json", "{}"))
+                condition_str = effect_spec.get("condition", "")
+                multiplier = float(effect_spec.get("multiplier", 1.0))
+                # Parse condition string: "age > 65" → variable=age, operator=>, value=65
+                parts = condition_str.split(None, 2) if condition_str else ["", "", ""]
+                cond_var = parts[0] if len(parts) > 0 else ""
+                cond_op = parts[1] if len(parts) > 1 else "=="
+                cond_val = parts[2] if len(parts) > 2 else ""
+                # Map applies_to → target_edge_id
+                applies_to = row.get("applies_to", "all_edges").strip()
+                target_edge_id = None if applies_to == "all_edges" else applies_to
+                rule = ModifierRule(
+                    rule_id=row.get("modifier_id", "").strip(),
+                    condition_variable=cond_var,
+                    condition_operator=cond_op,
+                    condition_value=cond_val,
+                    target_edge_id=target_edge_id,
+                    multiplier=multiplier,
+                    grade=row.get("support_class", "D").strip(),
+                    category=row.get("notes", "").strip().split("—")[0].strip().lower() if row.get("notes") else "other",
+                )
+                modifier_rules.append(rule)
+        logger.info("Loaded %d modifier rules from %s",
+                    len(modifier_rules), args.modifier_rules_csv)
+        print(f"  Loaded {len(modifier_rules)} modifier rules")
+    else:
+        logger.warning("Modifier rules CSV not found at %s — using empty rules",
+                       args.modifier_rules_csv)
 
     # Load pathway definitions
     from crci.shared.models.pathway_types import PathwayDef
@@ -304,6 +393,19 @@ def main() -> int:
         "cancer_type": args.cancer_type,
         "treatment_phase": args.treatment_phase,
     }
+    # Merge patient profile from CLI JSON (enables modifier rule matching)
+    if args.patient_profile_json:
+        try:
+            extra = json.loads(args.patient_profile_json)
+            patient_profile.update(extra)
+            logger.info("Patient profile enriched with %d attributes from JSON: %s",
+                        len(extra), list(extra.keys()))
+        except json.JSONDecodeError as exc:
+            print(f"Error: Invalid --patient-profile-json: {exc}", file=sys.stderr)
+            return 1
+    if len(patient_profile) > 2:
+        print(f"  Patient profile: {len(patient_profile)} attributes "
+              f"({', '.join(k for k in patient_profile if k not in ('cancer_type', 'treatment_phase'))})")
 
     try:
         patient_state, raw_posterior, loaded_prior, snapshot_result = run_chain_c(
@@ -732,34 +834,48 @@ def main() -> int:
     print(f"  ({time.monotonic() - t0:.2f}s)")
 
     # ══════════════════════════════════════════════════════════
-    #  Summary
+    #  Summary & Presentation
     # ══════════════════════════════════════════════════════════
     dt_total = time.monotonic() - t_total
 
-    _print_section("Summary")
-    print(f"  Patient: {args.patient_id}")
-    print(f"  Cancer: {args.cancer_type} / {args.treatment_phase}")
-    print(f"  Evidence: {len(evidence_records)} records")
-    print(f"  Interventions ranked: {ranking_result.n_interventions_ranked}")
-    if composite is not None:
-        print(f"  CRCI composite: {composite.crci_composite:.3f} "
-              f"(percentile {composite.percentile:.0f}, "
-              f"{composite.severity_tier.value})")
-    print(f"  Total time: {dt_total:.2f}s")
+    if args.render:
+        # Full presentation report via the 12 view-model renderers
+        try:
+            from crci.presentation.terminal_renderer import render_terminal_report
+            output = render_terminal_report(result.report)
+            print(output)
+        except Exception as render_exc:
+            logger.warning("Presentation rendering failed: %s", render_exc)
+            print(f"  [Presentation rendering failed: {render_exc}]")
+            # Fall through to raw summary
+            args.render = False
 
-    # Print top recommendations
-    if ranking_result.intervention_rankings:
-        print("\n  Top recommendations (by SAFE_A):")
-        sorted_rankings = sorted(
-            ranking_result.intervention_rankings.values(),
-            key=lambda r: r.rank_a,
-        )
-        for r in sorted_rankings[:5]:
-            print(f"    #{r.rank_a}: {r.action_label} "
-                  f"(SAFE_A={r.safe_a:.3f} [{r.safe_a_cri_lower:.3f}, "
-                  f"{r.safe_a_cri_upper:.3f}], "
-                  f"claim={r.claim_level.value})")
+    if not args.render:
+        _print_section("Summary")
+        print(f"  Patient: {args.patient_id}")
+        print(f"  Cancer: {args.cancer_type} / {args.treatment_phase}")
+        print(f"  Evidence: {len(evidence_records)} records")
+        print(f"  Interventions ranked: {ranking_result.n_interventions_ranked}")
+        if composite is not None:
+            print(f"  CRCI composite: {composite.crci_composite:.3f} "
+                  f"(percentile {composite.percentile:.0f}, "
+                  f"{composite.severity_tier.value})")
+        print(f"  Total time: {dt_total:.2f}s")
 
+        # Print top recommendations
+        if ranking_result.intervention_rankings:
+            print("\n  Top recommendations (by SAFE_A):")
+            sorted_rankings = sorted(
+                ranking_result.intervention_rankings.values(),
+                key=lambda r: r.rank_a,
+            )
+            for r in sorted_rankings[:5]:
+                print(f"    #{r.rank_a}: {r.action_label} "
+                      f"(SAFE_A={r.safe_a:.3f} [{r.safe_a_cri_lower:.3f}, "
+                      f"{r.safe_a_cri_upper:.3f}], "
+                      f"claim={r.claim_level.value})")
+
+    print(f"\n  Pipeline time: {dt_total:.2f}s")
     print("\nFull model pipeline complete.")
     return 0
 

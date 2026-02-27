@@ -1,0 +1,118 @@
+%% Database Table Relationships — Evidence Tables
+%% Foreign key relationships relevant to extraction
+
+erDiagram
+    study_registry_v1 {
+        TEXT study_id PK
+        TEXT title
+        TEXT doi
+        TEXT study_design
+        TEXT cancer_type
+        INTEGER year
+    }
+
+    biomarker_node_definitions_v1 {
+        TEXT node_id PK
+        TEXT node_label
+        TEXT node_domain
+        TEXT orientation
+    }
+
+    edge_relations_definitions_v1 {
+        TEXT edge_relation_id PK
+        TEXT node_x FK
+        TEXT node_y FK
+        TEXT relation_type
+        INTEGER default_effect_direction
+    }
+
+    instrument_definitions_v1 {
+        TEXT instrument_id PK
+        TEXT instrument_label
+        TEXT maps_to_node_id FK
+        TEXT instrument_kind
+        TEXT higher_means_pre_alignment
+    }
+
+    edge_evidence_v1 {
+        TEXT ler_id PK
+        TEXT edge_relation_id FK
+        TEXT study_id FK
+        TEXT effect_type_reported
+        FLOAT effect_value_reported
+        FLOAT se_reported
+        INTEGER N_effect
+        TEXT cancer_type
+        TEXT treatment_phase
+    }
+
+    edges_v1 {
+        TEXT edge_param_id PK
+        TEXT edge_relation_id FK
+        FLOAT beta_mean
+        FLOAT beta_se
+        TEXT cancer_type
+        TEXT treatment_phase
+    }
+
+    population_norms_v1 {
+        TEXT id PK
+        TEXT study_id FK
+        TEXT node_id FK
+        TEXT instrument_id FK
+        FLOAT mean_raw
+        FLOAT sd_raw
+        INTEGER N
+    }
+
+    node_priors_v1 {
+        TEXT prior_id PK
+        TEXT node_id FK
+        FLOAT mean
+        FLOAT sd
+        TEXT cancer_type
+    }
+
+    temporal_evidence_v1 {
+        TEXT id PK
+        TEXT study_id FK
+        FLOAT timepoint_weeks
+        FLOAT effect
+        FLOAT se
+    }
+
+    instrument_evidence_v1 {
+        TEXT id PK
+        TEXT study_id FK
+        TEXT instrument_id FK
+        FLOAT cronbachs_alpha
+        INTEGER N
+    }
+
+    correlation_evidence_v1 {
+        TEXT id PK
+        TEXT study_id FK
+        TEXT node_id_1 FK
+        TEXT node_id_2 FK
+        FLOAT correlation_r
+    }
+
+    study_registry_v1 ||--o{ edge_evidence_v1 : "study_id"
+    study_registry_v1 ||--o{ population_norms_v1 : "study_id"
+    study_registry_v1 ||--o{ temporal_evidence_v1 : "study_id"
+    study_registry_v1 ||--o{ instrument_evidence_v1 : "study_id"
+    study_registry_v1 ||--o{ correlation_evidence_v1 : "study_id"
+
+    edge_relations_definitions_v1 ||--o{ edge_evidence_v1 : "edge_relation_id"
+    edge_relations_definitions_v1 ||--o{ edges_v1 : "edge_relation_id"
+
+    biomarker_node_definitions_v1 ||--o{ edge_relations_definitions_v1 : "node_x"
+    biomarker_node_definitions_v1 ||--o{ edge_relations_definitions_v1 : "node_y"
+    biomarker_node_definitions_v1 ||--o{ population_norms_v1 : "node_id"
+    biomarker_node_definitions_v1 ||--o{ node_priors_v1 : "node_id"
+
+    instrument_definitions_v1 ||--o{ population_norms_v1 : "instrument_id"
+    instrument_definitions_v1 ||--o{ instrument_evidence_v1 : "instrument_id"
+
+    edge_evidence_v1 }o--|| edges_v1 : "pooled into"
+    population_norms_v1 }o--|| node_priors_v1 : "compiled into"

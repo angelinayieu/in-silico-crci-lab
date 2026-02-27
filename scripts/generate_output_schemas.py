@@ -35,7 +35,7 @@ SCHEMA_DIR = project_root / "docs" / "outputs" / "schemas"
 MODELS = [
     (
         RecommendationReport,
-        f"recommendation_report_{config.OUTPUT_SCHEMA_VERSION}.schema.json",
+        "recommendation_report_v1.1.0.schema.json",
     ),
     (
         ClinicalRiskProfile,

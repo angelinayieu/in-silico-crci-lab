@@ -22,11 +22,22 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from crci.shared.models.enums import ReportOutputMode
-from crci.shared.models.output_contracts import RecommendationReport
+from crci.shared.models.output_contracts import (
+    EvidenceGapReport,
+    ExtractionQualitySummary,
+    RecommendationReport,
+)
 
+from ..algorithm.chain_b_evidence.pathway_evidence_scorer import PathwayEvidenceScore
+from ..algorithm.chain_c_posterior.modifier_application import PathwayActivation
 from ..algorithm.chain_d_simulation.ranker import RankingResult
+from ..algorithm.chain_d_simulation.synergy_bundle import BundleResult
+from ..algorithm.chain_e_temporal.recovery_trajectory import RecoveryTrajectory
+from ..algorithm.chain_e_temporal.intervention_overlay import OverlayResult
+from ..algorithm.chain_e_temporal.uncertainty_counterfactual import UncertaintyResult
 from ..algorithm.chain_f_analytics.composite_scorer import CompositeState
 from ..algorithm.chain_f_analytics.evsi import VarianceState
+from ..algorithm.chain_f_analytics.risk_estimator import CRCIRiskEstimate
 from ..algorithm.chain_f_analytics.variance_decomposer import StabilityState
 
 from .adaptive_questions import QuestioningState
@@ -77,6 +88,25 @@ def run_session(
     stability: StabilityState | None = None,
     variance: VarianceState | None = None,
     questioning: QuestioningState | None = None,
+    # Phase 8: E-chain temporal results
+    recovery: RecoveryTrajectory | None = None,
+    overlay: OverlayResult | None = None,
+    uncertainty: UncertaintyResult | None = None,
+    node_labels: dict[str, str] | None = None,
+    # Extraction quality
+    extraction_quality: ExtractionQualitySummary | None = None,
+    # F4: Clinical risk estimate
+    risk_estimate: CRCIRiskEstimate | None = None,
+    # Evidence gaps (from evidence_gap_compiler)
+    evidence_gaps: EvidenceGapReport | None = None,
+    # C4d: Pathway activations (for pathway profile)
+    active_pathways: list[PathwayActivation] | None = None,
+    # F5: Subpopulation comparison (optional)
+    subpopulation_result: object | None = None,
+    # D3: Bundle synergy diagnostics (optional)
+    bundle_result: BundleResult | None = None,
+    # B6.5: Pathway evidence scores (from FrozenModelState)
+    pathway_evidence_scores: dict[str, PathwayEvidenceScore] | None = None,
 ) -> SessionResult:
     """Execute a complete runtime session.
 
@@ -93,6 +123,17 @@ def run_session(
         stability: From ALG-F2 — decision stability analysis.
         variance: From ALG-F3 — variance decomposition.
         questioning: From RT-H — adaptive questioning state (if pre-run).
+        recovery: From ALG-E2 (natural recovery trajectory).
+        overlay: From ALG-E3 (intervention overlays).
+        uncertainty: From ALG-E4 (uncertainty/counterfactuals).
+        node_labels: Optional node_id→label map for trajectories.
+        extraction_quality: From completeness_checker.
+        risk_estimate: From ALG-F4 (CRCIRiskEstimate).
+        evidence_gaps: From evidence_gap_compiler.
+        active_pathways: From ALG-C4d (PathwayActivation list).
+        subpopulation_result: From ALG-F5 (SubpopulationComparisonResult).
+        bundle_result: From ALG-D3 (BundleResult, for synergy diagnostics).
+        pathway_evidence_scores: From B6.5 (FrozenModelState.pathway_evidence_scores).
 
     Returns:
         SessionResult containing the RecommendationReport.
@@ -144,6 +185,18 @@ def run_session(
         variance=variance,
         questioning=questioning,
         output_mode=session_config.output_mode,
+        recovery=recovery,
+        overlay=overlay,
+        uncertainty=uncertainty,
+        node_labels=node_labels,
+        extraction_quality=extraction_quality,
+        risk_estimate=risk_estimate,
+        evidence_gaps=evidence_gaps,
+        active_pathways=active_pathways,
+        subpopulation_result=subpopulation_result,
+        bundle_result=bundle_result,
+        ranking_result=ranking_result,
+        pathway_evidence_scores=pathway_evidence_scores,
     )
 
     end_time = datetime.now(timezone.utc).isoformat()

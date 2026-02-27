@@ -26,18 +26,30 @@ from datetime import datetime, timezone
 import numpy as np
 
 from crci.shared import config
+from scipy import stats as sp_stats
+
 from crci.shared.models.output_contracts import (
+    ClinicalRiskProfile,
     CompositeScore,
     DecisionTrace,
     DecisionTraceEntry,
+    DifferentialEffectSummary,
+    DomainRiskBreakdown,
     DomainScore,
     EvidenceGapItem,
     EvidenceGapReport,
     ExtractionQualitySummary,
     NodeTrajectory,
+    PathwayContribution,
+    PathwayProfile,
     RecommendationReport,
+    RiskDifferentialSummary,
     ScheduleAction,
     SchedulePlan,
+    SensitivityIndexItem,
+    SensitivityReport,
+    SubpopulationComparisonSummary,
+    SynergyMetrics,
     TemporalTrajectory,
     TrajectoryPoint,
     VarianceComponent,
@@ -45,6 +57,8 @@ from crci.shared.models.output_contracts import (
 )
 from crci.shared.models.enums import ReportOutputMode, SeverityTier, StabilityClass
 
+from ..algorithm.chain_b_evidence.pathway_evidence_scorer import PathwayEvidenceScore
+from ..algorithm.chain_d_simulation.ranker import RankingResult, SensitivityIndex
 from ..algorithm.chain_e_temporal.recovery_trajectory import RecoveryTrajectory
 from ..algorithm.chain_e_temporal.intervention_overlay import (
     InterventionTrajectory,
@@ -55,8 +69,11 @@ from ..algorithm.chain_f_analytics.composite_scorer import (
     CompositeState,
     SeverityTier as F1SeverityTier,
 )
+from ..algorithm.chain_f_analytics.risk_estimator import CRCIRiskEstimate
 from ..algorithm.chain_f_analytics.variance_decomposer import StabilityState
 from ..algorithm.chain_f_analytics.evsi import VarianceState
+from ..algorithm.chain_d_simulation.synergy_bundle import BundleResult
+from ..algorithm.chain_c_posterior.modifier_application import PathwayActivation
 from .schedule_generator import RankedSchedules, Schedule
 from .adaptive_questions import QuestioningState
 
@@ -268,6 +285,25 @@ def _map_severity_tier(f1_tier: F1SeverityTier) -> SeverityTier:
     return mapping.get(f1_tier, SeverityTier.MODERATE)
 
 
+def _classify_output_severity(percentile: float) -> SeverityTier:
+    """Classify per-domain percentile directly to output SeverityTier.
+
+    Uses same tier boundaries as F1 _classify_severity_tier (config thresholds),
+    but maps to the output-contract enum (MILD_CONCERN not MILD_IMPAIRMENT).
+    """
+    if percentile >= config.F1_TIER_EXCELLENT_MIN:
+        return SeverityTier.EXCELLENT
+    if percentile >= config.F1_TIER_GOOD_MIN:
+        return SeverityTier.GOOD
+    if percentile >= config.F1_TIER_MILD_MIN:
+        return SeverityTier.MILD_CONCERN
+    if percentile >= config.F1_TIER_MODERATE_MIN:
+        return SeverityTier.MODERATE
+    if percentile >= config.F1_TIER_POOR_MIN:
+        return SeverityTier.POOR
+    return SeverityTier.SEVERE
+
+
 def _build_composite_score(
     composite: CompositeState | None,
     run_id: str,
@@ -293,10 +329,21 @@ def _build_composite_score(
                 domain_id=domain,
                 domain_label=domain.replace("_", " ").title(),
                 z_score=z,
-                severity_tier=SeverityTier.MODERATE,
+                severity_tier=_classify_output_severity(
+                    float(sp_stats.norm.cdf(-z) * 100.0)
+                ),
+                percentile=float(sp_stats.norm.cdf(-z) * 100.0),
+                confidence_sd=(
+                    1.0 / (composite.subdomain_weights[domain] ** 0.5)
+                    if composite.subdomain_weights.get(domain, 0) > 0
+                    else None
+                ),
             )
             for domain, z in composite.subdomain_scores.items()
         ],
+        cochrans_Q=composite.cochrans_Q,
+        I_squared=composite.I_squared,
+        random_effects_applied=composite.random_effects_applied,
     )
 
 
@@ -313,7 +360,12 @@ def _map_stability_class(f2_class) -> StabilityClass:
     return mapping.get(f2_class.value, StabilityClass.UNSTABLE)
 
 
-def _build_schedule_plan(sched: Schedule, run_id: str) -> SchedulePlan:
+def _build_schedule_plan(
+    sched: Schedule,
+    run_id: str,
+    bundle_result: BundleResult | None = None,
+    ranking_result: RankingResult | None = None,
+) -> SchedulePlan:
     """Convert internal Schedule to output SchedulePlan."""
     actions = [
         ScheduleAction(
@@ -329,6 +381,52 @@ def _build_schedule_plan(sched: Schedule, run_id: str) -> SchedulePlan:
         for item in sched.items
     ]
 
+    # D3 synergy diagnostics for bundle schedules
+    synergy = None
+    if sched.is_bundle and bundle_result is not None:
+        be = bundle_result.bundle_effects.get(sched.schedule_id)
+        if be is not None:
+            pairwise_list = []
+            for (a, b), pm in bundle_result.pairwise_metrics.items():
+                if a in be.member_ids and b in be.member_ids:
+                    pairwise_list.append({
+                        "action_a": pm.action_a,
+                        "action_b": pm.action_b,
+                        "jpo": pm.jpo,
+                        "ccs": pm.ccs,
+                        "gamma_empirical": pm.gamma_empirical,
+                    })
+            synergy = SynergyMetrics(
+                bundle_id=be.bundle_id,
+                member_ids=list(be.member_ids),
+                mean_delta_C=be.mean_delta_C,
+                interaction_completeness=be.interaction_completeness,
+                pairwise=pairwise_list,
+            )
+
+    # SAFE_A detail + safety status (from D4 ranking result)
+    safe_a_score: float | None = sched.safe_a
+    safe_a_cri_lower: float | None = None
+    safe_a_cri_upper: float | None = None
+    p_net_benefit: float | None = None
+    safety_status: str | None = None
+
+    if ranking_result is not None and sched.items:
+        action_id = sched.items[0].action_id
+        if sched.is_bundle and action_id in ranking_result.bundle_rankings:
+            br = ranking_result.bundle_rankings[action_id]
+            safe_a_cri_lower = br.safe_a_cri_lower
+            safe_a_cri_upper = br.safe_a_cri_upper
+            per_draw = br.per_draw_safe_a
+            p_net_benefit = float(np.mean(per_draw > 0)) if len(per_draw) > 0 else None
+        elif action_id in ranking_result.intervention_rankings:
+            ir = ranking_result.intervention_rankings[action_id]
+            safe_a_cri_lower = ir.safe_a_cri_lower
+            safe_a_cri_upper = ir.safe_a_cri_upper
+            per_draw = ir.per_draw_safe_a
+            p_net_benefit = float(np.mean(per_draw > 0)) if len(per_draw) > 0 else None
+            safety_status = ir.safety_status.value
+
     return SchedulePlan(
         schedule_id=sched.schedule_id,
         run_id=run_id,
@@ -341,6 +439,12 @@ def _build_schedule_plan(sched: Schedule, run_id: str) -> SchedulePlan:
         warnings=sched.warnings,
         cri_95_lower=sched.safe_b_cri_lower,
         cri_95_upper=sched.safe_b_cri_upper,
+        safe_a_score=safe_a_score,
+        safe_a_cri_lower=safe_a_cri_lower,
+        safe_a_cri_upper=safe_a_cri_upper,
+        p_net_benefit=p_net_benefit,
+        safety_status=safety_status,
+        synergy=synergy,
     )
 
 
@@ -367,7 +471,231 @@ def _build_variance_decomposition(
         components=components,
         total_variance=variance.total_variance,
         dominant_source=dominant,
+        per_edge_contributions=variance.per_edge_variance_contrib or {},
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-I: Clinical Risk Builder (F4 → ClinicalRiskProfile)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_clinical_risk(
+    risk_estimate: CRCIRiskEstimate | None,
+) -> ClinicalRiskProfile | None:
+    """Map F4 CRCIRiskEstimate to presentation-ready ClinicalRiskProfile."""
+    if risk_estimate is None:
+        return None
+
+    domain_breakdown = [
+        DomainRiskBreakdown(
+            domain_id=dp.domain_id,
+            domain_label=dp.domain_label,
+            node_ids=dp.node_ids,
+            marginal_risk_pct=dp.marginal_risk_pct,
+            trigger_share_pct=dp.trigger_share_pct,
+            ivw_weight_pct=dp.ivw_weight_pct,
+            mean_z=dp.mean_z,
+            sd_z=dp.sd_z,
+            z_5th=dp.z_5th,
+            z_95th=dp.z_95th,
+            is_directly_observed=dp.is_directly_observed,
+            n_observations=dp.n_observations,
+        )
+        for dp in risk_estimate.domain_profiles
+    ]
+
+    profile = ClinicalRiskProfile(
+        risk_pct=risk_estimate.risk_pct,
+        risk_lower_pct=risk_estimate.risk_lower_pct,
+        risk_upper_pct=risk_estimate.risk_upper_pct,
+        risk_range_text=risk_estimate.risk_range_text,
+        risk_tier=risk_estimate.risk_tier,
+        interval_method=risk_estimate.interval_method,
+        interval_level=risk_estimate.interval_level,
+        mc_se=risk_estimate.mc_se,
+        n_draws_used=risk_estimate.n_draws_used,
+        coverage_fraction=risk_estimate.coverage_fraction,
+        low_coverage_warning=risk_estimate.low_coverage_warning,
+        domain_breakdown=domain_breakdown,
+    )
+
+    logger.info(
+        "RT-I: Clinical risk mapped — risk=%.1f%% [%.1f%%–%.1f%%], tier=%s",
+        profile.risk_pct, profile.risk_lower_pct, profile.risk_upper_pct,
+        profile.risk_tier,
+    )
+    return profile
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-I: Pathway Profile Builder (C4 → PathwayProfile)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_pathway_profile(
+    active_pathways: list[PathwayActivation] | None,
+    run_id: str,
+    subject_ref: str,
+    pathway_evidence_scores: dict[str, PathwayEvidenceScore] | None = None,
+) -> PathwayProfile | None:
+    """Map C4d PathwayActivation list to presentation-ready PathwayProfile.
+
+    Enriches with B6.5 evidence density/distinction scores when available.
+    """
+    if not active_pathways:
+        return None
+
+    contributions = []
+    for pw in active_pathways:
+        # B6.5 enrichment
+        ed_val: float | None = None
+        ds_val: float | None = None
+        ec_val: float | None = None
+        adequate: bool | None = None
+        if pathway_evidence_scores and pw.pathway_id in pathway_evidence_scores:
+            pes = pathway_evidence_scores[pw.pathway_id]
+            ed_val = pes.evidence_density
+            ds_val = pes.distinction_score
+            ec_val = pes.edge_coverage
+            adequate = pes.is_adequate
+
+        contributions.append(PathwayContribution(
+            pathway_id=pw.pathway_id,
+            pathway_label=pw.pathway_label,
+            contribution_fraction=0.0,  # Not computed at C4d level
+            activation_z=pw.activation_score if pw.is_active else 0.0,
+            evidence_quality="high_uncertainty" if pw.high_uncertainty else "normal",
+            evidence_density=ed_val,
+            distinction_score=ds_val,
+            edge_coverage=ec_val,
+            is_adequate=adequate,
+        ))
+
+    # Dominant pathway = highest activation among active
+    active_only = [pw for pw in active_pathways if pw.is_active]
+    dominant = max(active_only, key=lambda p: p.activation_score).pathway_id if active_only else None
+
+    n_active = sum(1 for pw in active_pathways if pw.is_active)
+    coverage = n_active / len(active_pathways) if active_pathways else 0.0
+
+    profile = PathwayProfile(
+        run_id=run_id,
+        subject_ref=subject_ref,
+        pathway_contributions=contributions,
+        dominant_pathway_id=dominant,
+        coverage_fraction=coverage,
+    )
+
+    logger.info(
+        "RT-I: Pathway profile mapped — %d/%d active, dominant=%s",
+        n_active, len(active_pathways), dominant or "none",
+    )
+    return profile
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-I: Subpopulation Comparison Builder (F5)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_subpopulation_summary(
+    subpop_result: object | None,
+) -> SubpopulationComparisonSummary | None:
+    """Map F5 SubpopulationComparisonResult to presentation-ready summary.
+
+    Uses duck typing to avoid circular import of
+    SubpopulationComparisonResult from the algorithm layer.
+    """
+    if subpop_result is None:
+        return None
+
+    try:
+        pairwise = [
+            DifferentialEffectSummary(
+                intervention_id=d.intervention_id,
+                context_a=d.context_a,
+                context_b=d.context_b,
+                delta_C_diff_mean=d.delta_C_diff_mean,
+                delta_C_diff_ci_lower=d.delta_C_diff_ci_lower,
+                delta_C_diff_ci_upper=d.delta_C_diff_ci_upper,
+                practically_different=d.practically_different,
+            )
+            for d in subpop_result.pairwise_differentials  # type: ignore[attr-defined]
+        ]
+
+        risk_diffs = [
+            RiskDifferentialSummary(
+                context_a=r.context_a,
+                context_b=r.context_b,
+                risk_diff_pct=r.risk_diff_pct,
+                risk_diff_ci_lower=r.risk_diff_ci_lower,
+                risk_diff_ci_upper=r.risk_diff_ci_upper,
+            )
+            for r in subpop_result.risk_differentials  # type: ignore[attr-defined]
+        ]
+
+        summary = SubpopulationComparisonSummary(
+            n_contexts_compared=subpop_result.n_contexts_compared,  # type: ignore[attr-defined]
+            comparison_valid=subpop_result.comparison_valid,  # type: ignore[attr-defined]
+            validity_notes=subpop_result.validity_notes,  # type: ignore[attr-defined]
+            context_labels=list(subpop_result.context_results.keys()),  # type: ignore[attr-defined]
+            pairwise_differentials=pairwise,
+            risk_differentials=risk_diffs,
+            rank_concordance=subpop_result.rank_concordance,  # type: ignore[attr-defined]
+        )
+
+        logger.info(
+            "RT-I: Subpopulation summary mapped — %d contexts, valid=%s",
+            summary.n_contexts_compared, summary.comparison_valid,
+        )
+        return summary
+
+    except (AttributeError, TypeError) as exc:
+        logger.warning("RT-I: Failed to map subpopulation result: %s", exc)
+        return None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RT-I: Sensitivity Report Builder (D4c → SensitivityReport)
+# ═══════════════════════════════════════════════════════════════
+
+
+def _build_sensitivity_report(
+    ranking_result: RankingResult | None,
+    run_id: str,
+) -> SensitivityReport | None:
+    """Map D4c sensitivity indices to presentation-ready SensitivityReport."""
+    if ranking_result is None:
+        return None
+    if not ranking_result.sensitivity_indices:
+        return None
+
+    def _map_index(si: SensitivityIndex) -> SensitivityIndexItem:
+        return SensitivityIndexItem(
+            edge_id=si.edge_id,
+            source_node_id=si.source_node_id,
+            target_node_id=si.target_node_id,
+            elasticity=si.elasticity,
+            se_eff=si.se_eff,
+            discovery_score=si.discovery_score,
+        )
+
+    all_indices = [_map_index(si) for si in ranking_result.sensitivity_indices]
+    top_discovery = [_map_index(si) for si in ranking_result.top_discovery_edges]
+
+    report = SensitivityReport(
+        run_id=run_id,
+        sensitivity_indices=all_indices,
+        top_discovery_edges=top_discovery,
+        n_edges_analyzed=len(all_indices),
+    )
+
+    logger.info(
+        "RT-I: Sensitivity report mapped — %d indices, %d top discovery edges",
+        len(all_indices), len(top_discovery),
+    )
+    return report
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -594,6 +922,8 @@ def assemble_report(
     stability: StabilityState | None = None,
     variance: VarianceState | None = None,
     questioning: QuestioningState | None = None,
+    # B6.5: Pathway evidence scores (from FrozenModelState)
+    pathway_evidence_scores: dict[str, PathwayEvidenceScore] | None = None,
     output_mode: ReportOutputMode = ReportOutputMode.CLINICAL,
     # Phase 8: E-chain temporal results
     recovery: RecoveryTrajectory | None = None,
@@ -602,6 +932,18 @@ def assemble_report(
     node_labels: dict[str, str] | None = None,
     # Extraction quality (from completeness_checker, aggregated)
     extraction_quality: ExtractionQualitySummary | None = None,
+    # F4: Clinical risk estimate
+    risk_estimate: CRCIRiskEstimate | None = None,
+    # Evidence gaps (from evidence_gap_compiler)
+    evidence_gaps: EvidenceGapReport | None = None,
+    # C4d: Pathway activations (for pathway profile)
+    active_pathways: list[PathwayActivation] | None = None,
+    # F5: Subpopulation comparison (optional)
+    subpopulation_result: object | None = None,
+    # D3: Bundle synergy diagnostics (optional)
+    bundle_result: BundleResult | None = None,
+    # D4-D6: Full ranking result (for sensitivity + safety detail)
+    ranking_result: RankingResult | None = None,
 ) -> RecommendationReport:
     """RT-I4: Assemble complete RecommendationReport.
 
@@ -620,6 +962,14 @@ def assemble_report(
         overlay: From ALG-E3 (intervention overlays).
         uncertainty: From ALG-E4 (uncertainty/counterfactuals).
         node_labels: Optional node_id→label map for trajectories.
+        extraction_quality: From completeness_checker.
+        risk_estimate: From ALG-F4 (CRCIRiskEstimate).
+        evidence_gaps: From evidence_gap_compiler.
+        active_pathways: From ALG-C4d (PathwayActivation list).
+        subpopulation_result: From ALG-F5 (SubpopulationComparisonResult).
+        pathway_evidence_scores: From B6.5 (FrozenModelState.pathway_evidence_scores).
+        bundle_result: From ALG-D3 (BundleResult, for synergy diagnostics).
+        ranking_result: From ALG-D (D4-D6) — full ranking for sensitivity + safety.
 
     Returns:
         RecommendationReport.
@@ -646,7 +996,7 @@ def assemble_report(
 
     # Primary schedule
     if ranked_schedules.schedules:
-        primary = _build_schedule_plan(ranked_schedules.schedules[0], run_id)
+        primary = _build_schedule_plan(ranked_schedules.schedules[0], run_id, bundle_result, ranking_result)
     else:
         primary = SchedulePlan(
             schedule_id="empty",
@@ -657,7 +1007,7 @@ def assemble_report(
 
     # Alternative schedules
     alternatives = [
-        _build_schedule_plan(s, run_id)
+        _build_schedule_plan(s, run_id, bundle_result, ranking_result)
         for s in ranked_schedules.schedules[1:]
     ]
 
@@ -683,6 +1033,20 @@ def assemble_report(
     if not ranked_schedules.gate_g_g2_passed:
         warnings.append("Marginal recommendation: top SAFE_B below MID threshold")
 
+    # F4: Clinical risk profile
+    clinical_risk = _build_clinical_risk(risk_estimate)
+
+    # Pathway profile (from C4d activations, enriched with B6.5)
+    pathway_profile = _build_pathway_profile(
+        active_pathways, run_id, subject_ref, pathway_evidence_scores,
+    )
+
+    # F5: Subpopulation comparison
+    subpop_summary = _build_subpopulation_summary(subpopulation_result)
+
+    # D4c: Sensitivity report
+    sensitivity_report = _build_sensitivity_report(ranking_result, run_id)
+
     report = RecommendationReport(
         run_id=run_id,
         subject_ref=subject_ref,
@@ -693,6 +1057,11 @@ def assemble_report(
         trajectories=traj_list,
         variance_decomposition=var_decomp,
         decision_trace=trace,
+        clinical_risk=clinical_risk,
+        evidence_gaps=evidence_gaps,
+        pathway_profile=pathway_profile,
+        subpopulation_comparison=subpop_summary,
+        sensitivity_report=sensitivity_report,
         safety_flags=safety_flags,
         run_warnings=warnings,
         timestamp=session.timestamp,

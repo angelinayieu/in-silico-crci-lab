@@ -1,0 +1,8 @@
+align_id,profile_id,predictor_ref_type,predictor_ref_id,outcome_measure_id,alignment_type,lag_days,window_spec,notes,version,active
+ALIGN_IL6_PROC_SPEED,PROF_CHEMO_STANDARD,biomarker,MEAS_IL6_SERUM,MEAS_TMT_A_TIME,lag_predictor,90,"{""min_days"":60,""max_days"":120}",IL-6 predicts processing speed at 3-month lag,1,1
+ALIGN_CRP_EXEC_FUNC,PROF_CHEMO_STANDARD,biomarker,MEAS_CRP_SERUM,MEAS_TMT_B_TIME,lag_predictor,90,"{""min_days"":60,""max_days"":120}",CRP predicts executive function at 3-month lag,1,1
+ALIGN_TNF_WORK_MEM,PROF_CHEMO_STANDARD,biomarker,MEAS_TNF_SERUM,MEAS_DIGITSPAN_BACK,lag_predictor,90,"{""min_days"":60,""max_days"":120}",TNF-alpha predicts working memory at 3-month lag,1,1
+ALIGN_BDNF_EPISODIC,PROF_CHEMO_STANDARD,biomarker,MEAS_BDNF_SERUM,MEAS_HVLT_R_TOTAL,lag_predictor,90,"{""min_days"":60,""max_days"":120}",BDNF predicts episodic memory at 3-month lag,1,1
+ALIGN_CORTISOL_FATIGUE,PROF_CHEMO_STANDARD,biomarker,MEAS_CORTISOL_SERUM,MEAS_BFI_TOTAL,concurrent,0,,Cortisol concurrent with fatigue,1,1
+ALIGN_EXERCISE_COG,PROF_EXERCISE_STD,intervention,ACT_AEROBIC_EXERCISE,MEAS_FACTCOG_PCI_TOTAL,lag_predictor,180,"{""min_days"":120,""max_days"":240}",Exercise predicts perceived cognition at 6 months,1,1
+ALIGN_SLEEP_COG,PROF_SLEEP_STD,intervention,ACT_SLEEP_HYGIENE,MEAS_PSQI_TOTAL,lag_predictor,30,"{""min_days"":14,""max_days"":60}",Sleep hygiene predicts sleep quality at 1 month,1,1

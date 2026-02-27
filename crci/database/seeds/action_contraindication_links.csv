@@ -1,0 +1,7 @@
+link_id,action_id,rule_id,override_mode,scope_constraints_json,version,active,notes
+ACLINK_AEROBIC_CARDIO,ACT_AEROBIC_EXERCISE,CONTRA_CARDIAC_UNSTABLE,block,,1,1,Block aerobic exercise for unstable cardiac conditions
+ACLINK_RESIST_CARDIO,ACT_RESISTANCE_TRAINING,CONTRA_CARDIAC_UNSTABLE,block,,1,1,Block resistance training for unstable cardiac conditions
+ACLINK_AEROBIC_NEURO,ACT_AEROBIC_EXERCISE,CONTRA_NEURO_SEVERE,warn,,1,1,Warn for severe neurological impairment with aerobic exercise
+ACLINK_COGREHAB_NEURO,ACT_COGNITIVE_REHAB,CONTRA_NEURO_SEVERE,dose_reduce,{"max_intensity":"moderate"},1,1,Reduce cognitive rehab intensity for severe neuro impairment
+ACLINK_MINDFUL_PSYCH,ACT_MINDFULNESS,CONTRA_PSYCHOTIC_ACTIVE,block,,1,1,Block mindfulness meditation during active psychosis
+ACLINK_SLEEP_RX,ACT_SLEEP_HYGIENE,CONTRA_INSOMNIA_MEDICAL,warn,,1,1,Warn if medical insomnia requires pharmacological intervention

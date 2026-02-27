@@ -1,0 +1,39 @@
+%% SE Derivation Decision Tree
+%% Choose the correct method to derive standard error
+
+flowchart TD
+    START([Need SE for effect size]) --> Q1
+
+    Q1{SE reported<br/>directly?}
+    Q1 -->|Yes| M0["✅ Use reported SE<br/>method = 'reported'"]
+    Q1 -->|No| Q2
+
+    Q2{95% CI<br/>reported?}
+    Q2 -->|Yes| M1["Method 1: from_ci<br/>━━━━━━━━━━━━━<br/>SE = (CI_upper − CI_lower) / (2 × 1.96)"]
+    Q2 -->|No| Q3
+
+    Q3{Exact p-value<br/>reported?}
+    Q3 -->|Yes| M2["Method 2: from_p_value<br/>━━━━━━━━━━━━━━━━<br/>z = −Φ⁻¹(p/2)<br/>SE = |effect| / z"]
+    Q3 -->|No| Q4
+
+    Q4{t-statistic<br/>reported?}
+    Q4 -->|Yes| M3["Method 3: from_t_stat<br/>━━━━━━━━━━━━━━━<br/>SE = effect / t"]
+    Q4 -->|No| Q5
+
+    Q5{F-statistic<br/>with df₁=1?}
+    Q5 -->|Yes| M4["Method 4: from_f_stat<br/>━━━━━━━━━━━━━━━<br/>t = √F<br/>SE = effect / t"]
+    Q5 -->|No| Q6
+
+    Q6{Group SDs +<br/>group Ns known?}
+    Q6 -->|Yes| M5["Method 5: from_sd_n<br/>━━━━━━━━━━━━━━━<br/>SE(d) = √((n₁+n₂)/(n₁×n₂) + d²/(2(n₁+n₂)))"]
+    Q6 -->|No| M6["Method 6: fallback_4_over_n<br/>━━━━━━━━━━━━━━━━━━<br/>SE(d) ≈ √(4/N)"]
+
+    M0 --> DOC
+    M1 --> DOC
+    M2 --> DOC
+    M3 --> DOC
+    M4 --> DOC
+    M5 --> DOC
+    M6 --> DOC
+
+    DOC["📝 Document in confidence_note:<br/>- Formula used<br/>- Raw values input<br/>- Any assumptions"]

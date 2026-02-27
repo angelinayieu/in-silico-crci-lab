@@ -13,6 +13,8 @@ Steps performed:
   A4. Load CSV evidence → edge_evidence_v1   (populates BOTH raw AND harmonized columns)
   A4b. Load auxiliary family CSVs → node_priors_v1, instrument_evidence_v1,
        population_norms_v1, temporal_evidence_v1
+  A4c. Harmonize scales: mean_diff_raw → cohens_d (SD borrowing)
+  A4d. Apply 7-layer SE_eff calibration (Formula P3-8, Gate P3-G1)
   A5. Seed action_catalog_v1                  (from seeds/actions.csv)
   A6. Compile evidence → edges_v1             (IVW aggregation per edge)
   A7. Verify final state
@@ -52,8 +54,15 @@ from sqlalchemy import text
 from crci.shared.db import init_db, get_session
 from crci.extraction.family_importers import (
     import_context_prior,
+    import_correlation,
+    import_dose_evidence,
     import_instrument_evidence,
+    import_ontology_link,
     import_population_norm,
+    import_profile_data_stream,
+    import_stream_timepoint,
+    import_study_cohort_profile,
+    import_subgroup_evidence,
     import_temporal_evidence,
 )
 
@@ -95,6 +104,19 @@ STUDIES = [
         "study_design": "RCT",
         "notes": "Breast cancer survivors; 3-arm pilot RCT: HIIT vs MOD vs CON; n=17; 12-week cycle ergometer; CogState battery",
     },
+    {
+        "study_id": "STUDY_ADAM_2017",
+        "title": "Diurnal Cortisol Slopes and Mental and Physical Health Outcomes: "
+                 "A Systematic Review and Meta-analysis",
+        "authors": "Adam EK; Quinn ME; Tavernier R; McQuillan MT; Dahlke KA; Gilbert KE",
+        "journal": "Psychoneuroendocrinology",
+        "year": 2017,
+        "doi": "10.1016/j.psyneuen.2017.05.018",
+        "study_design": "systematic_review",
+        "notes": "Meta-analysis of 80 studies (k=179, N=36823). DCS↔health outcomes. "
+                 "Subgroups: inflammation r=.288, depression r=.106, fatigue r=.167, anxiety r=-.084 (NS). "
+                 "Overall r=.147. Cross-sectional=91.1%. I²=83.23%.",
+    },
 ]
 
 
@@ -115,6 +137,7 @@ DOI_TO_STUDY = {
     "10.1016/j.lfs.2013.08.011": "STUDY_CHERRIER_2013",
     "10.1002/pon.4370": "STUDY_CAMPBELL_2017",
     "10.1016/j.jsams.2018.11.026": "STUDY_NORTHEY_2018",
+    "10.1016/j.psyneuen.2017.05.018": "STUDY_ADAM_2017",
 }
 
 
@@ -427,6 +450,230 @@ def reseed_node_and_instrument_definitions(engine, dry_run: bool = False) -> tup
 
 
 # ============================================================================
+#  STEP 1c: Reseed measure_definitions_v1 and pathways_v1
+#           from authoritative registries
+# ============================================================================
+def reseed_measure_and_pathway_definitions(engine, dry_run: bool = False) -> tuple[int, int]:
+    """Reseed measure_definitions_v1 from MEASURE_REGISTRY.csv and
+    pathways_v1 from PATHWAY_REGISTRY.csv.
+
+    The registries contain fine-grained columns (cancer_validation_status,
+    se_multiplier, mcid, etc.) that the seed CSVs lack.  Column mapping
+    adapts registry names → DB schema names.
+
+    Returns:
+        Tuple of (measures_loaded, pathways_loaded).
+    """
+    measure_registry = PROJECT_ROOT / "registries" / "MEASURE_REGISTRY.csv"
+    pathway_registry = PROJECT_ROOT / "registries" / "PATHWAY_REGISTRY.csv"
+
+    measures_loaded = 0
+    pathways_loaded = 0
+
+    # ---- Reseed measures ----
+    if measure_registry.exists():
+        with open(measure_registry, "r") as f:
+            reader = csv.DictReader(f)
+            measure_rows = list(reader)
+
+        logger.info("Read %d measures from MEASURE_REGISTRY.csv", len(measure_rows))
+
+        if not dry_run:
+            with engine.begin() as conn:
+                result = conn.execute(text("DELETE FROM measure_definitions_v1"))
+                logger.info("Cleared %d existing measure rows", result.rowcount)
+
+                insert_sql = text("""
+                    INSERT OR IGNORE INTO measure_definitions_v1 (
+                        measure_id, measure_label, maps_to_node_id,
+                        measure_kind, analyte, specimen_or_device,
+                        biospecimen, device_type, proxy_type,
+                        time_aggregation, raw_unit, value_transform_spec,
+                        direction_rule_id, directionality_after_alignment,
+                        measure_family_id, compatibility_group_id,
+                        effective_window_days, min_required_samples,
+                        required_fields_json,
+                        preferred_norm_ref_id, preferred_noise_id,
+                        active, version, description, notes
+                    ) VALUES (
+                        :measure_id, :measure_label, :maps_to_node_id,
+                        :measure_kind, :analyte, :specimen_or_device,
+                        :biospecimen, :device_type, :proxy_type,
+                        :time_aggregation, :raw_unit, :value_transform_spec,
+                        :direction_rule_id, :directionality_after_alignment,
+                        :measure_family_id, :compatibility_group_id,
+                        :effective_window_days, :min_required_samples,
+                        :required_fields_json,
+                        :preferred_norm_ref_id, :preferred_noise_id,
+                        :active, :version, :description, :notes
+                    )
+                """)
+
+                for row in measure_rows:
+                    mid = row.get("measure_id", "").strip()
+                    if not mid:
+                        continue
+
+                    scoring_dir = row.get("scoring_direction", "").strip() or "higher_better"
+                    if scoring_dir == "higher_better":
+                        dir_rule = "DIR_POSITIVE"
+                        dir_post = "higher_better"
+                    elif scoring_dir == "lower_better":
+                        dir_rule = "DIR_REVERSE"
+                        dir_post = "higher_worse"
+                    else:
+                        dir_rule = "DIR_POSITIVE"
+                        dir_post = "higher_better"
+
+                    mtype = row.get("measure_type", "").strip() or "total_score"
+                    assay = row.get("assay_method", "").strip() or ""
+                    sample = row.get("sample_type", "").strip() or ""
+
+                    # Derive measure_kind from measure_type
+                    kind_map = {
+                        "total_score": "total_score",
+                        "subscale": "subscale",
+                        "single_item": "single_item",
+                        "biomarker": "biomarker",
+                        "composite": "composite",
+                        "performance": "performance_metric",
+                    }
+                    measure_kind = kind_map.get(mtype, mtype)
+
+                    # Derive specimen/device from assay_method + sample_type
+                    if assay and assay != "N/A":
+                        specimen_or_device = assay
+                    elif sample and sample != "N/A":
+                        specimen_or_device = sample
+                    else:
+                        specimen_or_device = "questionnaire"
+
+                    # Build required_fields_json
+                    req_fields = row.get("alternative_measure_ids_json", "").strip()
+                    if not req_fields or req_fields == "N/A":
+                        req_fields = '{"total_score": "required"}'
+
+                    time_res = row.get("time_resolution_days", "").strip() or "30"
+                    try:
+                        eff_window = int(float(time_res))
+                    except (ValueError, TypeError):
+                        eff_window = 30
+
+                    params = {
+                        "measure_id": mid,
+                        "measure_label": row.get("measure_name", "").strip() or mid,
+                        "maps_to_node_id": row.get("maps_to_node_id", "").strip() or "NODE_COMP_CRCI",
+                        "measure_kind": measure_kind,
+                        "analyte": assay if assay != "N/A" else "",
+                        "specimen_or_device": specimen_or_device,
+                        "biospecimen": sample if sample != "N/A" else "",
+                        "device_type": "",
+                        "proxy_type": "direct",
+                        "time_aggregation": row.get("aggregation_method", "").strip() or "mean",
+                        "raw_unit": row.get("unit_of_measure", "").strip() or "score",
+                        "value_transform_spec": "",
+                        "direction_rule_id": dir_rule,
+                        "directionality_after_alignment": dir_post,
+                        "measure_family_id": row.get("parent_instrument_id", "").strip() or mid,
+                        "compatibility_group_id": row.get("tier_assignment", "").strip() or "0",
+                        "effective_window_days": eff_window,
+                        "min_required_samples": 1,
+                        "required_fields_json": req_fields,
+                        "preferred_norm_ref_id": row.get("norm_id", "").strip() or None,
+                        "preferred_noise_id": row.get("noise_id", "").strip() or None,
+                        "active": int(row.get("active", 1)),
+                        "version": 1,
+                        "description": row.get("measure_short", "").strip() or mid,
+                        "notes": row.get("notes", "").strip() or "",
+                    }
+                    conn.execute(insert_sql, params)
+                    measures_loaded += 1
+
+                logger.info("Inserted %d measure definitions from MEASURE_REGISTRY.csv", measures_loaded)
+        else:
+            measures_loaded = len(measure_rows)
+            logger.info("[DRY RUN] Would insert %d measure definitions", measures_loaded)
+    else:
+        logger.warning("MEASURE_REGISTRY.csv not found at %s", measure_registry)
+
+    # ---- Reseed pathways ----
+    if pathway_registry.exists():
+        with open(pathway_registry, "r") as f:
+            reader = csv.DictReader(f)
+            pathway_rows = list(reader)
+
+        logger.info("Read %d pathways from PATHWAY_REGISTRY.csv", len(pathway_rows))
+
+        if not dry_run:
+            with engine.begin() as conn:
+                result = conn.execute(text("DELETE FROM pathways_v1"))
+                logger.info("Cleared %d existing pathway rows", result.rowcount)
+
+                insert_sql = text("""
+                    INSERT OR IGNORE INTO pathways_v1 (
+                        pathway_id, pathway_label, tier,
+                        entry_node_ids_json, exit_node_ids_json,
+                        intermediate_node_ids_json, edge_relation_ids_json,
+                        cognitive_domain_specificity_json,
+                        best_proxy_biomarker, proxy_r_squared,
+                        causal_evidence_level, key_citation,
+                        version, active, notes
+                    ) VALUES (
+                        :pathway_id, :pathway_label, :tier,
+                        :entry_node_ids_json, :exit_node_ids_json,
+                        :intermediate_node_ids_json, :edge_relation_ids_json,
+                        :cognitive_domain_specificity_json,
+                        :best_proxy_biomarker, :proxy_r_squared,
+                        :causal_evidence_level, :key_citation,
+                        :version, :active, :notes
+                    )
+                """)
+
+                for row in pathway_rows:
+                    pid = row.get("pathway_id", "").strip()
+                    if not pid:
+                        continue
+
+                    # proxy_r_squared: convert qualitative → numeric
+                    proxy_qual = row.get("proxy_r_squared_qualitative", "").strip().lower()
+                    proxy_map = {"high": 0.7, "moderate": 0.4, "low": 0.15, "very_low": 0.05}
+                    proxy_r2 = proxy_map.get(proxy_qual, 0.3)
+
+                    # Build edge_relation_ids_json from component_nodes if available
+                    # (the registry has component_nodes_json but not edge_relation_ids_json)
+                    edge_rel_json = "[]"
+
+                    params = {
+                        "pathway_id": pid,
+                        "pathway_label": row.get("pathway_label", "").strip() or pid,
+                        "tier": row.get("tier", "").strip() or "unknown",
+                        "entry_node_ids_json": row.get("entry_node_ids_json", "").strip() or "[]",
+                        "exit_node_ids_json": row.get("exit_node_ids_json", "").strip() or "[]",
+                        "intermediate_node_ids_json": row.get("intermediate_node_ids_json", "").strip() or "[]",
+                        "edge_relation_ids_json": edge_rel_json,
+                        "cognitive_domain_specificity_json": row.get("cognitive_domain_specificity_json", "").strip() or "{}",
+                        "best_proxy_biomarker": row.get("best_proxy_biomarker", "").strip() or None,
+                        "proxy_r_squared": proxy_r2,
+                        "causal_evidence_level": row.get("causal_evidence_level", "").strip() or "unknown",
+                        "key_citation": row.get("key_citation", "").strip() or "pending",
+                        "version": int(row.get("version", 1)),
+                        "active": int(row.get("active", 1)),
+                        "notes": row.get("notes", "").strip() or "",
+                    }
+                    conn.execute(insert_sql, params)
+                    pathways_loaded += 1
+
+                logger.info("Inserted %d pathway definitions from PATHWAY_REGISTRY.csv", pathways_loaded)
+        else:
+            pathways_loaded = len(pathway_rows)
+            logger.info("[DRY RUN] Would insert %d pathway definitions", pathways_loaded)
+    else:
+        logger.warning("PATHWAY_REGISTRY.csv not found at %s", pathway_registry)
+
+    return measures_loaded, pathways_loaded
+
+
+# ============================================================================
 #  STEP 2: Register studies in study_registry_v1
 # ============================================================================
 def register_studies(engine, dry_run: bool = False) -> int:
@@ -573,6 +820,8 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
             rob_overall, identification_status,
             quality_rating, notes, extraction_snippet,
             shared_control_flag, endpoint_vs_change, comparison_arm_label,
+            study_design, cancer_type, treatment_phase, pub_year,
+            covariates_adjusted, sd_x, sd_y, cancer_validation_status,
             entered_by, entered_at, version, active,
             span_hash
         ) VALUES (
@@ -587,6 +836,8 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
             :rob_overall, :identification_status,
             :quality_rating, :notes, :extraction_snippet,
             :shared_control_flag, :endpoint_vs_change, :comparison_arm_label,
+            :study_design, :cancer_type, :treatment_phase, :pub_year,
+            :covariates_adjusted, :sd_x, :sd_y, :cancer_validation_status,
             :entered_by, :entered_at, :version, :active,
             :span_hash
         )
@@ -725,6 +976,15 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                     "shared_control_flag": 1 if _csv_str(row, "shared_control_flag") == "1" else 0,
                     "endpoint_vs_change": _csv_str(row, "endpoint_vs_change"),
                     "comparison_arm_label": _csv_str(row, "comparison_arm_label"),
+                    # Study-level metadata columns (from CSV)
+                    "study_design": _csv_str(row, "study_design"),
+                    "cancer_type": _csv_str(row, "cancer_type"),
+                    "treatment_phase": _csv_str(row, "treatment_phase"),
+                    "pub_year": _safe_int(row.get("pub_year")),
+                    "covariates_adjusted": _csv_str(row, "covariates_adjusted"),
+                    "sd_x": _safe_float(row.get("sd_treatment")),
+                    "sd_y": _safe_float(row.get("sd_control")),
+                    "cancer_validation_status": _csv_str(row, "cancer_validated"),
                     # Audit
                     "entered_by": "manual_csv_import",
                     "entered_at": datetime.now(timezone.utc).isoformat(),
@@ -760,9 +1020,18 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
 # Map CSV template filename stem → (importer function, target table)
 _FAMILY_IMPORTERS = {
     "context_priors_template": ("context_prior", import_context_prior),
+    "correlation_template": ("correlation", import_correlation),
     "instrument_evidence_template": ("instrument_evidence", import_instrument_evidence),
     "population_norms_template": ("population_norm", import_population_norm),
     "temporal_evidence_template": ("temporal_evidence", import_temporal_evidence),
+    # B2-B5 study metadata families
+    "study_cohort_profile_template": ("study_cohort_profile", import_study_cohort_profile),
+    "profile_data_stream_template": ("profile_data_stream", import_profile_data_stream),
+    "stream_timepoint_template": ("stream_timepoint", import_stream_timepoint),
+    "ontology_link_template": ("ontology_link", import_ontology_link),
+    # Dose + subgroup evidence
+    "dose_evidence_template": ("dose_evidence", import_dose_evidence),
+    "subgroup_evidence_template": ("subgroup_evidence", import_subgroup_evidence),
 }
 
 
@@ -953,6 +1222,542 @@ def seed_action_catalog(engine, dry_run: bool = False) -> int:
             logger.info("Inserted action %s", action_id)
 
     return loaded
+
+
+# ============================================================================
+#  STEP 5b: Seed dose_bridges_v1 from crci/database/seeds/dose_bridges.csv
+# ============================================================================
+def seed_dose_bridges(engine, dry_run: bool = False) -> int:
+    """Seed dose_bridges_v1 from crci/database/seeds/dose_bridges.csv."""
+    csv_path = PROJECT_ROOT / "crci" / "database" / "seeds" / "dose_bridges.csv"
+    if not csv_path.exists():
+        logger.warning("dose_bridges.csv not found at %s", csv_path)
+        return 0
+
+    with open(csv_path, "r", newline="") as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    logger.info("Read %d dose bridges from %s", len(rows), csv_path)
+
+    loaded = 0
+    with engine.begin() as conn:
+        for row in rows:
+            bridge_id = row.get("bridge_id", "").strip()
+            if not bridge_id:
+                continue
+
+            # Check if exists
+            existing = conn.execute(
+                text("SELECT bridge_id FROM dose_bridges_v1 WHERE bridge_id = :bid"),
+                {"bid": bridge_id},
+            ).fetchone()
+            if existing:
+                logger.debug("Dose bridge %s already exists, skipping", bridge_id)
+                continue
+
+            if dry_run:
+                logger.info("[DRY RUN] Would insert dose bridge %s", bridge_id)
+                loaded += 1
+                continue
+
+            conn.execute(
+                text("""
+                    INSERT INTO dose_bridges_v1 (
+                        bridge_id, action_id, output_mode, output_feature_id,
+                        output_node_id, maps_to_node_id, dose_type, dose_unit,
+                        dose_min, dose_max, dose_step, dose_reference,
+                        dose_response_family, dose_response_params_json,
+                        bridge_effect_sign, bridge_gain, bridge_noise_sd,
+                        time_step_unit, temporal_family, lag_steps, half_life_steps,
+                        scope_json, provenance, version, active
+                    ) VALUES (
+                        :bridge_id, :action_id, :output_mode, :output_feature_id,
+                        :output_node_id, :maps_to_node_id, :dose_type, :dose_unit,
+                        :dose_min, :dose_max, :dose_step, :dose_reference,
+                        :dose_response_family, :dose_response_params_json,
+                        :bridge_effect_sign, :bridge_gain, :bridge_noise_sd,
+                        :time_step_unit, :temporal_family, :lag_steps, :half_life_steps,
+                        :scope_json, :provenance, :version, :active
+                    )
+                """),
+                {
+                    "bridge_id": bridge_id,
+                    "action_id": row.get("action_id", "").strip(),
+                    "output_mode": row.get("output_mode", "node").strip(),
+                    "output_feature_id": row.get("output_feature_id", "").strip() or None,
+                    "output_node_id": row.get("output_node_id", "").strip() or None,
+                    "maps_to_node_id": row.get("maps_to_node_id", "").strip() or None,
+                    "dose_type": row.get("dose_type", "").strip() or None,
+                    "dose_unit": row.get("dose_unit", "").strip() or None,
+                    "dose_min": _safe_float(row.get("dose_min")),
+                    "dose_max": _safe_float(row.get("dose_max")),
+                    "dose_step": _safe_float(row.get("dose_step")),
+                    "dose_reference": _safe_float(row.get("dose_reference")) or 1.0,
+                    "dose_response_family": row.get("dose_response_family", "linear").strip(),
+                    "dose_response_params_json": row.get("dose_response_params_json", "{}").strip(),
+                    "bridge_effect_sign": _safe_int(row.get("bridge_effect_sign")) or 1,
+                    "bridge_gain": _safe_float(row.get("bridge_gain")) or 1.0,
+                    "bridge_noise_sd": _safe_float(row.get("bridge_noise_sd")),
+                    "time_step_unit": row.get("time_step_unit", "day").strip(),
+                    "temporal_family": row.get("temporal_family", "delta").strip(),
+                    "lag_steps": _safe_int(row.get("lag_steps")) or 0,
+                    "half_life_steps": _safe_float(row.get("half_life_steps")),
+                    "scope_json": row.get("scope_json", "{}").strip(),
+                    "provenance": row.get("provenance", "CATEGORY_A_CURATED").strip(),
+                    "version": _safe_int(row.get("version")) or 1,
+                    "active": _safe_int(row.get("active")) or 1,
+                },
+            )
+            loaded += 1
+            logger.info("Inserted dose bridge %s → %s",
+                        bridge_id, row.get("output_node_id", "").strip())
+
+    return loaded
+
+
+# ============================================================================
+#  STEP 4c: Harmonize scales to Cohen's d
+# ============================================================================
+def harmonize_scales_to_cohens_d(engine, dry_run: bool = False) -> int:
+    """Convert mean_diff_raw evidence rows to cohens_d using population norm SD.
+
+    For each evidence row with harmonized_scale='mean_diff_raw':
+    1. Look up the outcome node (node_y) in population_norms_v1
+    2. Borrow the pooled SD from the closest matching norm
+    3. Convert: d = mean_diff / SD_pooled,  SE_d = SE_raw / SD_pooled
+    4. Apply Tier-based SE inflation per SYS_EXTRACTION S3 SD borrowing spec
+    5. Update the row to harmonized_scale='cohens_d'
+
+    This ensures all evidence rows fed to IVW compilation are on a
+    common standardized scale, preventing nonsensical pooling of raw
+    score differences with Cohen's d values.
+
+    Returns:
+        Number of rows converted.
+    """
+    from crci.shared.config import (
+        SD_BORROW_TIER1_INFLATION,
+        SD_BORROW_TIER2_INFLATION,
+        SD_BORROW_TIER3_INFLATION,
+    )
+
+    converted = 0
+    skipped = 0
+
+    with engine.begin() as conn:
+        # Get all mean_diff_raw rows
+        rows = conn.execute(text("""
+            SELECT ler_id, edge_relation_id, harmonized_beta, harmonized_se,
+                   N_effect, node_y, study_id
+            FROM edge_evidence_v1
+            WHERE harmonized_scale = 'mean_diff_raw' AND active = 1
+        """)).fetchall()
+
+        if not rows:
+            logger.info("No mean_diff_raw rows to harmonize")
+            return 0
+
+        logger.info(
+            "Found %d mean_diff_raw evidence rows to harmonize to cohens_d",
+            len(rows),
+        )
+
+        for row in rows:
+            ler_id, edge_id, beta_raw, se_raw, n_eff, node_y, study_id = row
+
+            if not node_y:
+                logger.warning(
+                    "Harmonization skipped for %s: no node_y set", ler_id,
+                )
+                skipped += 1
+                continue
+
+            # Priority 1: SD from same study + same node (Tier 1)
+            sd_row = conn.execute(text("""
+                SELECT sd_raw, instrument_id, study_id
+                FROM population_norms_v1
+                WHERE node_id = :nid AND sd_raw > 0 AND study_id = :sid
+                ORDER BY sd_raw DESC
+                LIMIT 1
+            """), {"nid": node_y, "sid": study_id}).fetchone()
+
+            if sd_row:
+                sd_pooled = sd_row[0]
+                sd_source_inst = sd_row[1]
+                sd_source_study = sd_row[2]
+                se_inflation = SD_BORROW_TIER1_INFLATION  # 1.0 — same study
+                borrow_tier = 1
+            else:
+                # Priority 2: SD from any study for this node (Tier 2)
+                sd_row = conn.execute(text("""
+                    SELECT sd_raw, instrument_id, study_id
+                    FROM population_norms_v1
+                    WHERE node_id = :nid AND sd_raw > 0
+                    ORDER BY sd_raw DESC
+                    LIMIT 1
+                """), {"nid": node_y}).fetchone()
+
+                if sd_row:
+                    sd_pooled = sd_row[0]
+                    sd_source_inst = sd_row[1]
+                    sd_source_study = sd_row[2]
+                    se_inflation = SD_BORROW_TIER2_INFLATION  # 1.15
+                    borrow_tier = 2
+                else:
+                    logger.warning(
+                        "Harmonization skipped for %s (%s): no population norm "
+                        "SD found for node_y=%s",
+                        ler_id, edge_id, node_y,
+                    )
+                    skipped += 1
+                    continue
+
+            if sd_pooled <= 0:
+                logger.warning(
+                    "Harmonization skipped for %s: SD_pooled=%.4f <= 0",
+                    ler_id, sd_pooled,
+                )
+                skipped += 1
+                continue
+
+            # Formula: d = mean_diff / SD_pooled
+            d = beta_raw / sd_pooled
+            # SE transforms linearly: SE_d = SE_raw / SD_pooled
+            se_d = se_raw / sd_pooled
+            # Apply tier-based SE inflation for borrowed SD uncertainty
+            se_d_inflated = se_d * se_inflation
+
+            provenance_note = (
+                f"; HARMONIZED mean_diff→cohens_d: d={d:.4f} "
+                f"(beta_raw={beta_raw:.4f} / SD_pooled={sd_pooled:.4f}); "
+                f"SE_d={se_d_inflated:.4f} (inflation={se_inflation:.2f}, "
+                f"tier={borrow_tier}); SD from {sd_source_inst} "
+                f"(study={sd_source_study})"
+            )
+
+            if dry_run:
+                logger.info(
+                    "[DRY RUN] Would harmonize %s: β=%.3f → d=%.4f, "
+                    "SE=%.3f → %.4f (SD_pooled=%.2f, tier=%d)",
+                    ler_id, beta_raw, d, se_raw, se_d_inflated,
+                    sd_pooled, borrow_tier,
+                )
+            else:
+                conn.execute(text("""
+                    UPDATE edge_evidence_v1
+                    SET harmonized_beta = :d,
+                        harmonized_se = :se_d,
+                        harmonized_scale = 'cohens_d',
+                        harmonization_status = 'harmonized_scale_converted',
+                        notes = notes || :provenance
+                    WHERE ler_id = :ler_id
+                """), {
+                    "d": round(d, 6),
+                    "se_d": round(se_d_inflated, 6),
+                    "provenance": provenance_note,
+                    "ler_id": ler_id,
+                })
+                logger.info(
+                    "Harmonized %s (%s): β=%.3f → d=%.4f, SE=%.3f → %.4f "
+                    "(SD_pooled=%.2f from %s, tier=%d)",
+                    ler_id, edge_id, beta_raw, d, se_raw, se_d_inflated,
+                    sd_pooled, sd_source_inst, borrow_tier,
+                )
+
+            converted += 1
+
+    if skipped:
+        logger.warning(
+            "Scale harmonization: %d rows converted, %d skipped (no SD available)",
+            converted, skipped,
+        )
+    else:
+        logger.info("Scale harmonization: %d rows converted to cohens_d", converted)
+
+    return converted
+
+
+# ============================================================================
+#  STEP 4d: Apply 7-layer SE_eff calibration (Formula P3-8)
+#
+#  Implements the full P3 heterogeneity pipeline for CSV-imported data.
+#  For each evidence row, applies:
+#    L1: Study design penalty (small RCT interpolation from N)
+#    L2: Scope match (1.0 for manual extraction = well-scoped)
+#    L3: Statistical heterogeneity (τ²/I² from grouped edge data)
+#    L4: Cancer validation multiplier (from CSV cancer_validated column)
+#    L5: GRADE quality (from quality_rating → HIGH/MODERATE/LOW)
+#    L6: Temporal decay (conservative default: 14 days when absent)
+#    L7: Freshness (from pub_year, decay 1.5%/yr)
+#
+#  Formula P3-8:
+#    SE_eff = √[(SE · m_design · m_scale · m_GRADE)² + σ²_struct + τ²·𝟙[I²≥50%]]
+#             / (max(w_scope, 0.3) · w_fresh)
+#
+#  Gate P3-G1: SE_eff ≥ SE_raw (calibration only inflates, never deflates)
+# ============================================================================
+
+
+def _build_cancer_validation_lookup() -> dict[tuple[str, str], str]:
+    """Read CSV files to build (doi_slug, edge_id) → validation_status map.
+
+    Maps CSV ``cancer_validated`` column values to config.SCALE_MULTIPLIERS keys:
+      - "yes" → "validated_cancer"  (m=1.0)
+      - "no"  → "general_population" (m=1.30)
+      - missing column → "general_population" (m=1.30)
+
+    Returns:
+        Dict mapping (doi_slug, edge_relation_id) → validation_status string.
+    """
+    structured_dir = PROJECT_ROOT / "data" / "manual_uploads" / "structured"
+    lookup: dict[tuple[str, str], str] = {}
+
+    if not structured_dir.exists():
+        logger.warning("Structured dir %s not found; cancer validation will default", structured_dir)
+        return lookup
+
+    for doi_dir in sorted(structured_dir.iterdir()):
+        if not doi_dir.is_dir():
+            continue
+        csv_path = doi_dir / "edge_evidence_template.csv"
+        if not csv_path.exists():
+            continue
+
+        doi_slug = doi_dir.name
+        with open(csv_path, newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                edge_id = row.get("edge_id", "").strip()
+                cancer_val = row.get("cancer_validated", "").strip().lower()
+                if cancer_val == "yes":
+                    status = "validated_cancer"
+                elif cancer_val == "no":
+                    status = "general_population"
+                else:
+                    # Column missing or empty → default
+                    status = "general_population"
+                key = (doi_slug, edge_id)
+                # For duplicate edge_ids (e.g. multiple comparison arms),
+                # prefer the most informative (non-default) value
+                existing = lookup.get(key)
+                if existing is None or (
+                    existing == "general_population"
+                    and status != "general_population"
+                ):
+                    lookup[key] = status
+
+    logger.info(
+        "Cancer validation lookup: %d entries from %s",
+        len(lookup), structured_dir,
+    )
+    return lookup
+
+
+def _doi_to_slug(doi: str) -> str:
+    """Convert a DOI like '10.1002/pon.4370' to directory slug '10.1002_pon.4370'."""
+    return doi.replace("/", "_")
+
+
+def apply_se_eff_calibration(engine, dry_run: bool = False) -> int:
+    """Step 4d: Apply 7-layer SE_eff calibration to all evidence rows.
+
+    Replaces the P3 heterogeneity pipeline that was bypassed for
+    CSV-imported data. Updates harmonized_se in-place with the
+    calibrated SE_eff value. Records se_inflation_applied and
+    cancer_validation_status for audit trail.
+
+    Formula P3-8 implementation via crci.extraction.p3_heterogeneity.
+
+    Returns:
+        Number of rows calibrated.
+    """
+    from crci.extraction.p3_heterogeneity.se_eff_assembly import (
+        SEEffInput,
+        compute_se_eff,
+    )
+
+    calibrated = 0
+    failed = 0
+
+    # Build cancer validation lookup from source CSVs
+    cancer_lookup = _build_cancer_validation_lookup()
+
+    with engine.begin() as conn:
+        # Fetch all active evidence with harmonized values
+        rows = conn.execute(text("""
+            SELECT
+                ee.ler_id,
+                ee.edge_relation_id,
+                ee.study_id,
+                ee.harmonized_beta,
+                ee.harmonized_se,
+                ee.N_effect,
+                ee.quality_rating,
+                ee.study_design,
+                ee.pub_year,
+                ee.cancer_validation_status,
+                ee.parameter_family,
+                ee.freshness_superseded,
+                ee.notes
+            FROM edge_evidence_v1 ee
+            WHERE ee.active = 1
+              AND ee.harmonized_beta IS NOT NULL
+              AND ee.harmonized_se IS NOT NULL
+              AND ee.harmonized_se > 0
+        """)).fetchall()
+
+        if not rows:
+            logger.warning("SE_eff calibration: no active evidence rows found")
+            return 0
+
+        # Group by edge_relation_id for L3 heterogeneity computation
+        edge_groups: dict[str, list] = {}
+        for row in rows:
+            eid = row[1]  # edge_relation_id
+            if eid not in edge_groups:
+                edge_groups[eid] = []
+            edge_groups[eid].append(row)
+
+        # Per-edge grouped betas/SEs for L3 (DerSimonian-Laird τ²/I²)
+        edge_betas: dict[str, list[float]] = {}
+        edge_ses: dict[str, list[float]] = {}
+        for eid, group in edge_groups.items():
+            edge_betas[eid] = [r[3] for r in group]  # harmonized_beta
+            edge_ses[eid] = [r[4] for r in group]     # harmonized_se
+
+        # Look up DOI for each study_id (for cancer validation CSV lookup)
+        study_doi_map: dict[str, str] = {}
+        doi_rows = conn.execute(text(
+            "SELECT study_id, doi FROM study_registry_v1"
+        )).fetchall()
+        for sr in doi_rows:
+            study_doi_map[sr[0]] = sr[1]
+
+        logger.info(
+            "SE_eff calibration: %d rows across %d edges",
+            len(rows), len(edge_groups),
+        )
+
+        for row in rows:
+            ler_id = row[0]
+            edge_id = row[1]
+            study_id = row[2]
+            se_raw = row[4]
+            n_total = row[5]
+            quality_rating = row[6]
+            study_design_raw = row[7]
+            pub_year = row[8]
+            existing_cancer_val = row[9]
+            param_family = row[10]
+            freshness_superseded = row[11]
+
+            # ── L1: Map study_design for layer function ──
+            sd = (study_design_raw or "RCT").strip().upper()
+            if sd == "RCT":
+                if n_total and n_total > 200:
+                    study_design_key = "large_rct"
+                else:
+                    study_design_key = "small_rct"
+            elif sd in ("COHORT", "WELL_ADJUSTED_COHORT"):
+                study_design_key = "well_adjusted_cohort"
+            elif sd in ("CROSS_SECTIONAL", "CROSS-SECTIONAL"):
+                study_design_key = "cross_sectional_adjusted"
+            else:
+                study_design_key = sd.lower()
+
+            # ── L4: Cancer validation status ──
+            # Priority: existing DB value > CSV lookup > default
+            if existing_cancer_val and existing_cancer_val in (
+                "validated_cancer", "used_cancer",
+                "general_population", "known_somatic_confound",
+            ):
+                validation_status = existing_cancer_val
+            else:
+                # Look up from CSV via DOI slug
+                doi = study_doi_map.get(study_id, "")
+                doi_slug = _doi_to_slug(doi) if doi else ""
+                csv_val = cancer_lookup.get((doi_slug, edge_id))
+                validation_status = csv_val or "general_population"
+
+            # ── L5: GRADE quality ──
+            qr = (quality_rating or "moderate").strip().upper()
+            grade_level = qr if qr in ("HIGH", "MODERATE", "LOW", "VERY_LOW") else "MODERATE"
+
+            # ── Build SEEffInput ──
+            try:
+                inp = SEEffInput(
+                    ler_id=ler_id,
+                    se_raw=se_raw,
+                    study_design=study_design_key,
+                    n_total=n_total,
+                    w_scope=1.0,  # Manual extraction = well-scoped studies
+                    betas=edge_betas[edge_id],
+                    ses=edge_ses[edge_id],
+                    validation_status=validation_status,
+                    grade_level=grade_level,
+                    days_since_measurement=0.0,
+                    temporal_data_available=False,  # → conservative 14d default
+                    is_trait=False,
+                    pub_year=pub_year,
+                    parameter_family=param_family,
+                    superseded_by_newer=bool(freshness_superseded),
+                    sigma_sq_structural=None,  # → config.SIGMA_SQ_STRUCTURAL_DEFAULT
+                    edge_relation_id=edge_id,
+                )
+
+                result = compute_se_eff(inp)
+                se_eff = result.se_effective
+
+            except Exception as exc:
+                logger.error(
+                    "SE_eff failed for %s: %s", ler_id, exc,
+                )
+                failed += 1
+                continue
+
+            # ── Update DB ──
+            inflation = se_eff / se_raw if se_raw > 0 else 1.0
+            note_suffix = (
+                f"\n[SE_eff P3-8] SE calibrated: {se_raw:.4f} → {se_eff:.4f} "
+                f"(×{inflation:.2f}). design={study_design_key}(N={n_total}), "
+                f"validation={validation_status}, grade={grade_level}, "
+                f"pub={pub_year}, k={len(edge_betas[edge_id])}"
+            )
+
+            if not dry_run:
+                conn.execute(text("""
+                    UPDATE edge_evidence_v1
+                    SET harmonized_se = :se_eff,
+                        cancer_validation_status = :validation_status,
+                        se_inflation_applied = :inflation,
+                        notes = COALESCE(notes, '') || :note
+                    WHERE ler_id = :ler_id
+                """), {
+                    "se_eff": round(se_eff, 6),
+                    "validation_status": validation_status,
+                    "inflation": round(inflation, 4),
+                    "note": note_suffix,
+                    "ler_id": ler_id,
+                })
+
+            logger.info(
+                "SE_eff %s (%s): SE %.4f → %.4f (×%.2f) "
+                "[L1=%s(N=%s), L4=%s, L5=%s, L7=pub%s, k=%d]",
+                ler_id, edge_id, se_raw, se_eff, inflation,
+                study_design_key, n_total, validation_status,
+                grade_level, pub_year, len(edge_betas[edge_id]),
+            )
+            calibrated += 1
+
+    if failed:
+        logger.warning(
+            "SE_eff calibration: %d calibrated, %d failed", calibrated, failed,
+        )
+    else:
+        logger.info("SE_eff calibration: all %d rows calibrated", calibrated)
+
+    return calibrated
 
 
 # ============================================================================
@@ -1300,53 +2105,73 @@ def main() -> int:
 
     # Optional reset
     if args.reset and not args.dry_run:
-        print("[0/7] Resetting evidence and edge tables...")
+        print("[0/10] Resetting evidence and edge tables...")
         reset_evidence(engine)
         print("  → Tables cleared\n")
 
     # Step 1: Reseed edge definitions
-    print("[1/8] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
+    print("[1/10] Reseeding edge_relations_definitions_v1 from EDGE_REGISTRY.csv...")
     n_edges = reseed_edge_definitions(engine, dry_run=args.dry_run)
     print(f"  → {n_edges} edge definitions loaded")
 
     # Step 1b: Reseed node + instrument definitions from authoritative registries
-    print("\n[1b/8] Reseeding node + instrument definitions from registries...")
+    print("\n[1b/10] Reseeding node + instrument definitions from registries...")
     n_nodes, n_insts = reseed_node_and_instrument_definitions(engine, dry_run=args.dry_run)
     print(f"  → {n_nodes} node definitions, {n_insts} instrument definitions loaded")
 
+    # Step 1c: Reseed measure + pathway definitions from authoritative registries
+    print("\n[1c/10] Reseeding measure + pathway definitions from registries...")
+    n_measures, n_pathways = reseed_measure_and_pathway_definitions(engine, dry_run=args.dry_run)
+    print(f"  → {n_measures} measure definitions, {n_pathways} pathway definitions loaded")
+
     # Step 2: Clean up old entries
-    print("\n[2/8] Cleaning up legacy study entries...")
+    print("\n[2/10] Cleaning up legacy study entries...")
     cleanup_old_entries(engine, dry_run=args.dry_run)
 
     # Step 3: Register studies
-    print("\n[3/8] Registering studies in study_registry_v1...")
+    print("\n[3/10] Registering studies in study_registry_v1...")
     n_studies = register_studies(engine, dry_run=args.dry_run)
     print(f"  → {n_studies} new studies registered")
 
     # Step 4: Load CSV evidence
-    print("\n[4/8] Loading CSV evidence into edge_evidence_v1...")
+    print("\n[4/10] Loading CSV evidence into edge_evidence_v1...")
     n_evidence = load_csv_evidence(engine, dry_run=args.dry_run)
     print(f"  → {n_evidence} evidence rows loaded")
 
     # Step 4b: Load auxiliary family CSVs
-    print("\n[4b/8] Loading auxiliary family CSVs (context_priors, instrument, norms, temporal)...")
+    print("\n[4b/10] Loading auxiliary family CSVs (context_priors, instrument, norms, temporal)...")
     family_results = load_family_csvs(engine, dry_run=args.dry_run)
     for fam, count in family_results.items():
         print(f"  → {fam}: {count} rows loaded")
 
+    # Step 4c: Harmonize scales to Cohen's d
+    print("\n[4c/10] Harmonizing mean_diff_raw → cohens_d (SD borrowing from population_norms)...")
+    n_harmonized = harmonize_scales_to_cohens_d(engine, dry_run=args.dry_run)
+    print(f"  → {n_harmonized} rows converted to cohens_d")
+
+    # Step 4d: Apply 7-layer SE_eff calibration (P3-8)
+    print("\n[4d/10] Applying 7-layer SE_eff calibration (Formula P3-8)...")
+    n_calibrated = apply_se_eff_calibration(engine, dry_run=args.dry_run)
+    print(f"  → {n_calibrated} rows SE-calibrated")
+
     # Step 5: Seed action catalog
-    print("\n[5/8] Seeding action_catalog_v1...")
+    print("\n[5/10] Seeding action_catalog_v1...")
     n_actions = seed_action_catalog(engine, dry_run=args.dry_run)
     print(f"  → {n_actions} actions loaded")
 
+    # Step 5b: Seed dose bridges
+    print("\n[5b/10] Seeding dose_bridges_v1...")
+    n_bridges = seed_dose_bridges(engine, dry_run=args.dry_run)
+    print(f"  → {n_bridges} dose bridges loaded")
+
     # Step 6: Compile edges
-    print("\n[6/8] Compiling evidence → edges_v1 (IVW aggregation)...")
+    print("\n[6/10] Compiling evidence → edges_v1 (IVW aggregation)...")
     n_compiled = compile_edges(engine, dry_run=args.dry_run)
     print(f"  → {n_compiled} edges compiled")
 
     # Step 7: Verify
     if not args.dry_run:
-        print("\n[7/8] Verifying...")
+        print("\n[7/10] Verifying...")
         verify_state(engine)
 
     return 0

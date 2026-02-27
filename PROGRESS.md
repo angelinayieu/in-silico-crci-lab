@@ -4,7 +4,7 @@
 - **Phase:** 7 (Integration + CLI Scripts) — COMPLETE
 - **Prompt:** 7.2 completed (End-to-End Test)
 - **Last completed slice:** Test Health Remediation — all 82 pre-existing test failures fixed
-- **Next:** All 12 dead wires resolved (9 FIXED, 1 RESOLVED by DW#6, 2 DEFERRED). Pipeline dead wire remediation complete. Test suite fully green.
+- **Next:** Pipeline audit fixes 1-6 verified end-to-end (2026-02-27). Fix 7 (presentation renderer) deferred. Full model runs in ~6s with 100 MC draws.
 - **Branch:** `claude/extraction-algorithm-phase-one-iT9pH`
 - **Total tests:** 1550 passing, 0 failures, 24 skipped
 
@@ -114,6 +114,17 @@
 | DW#7 | Missing P1 annotation categories | Requires LLM prompt changes | ⏸️ DEFERRED |
 | DW#10 | P3 annotation query silent fallback | Resolved by DW#6 — annotation query wrapped in try/except with explicit warning | ✅ RESOLVED |
 | DW#11 | P7 synergy compiler empty context | No factorial trial data exists; compiler handles empty data gracefully | ⏸️ DEFERRED |
+
+### Pipeline Audit Fixes (PIPELINE_AUDIT.md)
+| Fix | Issue | Status |
+|-----|-------|--------|
+| Fix 1 | Scale standardization (mean_diff → cohens_d) | ✅ VERIFIED — Step 4c in load_evidence_into_db.py |
+| Fix 2 | SE_eff 7-layer calibration | ✅ VERIFIED — Step 4d in load_evidence_into_db.py |
+| Fix 3 | Modifier rules wiring | ✅ VERIFIED — 15 rules CSV + run_full_model.py loading |
+| Fix 4 | Dose bridges seeded | ✅ VERIFIED — 10 bridges CSV + seed_dose_bridges() |
+| Fix 5 | Observation CSV support | ✅ VERIFIED — 7 sample observations + CLI --observations-csv |
+| Fix 6 | Structural prior sampling | ✅ VERIFIED — mc_sampler.py N(0, σ²_structural) |
+| Fix 7 | Presentation renderer | ⬜ DEFERRED — CLI summary functional |
 
 ## Known Limitations (Not Yet Populated)
 These RecommendationReport fields are defined but not yet populated by report_assembler.py, because their upstream data sources don't exist yet:

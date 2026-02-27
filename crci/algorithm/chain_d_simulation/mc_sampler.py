@@ -116,13 +116,30 @@ def _sample_edge_weights(
     for edge_id, (src, tgt) in edge_map.items():
         mu_e = B_hat[src, tgt]
         if mu_e == 0.0 and edge_id not in Sigma_eff:
-            # Zero edge with no SE — skip
+            # Structural placeholder: no evidence, no point estimate.
+            # Sample from wide structural prior N(0, σ²_structural) to propagate
+            # meaningful uncertainty through the DAG rather than contributing
+            # deterministic zeros (which would suppress 129/139 edges).
+            # Formula: β_e^(m) ~ N(0, σ²_structural)
+            # config.SIGMA_SQ_STRUCTURAL_DEFAULT = 0.25 → SD = 0.5
+            sigma_structural = np.sqrt(config.SIGMA_SQ_STRUCTURAL_DEFAULT)
+            samples = rng.normal(0.0, sigma_structural, size=n_draws)
+
+            # Apply sign constraint if known
+            expected_sign = edge_signs.get(edge_id, 0.0)
+            if expected_sign != 0.0:
+                if expected_sign > 0:
+                    samples = np.abs(samples)
+                else:
+                    samples = -np.abs(samples)
+
+            beta_draws[:, src, tgt] = samples
             continue
 
         # Formula D1a-EQ1: σ² = SE²_eff
         se_eff = Sigma_eff.get(edge_id, 0.0)
         if se_eff <= 0.0 or not np.isfinite(se_eff):
-            # Deterministic edge (no uncertainty) or infinite SE (no evidence)
+            # Deterministic edge (non-zero mu but no SE — rare)
             beta_draws[:, src, tgt] = mu_e
             continue
 

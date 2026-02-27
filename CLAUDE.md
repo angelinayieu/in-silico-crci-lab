@@ -6,6 +6,10 @@ Every gate must be enforced. Every module must connect to the next.
 
 ## Task Routing — Read This First
 
+> **Quick start:** Read **[LLM_TASK_ROUTER.md](LLM_TASK_ROUTER.md)** for a comprehensive routing table
+> that maps paper types → specific instructions, and covers ALL task types
+> (extraction, Category A curation, registry updates, code implementation).
+
 **What are you being asked to do?** Match the task below, then follow its bootstrap.
 
 ---
@@ -31,6 +35,14 @@ Every gate must be enforced. Every module must connect to the next.
 4. Read upstream file(s) that produce your input types
 5. Read `shared/config.py` for constants
 6. Follow the Slice Implementation Protocol in PROGRESS.md
+
+---
+
+### → "Fill Category A tables (kernels, dose bridges, safety, correlations, norms)"
+1. Read **[CATEGORY_A_RESEARCH_GUIDE.md](CATEGORY_A_RESEARCH_GUIDE.md)** — full instructions per table
+2. Read **[docs/03_database/05_TABLE_SCHEMAS.md](docs/03_database/05_TABLE_SCHEMAS.md)** — exact column definitions
+3. Read **[docs/02_system_specs/SYS_ALGORITHM_COMPLETE.md](docs/02_system_specs/SYS_ALGORITHM_COMPLETE.md)** §Chain D-E — how the algorithm uses these tables
+4. These are domain-knowledge curation tasks, NOT per-paper extraction
 
 ---
 

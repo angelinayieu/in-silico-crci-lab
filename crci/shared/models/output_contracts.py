@@ -54,6 +54,11 @@ class CompositeScore(BaseModel):
     population_norm_used: str | None = None
     calibration_mode: str = "index_mode"
 
+    # Heterogeneity diagnostics (from F1 — Cochran's Q, Higgins I²)
+    cochrans_Q: float | None = None
+    I_squared: float | None = None  # [0, 100] — proportion of real heterogeneity
+    random_effects_applied: bool = False
+
 
 # ═══════════════════════════════════════════════════════════════
 #  SCHEDULE PLAN (presentation-ready)
@@ -73,6 +78,23 @@ class ScheduleAction(BaseModel):
     duration_days: int
     expected_benefit_z: float | None = None
     rationale: str | None = None
+
+
+class SynergyMetrics(BaseModel):
+    """Synergy diagnostics for a bundle schedule.
+
+    Surfaces JPO, CCS, and γ from D3 synergy analysis so the
+    presentation layer can explain intervention interactions.
+    """
+
+    bundle_id: str
+    member_ids: list[str] = Field(default_factory=list)
+    mean_delta_C: float = 0.0  # composite cognitive effect of the bundle
+    interaction_completeness: float = 1.0  # fraction of interaction terms modeled
+    pairwise: list[dict] = Field(
+        default_factory=list,
+        description="[{action_a, action_b, jpo, ccs, gamma_empirical}, ...]",
+    )
 
 
 class SchedulePlan(BaseModel):
@@ -97,6 +119,14 @@ class SchedulePlan(BaseModel):
     # calibration tuning.
     cri_95_lower: float | None = None
     cri_95_upper: float | None = None
+    # SAFE_A detail (from D4 — efficacy-only score)
+    safe_a_score: float | None = None
+    safe_a_cri_lower: float | None = None
+    safe_a_cri_upper: float | None = None
+    p_net_benefit: float | None = None  # P(SAFE_A > 0) from per_draw_safe_a
+    safety_status: str | None = None    # CLEARED, CAUTION, BLOCKED
+    # D3 synergy diagnostics (populated for bundle schedules)
+    synergy: SynergyMetrics | None = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -113,6 +143,11 @@ class PathwayContribution(BaseModel):
     activation_z: float = 0.0  # signed pathway z-score (direction matters)
     key_edges: list[str] = Field(default_factory=list)
     evidence_quality: str | None = None
+    # B6.5 pathway evidence metrics (if available)
+    evidence_density: float | None = None   # ED(P): quality-weighted studies/edge
+    distinction_score: float | None = None  # DS(P): 1 − max cosine similarity
+    edge_coverage: float | None = None      # fraction of edges with ≥1 study
+    is_adequate: bool | None = None         # ED ≥ threshold
 
 
 class PathwayProfile(BaseModel):
@@ -179,6 +214,10 @@ class VarianceDecomposition(BaseModel):
     components: list[VarianceComponent] = Field(default_factory=list)
     total_variance: float = 0.0
     dominant_source: str | None = None
+    per_edge_contributions: dict[str, float] = Field(
+        default_factory=dict,
+        description="edge_id → variance contribution (absolute). From F3 per_edge_variance_contrib.",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -204,6 +243,34 @@ class EvidenceGapReport(BaseModel):
     run_id: str
     gaps: list[EvidenceGapItem] = Field(default_factory=list)
     top_acquisition_targets: list[str] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  SENSITIVITY REPORT (D4c — decision sensitivity analysis)
+# ═══════════════════════════════════════════════════════════════
+
+
+class SensitivityIndexItem(BaseModel):
+    """Single edge sensitivity index from D4c."""
+
+    edge_id: str
+    source_node_id: str
+    target_node_id: str
+    elasticity: float       # Corr(β_e, ΔC_top)
+    se_eff: float           # effective SE
+    discovery_score: float  # |elasticity| × SE_eff
+
+
+class SensitivityReport(BaseModel):
+    """Sensitivity analysis report — which edges most influence the ranking.
+
+    Built from D4c sensitivity indices (Sobol-style elasticities).
+    """
+
+    run_id: str
+    sensitivity_indices: list[SensitivityIndexItem] = Field(default_factory=list)
+    top_discovery_edges: list[SensitivityIndexItem] = Field(default_factory=list)
+    n_edges_analyzed: int = 0
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -272,6 +339,49 @@ class ClinicalRiskProfile(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════
+#  SUBPOPULATION COMPARISON SUMMARY (F5)
+# ═══════════════════════════════════════════════════════════════
+
+
+class DifferentialEffectSummary(BaseModel):
+    """Pairwise intervention effect comparison across two contexts."""
+
+    intervention_id: str
+    context_a: str
+    context_b: str
+    delta_C_diff_mean: float
+    delta_C_diff_ci_lower: float
+    delta_C_diff_ci_upper: float
+    practically_different: bool = False
+
+
+class RiskDifferentialSummary(BaseModel):
+    """Pairwise CRCI risk comparison across two contexts."""
+
+    context_a: str
+    context_b: str
+    risk_diff_pct: float
+    risk_diff_ci_lower: float
+    risk_diff_ci_upper: float
+
+
+class SubpopulationComparisonSummary(BaseModel):
+    """Presentation-ready summary of F5 subpopulation comparison.
+
+    Mapped from SubpopulationComparisonResult (algorithm internal type)
+    by report_assembler.py.
+    """
+
+    n_contexts_compared: int = 0
+    comparison_valid: bool = False
+    validity_notes: list[str] = Field(default_factory=list)
+    context_labels: list[str] = Field(default_factory=list)
+    pairwise_differentials: list[DifferentialEffectSummary] = Field(default_factory=list)
+    risk_differentials: list[RiskDifferentialSummary] = Field(default_factory=list)
+    rank_concordance: dict[str, float] = Field(default_factory=dict)
+
+
+# ═══════════════════════════════════════════════════════════════
 #  EXTRACTION QUALITY SUMMARY
 # ═══════════════════════════════════════════════════════════════
 
@@ -329,6 +439,8 @@ class RecommendationReport(BaseModel):
     decision_trace: DecisionTrace | None = None
     clinical_risk: ClinicalRiskProfile | None = None
     extraction_quality: ExtractionQualitySummary | None = None
+    subpopulation_comparison: SubpopulationComparisonSummary | None = None
+    sensitivity_report: SensitivityReport | None = None
 
     # Safety & warnings
     safety_flags: list[str] = Field(default_factory=list)

@@ -12,6 +12,14 @@ This Plan is authoritative for: source adapters, query generation from
 Class A tables, APS scoring, full-text retrieval priority, manual input
 protocol, budget controls, and the Prompts 3.11-3.15 implementation.
 
+**Part 14 (added 2026-02-27) is the authoritative pipeline execution
+design.** It supersedes Parts 2 and 6 for stage gates and decision logic.
+Read Part 14 FIRST if you are implementing or running the pipeline.
+
+  DEEP_RESEARCH_STRATEGY.md — Search queries, prompts, and keyword
+  batteries that produce the INPUT to Stage 0 of this pipeline.
+  (Located at repo root: /DEEP_RESEARCH_STRATEGY.md)
+
 Two features in this Plan originate from companion docs:
 
   P. Intelligence Maximization — Author-identified research_gap
@@ -74,6 +82,8 @@ TARGET Phase 4 WORKFLOW (automated):
 
 ═══════════════════════════════════════════════════════════════════════════
  PART 2: THE AUTOMATED ACQUISITION ARCHITECTURE
+ ⚠ NOTE: Part 14 supersedes this section for pipeline execution flow.
+    Part 2 remains valid for high-level architecture context.
 ═══════════════════════════════════════════════════════════════════════════
 
 The system has TWO input pathways. Both feed into EX-P0 (triage).
@@ -506,6 +516,8 @@ Three manual input methods, all going through the same pipeline:
 ═══════════════════════════════════════════════════════════════════════════
  PART 6: THE RETRIEVAL → EXTRACTION → COMPILATION FLOW
  End-to-end: how a query becomes a parameter value
+ ⚠ NOTE: Part 14 supersedes this section for stage gates and decision
+    logic. Part 6 remains valid for the internal extraction chain.
 ═══════════════════════════════════════════════════════════════════════════
 
 STEP 1: QUERY GENERATION (retrieval/query_generator.py)
@@ -1050,6 +1062,665 @@ After all 42 prompts are built and Phase 0A seeds are populated:
    extractions. This is expected. You iterate: tune synonyms, adjust
    APS weights, review extraction errors, re-run. The system improves
    with each cycle.
+
+
+═══════════════════════════════════════════════════════════════════════════
+ PART 14: REVISED 4-STAGE TRIAGE PIPELINE (AUTHORITATIVE)
+ Supersedes the simple flow in Parts 2 and 6 for pipeline execution.
+ Parts 2 and 6 remain valid for architecture context; this Part governs
+ the actual stage gates and decision logic.
+═══════════════════════════════════════════════════════════════════════════
+
+DESIGN RATIONALE
+────────────────
+The original pipeline (Parts 2/6) goes:
+  query → search → APS score → retrieve full text → extract
+
+The problem: ~40-60% of papers that pass APS scoring and enter full
+extraction (Stage 2, costing $0.30-2.00/paper in LLM calls) turn out
+to contain no extractable statistics. The abstract says "associated
+with" but the full text has only narrative discussion or unconvertible
+results (e.g., only figures, no tables with CIs/SEs).
+
+The revised pipeline adds two cheap intermediate gates that eliminate
+this waste mode:
+
+  Stage 0 (FREE)     → metadata + dedup + OA routing + relevance + APS
+  Stage 1 (CHEAP)    → LLM abstract pre-extraction for edge mapping
+  Stage 1.5 (V.CHEAP)→ deterministic full-text extractability scan
+  Stage 2 (EXPENSIVE)→ full deep extraction + quality + CSV writes
+
+Expected savings: ~50% reduction in wasted Stage 2 runs.
+
+
+─── THE 4-STAGE PIPELINE ───
+
+  ┌─────────────────────────────────────────────────────────────┐
+  │ INPUT: DOIs/PMIDs/URLs from:                                │
+  │   • DEEP_RESEARCH_STRATEGY.md search prompts                │
+  │   • Automated query_generator.py workstream queries         │
+  │   • Manual DOI lists (search_overrides/)                    │
+  │   • Hop discovery (hop_discoverer.py citation expansion)    │
+  └────────────────────┬────────────────────────────────────────┘
+                       │
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ STAGE 0 — METADATA + TRIAGE (FREE)                         │
+  │                                                              │
+  │ Existing modules used:                                       │
+  │   • search_coordinator.py → ID normalization, multi-source  │
+  │   • abstract_screener.py  → SCREEN-1 relevance label        │
+  │   • aps_scorer.py         → 5-component APS score           │
+  │   • Unpaywall adapter     → OA status + best URL            │
+  │                                                              │
+  │ Performs:                                                     │
+  │   1. ID normalization (DOI→PMID→PMC cross-resolve)          │
+  │   2. Dedup: DOI first, then PMID, then title+year fuzzy     │
+  │   3. Fetch abstract + metadata from PubMed/OpenAlex         │
+  │   4. Run SCREEN-1: → HIGH / MODERATE / LOW / IRRELEVANT     │
+  │   5. Run APS scoring (5-component formula)                  │
+  │   6. Check Unpaywall: OA status + best_oa_url               │
+  │   7. Classify access route:                                  │
+  │      OA_AVAILABLE | PAYWALLED | ABSTRACT_ONLY               │
+  │                                                              │
+  │ Output per paper (written to acquisition_queue_v1):          │
+  │   doi, pmid, pmcid, title, year, journal, abstract          │
+  │   oa_status, best_oa_url, access_route                      │
+  │   relevance_label (HIGH/MOD/LOW/IRRELEVANT)                 │
+  │   aps_score, aps_components{}                                │
+  │   target_edges[], target_pathways[]                          │
+  │   stage0_status: PASSED | REJECTED | PARKED                 │
+  │                                                              │
+  │ Gate S0-G1:                                                  │
+  │   IRRELEVANT → REJECT (stop)                                │
+  │   APS < 0.40 → DEFER (park for later re-evaluation)        │
+  │   HIGH/MOD + APS ≥ 0.40 → PASS to Stage 1                  │
+  │   PAYWALLED papers: still pass to Stage 1 for abstract      │
+  │     mapping (decide later whether manual acquisition is      │
+  │     worth it)                                                │
+  └────────────────────┬────────────────────────────────────────┘
+                       │ PASSED candidates
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ STAGE 1 — ABSTRACT PRE-EXTRACTION (CHEAP, ~$0.01-0.05/ea)  │
+  │                                                              │
+  │ New module: retrieval/abstract_pre_extractor.py              │
+  │   Uses: LLM call on abstract text only                      │
+  │                                                              │
+  │ Extracts (categorical only — NEVER numeric claims):          │
+  │   • design_guess: RCT / cohort / cross_sectional / etc.     │
+  │   • population_guess: cancer_type + treatment_phase          │
+  │   • instruments_guess[]: which instruments mentioned         │
+  │   • edges_covered_guess[]: edge_ids with per-edge confidence │
+  │   • extractability_guess: YES / MAYBE / NO                  │
+  │     (does abstract imply tables with stats exist?)           │
+  │   • multi_edge_flag: covers ≥2 target edges?                │
+  │   • priority_band: CRITICAL / HIGH / MODERATE / LOW         │
+  │                                                              │
+  │ CRITICAL classification (any ONE sufficient):                │
+  │   • covers a k=0 edge in the active slice                   │
+  │   • RCT/longitudinal/mediation design for a k<3 edge        │
+  │   • multi-biomarker panel paper (≥3 of: IL-6, CRP, TNF-α,  │
+  │     cortisol, BDNF) likely to provide correlation matrix     │
+  │   • covers ≥2 target edges with extractability_guess ≠ NO   │
+  │                                                              │
+  │ STRICT RULE: Stage 1 NEVER produces effect sizes, sample    │
+  │ sizes, SE values, or any numeric claims. It produces only    │
+  │ categorical metadata for prioritization. Numeric extraction  │
+  │ happens exclusively in Stage 2.                              │
+  │                                                              │
+  │ Output per paper (appended to acquisition_queue_v1 row):     │
+  │   stage1_design_guess, stage1_population_guess               │
+  │   stage1_instruments_json[], stage1_edges_json[]             │
+  │   stage1_extractability, stage1_priority_band                │
+  │   stage1_status: PROCEED | SKIP | PARK_PAYWALLED            │
+  │                                                              │
+  │ Gate S1-G1:                                                  │
+  │   extractability_guess = NO → SKIP (stop)                   │
+  │   priority_band = LOW and no unique edge coverage → SKIP     │
+  │   CRITICAL/HIGH → PROCEED to Stage 1.5                      │
+  │   MODERATE → PROCEED only if edge gap is k≤1                │
+  │   PAYWALLED + CRITICAL → PARK with "manual_acquisition_     │
+  │     recommended" flag for human review                       │
+  └────────────────────┬────────────────────────────────────────┘
+                       │ PROCEED candidates (OA available)
+                       │ PARK_PAYWALLED candidates (for human)
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ STAGE 1.5 — FULL-TEXT EXTRACTABILITY SCAN (V.CHEAP, no LLM) │
+  │                                                              │
+  │ New module: retrieval/fulltext_extractability_scanner.py     │
+  │   Uses: regex/string matching on full text — NO LLM cost    │
+  │   Runs on: any paper whose full text is already available:   │
+  │     • OA papers fetched by fulltext_retriever.py             │
+  │     • Manual uploads in data/manual_uploads/pdfs/           │
+  │     • Already-cached papers in retrieval_cache/             │
+  │   Skipped for: paywalled papers without cached text          │
+  │     (these go straight to Stage 2 if manually obtained)      │
+  │                                                              │
+  │ Scan 1 — Statistical extractability markers:                 │
+  │   Searches for strings that imply extractable statistics:    │
+  │     "95% confidence interval", "standard error", "SE =",    │
+  │     "β =", "beta =", "B =", "regression coefficient",      │
+  │     "odds ratio", "OR =", "hazard ratio", "HR =",          │
+  │     "Pearson r", "r =", "correlation", "η²", "eta",        │
+  │     "Cohen", "effect size", "d =", "g =",                  │
+  │     "Table 2", "Table 3", "Table 4",                       │
+  │     "mixed-effects", "ANCOVA", "ANOVA", "adjusted for",    │
+  │     "mediated by", "mediation", "path coefficient",         │
+  │     "multilevel", "hierarchical linear",                    │
+  │     "p < 0.0", "p = 0.0", "p<.0", "p=.0",                 │
+  │     "(F(", "(t(", "(χ²", "(chi-square",                    │
+  │     "Supplementary Table"                                    │
+  │                                                              │
+  │ Scan 2 — Construct/instrument matching:                      │
+  │   For each target edge from Stage 1 edges_covered_guess[],  │
+  │   looks for the specific instrument names or construct terms │
+  │   that would provide evidence for that edge:                 │
+  │     PSQI, ISI, salivary cortisol, CAR, AUC,                │
+  │     IL-6, CRP, TNF, C-reactive protein,                    │
+  │     plasma BDNF, serum BDNF,                                │
+  │     HVLT, RAVLT, TMT, Trail Making, DSST,                  │
+  │     FACT-Cog, EORTC, digit span, Stroop,                   │
+  │     (full list from INSTRUMENT_REGISTRY.csv labels)          │
+  │                                                              │
+  │ Scan 3 — Table/figure section detection:                     │
+  │   Regex scan for table captions that suggest quantitative    │
+  │   results: "Table \d+[.:] .*(?:regression|model|           │
+  │   coefficient|association|correlation|comparison|outcome)"   │
+  │                                                              │
+  │ Output per paper:                                            │
+  │   fulltext_scan_pass: PASS / FAIL / UNCLEAR                 │
+  │   extractability_markers_found[]: which trigger strings hit  │
+  │   table_hints[]: candidate table captions with page/section  │
+  │   construct_matches[]: which instruments/constructs found    │
+  │   marker_count: total distinct markers found                 │
+  │   stage1p5_status: PROCEED | FAIL | UNCLEAR                 │
+  │                                                              │
+  │ Classification:                                              │
+  │   marker_count ≥ 3 AND table_hints ≥ 1 → PASS              │
+  │   marker_count ≥ 1 OR table_hints ≥ 1  → UNCLEAR           │
+  │   marker_count = 0 AND table_hints = 0  → FAIL             │
+  │                                                              │
+  │ Gate S1.5-G1:                                                │
+  │   FAIL  → do NOT deep-extract (unless paper is uniquely      │
+  │           important: only candidate for a k=0 critical edge) │
+  │   PASS  → PROCEED to Stage 2                                │
+  │   UNCLEAR → PROCEED only if edge gap is critical (k=0) and  │
+  │             no PASS alternatives exist for that edge         │
+  └────────────────────┬────────────────────────────────────────┘
+                       │ PROCEED candidates
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ PRE-STAGE 2: GREEDY EDGE-COVERAGE SET COVER                │
+  │                                                              │
+  │ Before paying for Stage 2, optimize which papers to extract. │
+  │                                                              │
+  │ New module: retrieval/extraction_batch_optimizer.py          │
+  │                                                              │
+  │ Inputs:                                                      │
+  │   • All PROCEED candidates from Stage 1.5                    │
+  │   • edges_covered_guess[] from Stage 1 (candidate → edges)  │
+  │   • Edge gap report from pathway_evidence_auditor.py        │
+  │   • Daily extraction budget (from config)                    │
+  │                                                              │
+  │ Algorithm:                                                   │
+  │   1. Build matrix: candidate_i → {edges_covered_guess}      │
+  │   2. Initialize: uncovered_edges = all target edges with     │
+  │      k < sufficiency_target                                  │
+  │   3. Greedy loop:                                            │
+  │      a. Score each candidate:                                │
+  │         extraction_priority = w1·APS                         │
+  │                             + w2·new_edges_covered           │
+  │                             + w3·extractability_score        │
+  │                             + w4·design_rank                 │
+  │                             - w5·access_cost_penalty         │
+  │         Where:                                               │
+  │           w1=0.20, w2=0.35, w3=0.20, w4=0.15, w5=0.10      │
+  │           new_edges_covered = |edges_guess ∩ uncovered|      │
+  │                              / |uncovered|                   │
+  │           extractability_score =                             │
+  │             1.0 if scan_pass=PASS                            │
+  │             0.4 if scan_pass=UNCLEAR                         │
+  │             0.1 if no scan (paywalled, manually obtained)    │
+  │           design_rank =                                      │
+  │             1.0 meta-analysis, 0.9 RCT, 0.7 cohort,        │
+  │             0.5 cross-sectional, 0.3 unknown                 │
+  │           access_cost_penalty =                              │
+  │             0.0 if OA+cached, 0.3 if needs fetch,           │
+  │             0.8 if paywalled                                 │
+  │         (all weights from shared/config.py)                  │
+  │      b. Select candidate with highest extraction_priority    │
+  │      c. Remove its covered edges from uncovered_edges        │
+  │      d. Add to extraction_batch                              │
+  │      e. Repeat until:                                        │
+  │         - extraction_batch reaches daily budget, OR          │
+  │         - all target edges have ≥1 candidate scheduled, OR  │
+  │         - no candidates with extraction_priority > 0.20      │
+  │   4. Reserve exploration_budget = max(3, 0.10 × daily_cap)  │
+  │      slots for borderline/surprising candidates              │
+  │   5. Log: why_selected[] per paper (which edges, design,    │
+  │      gap reason)                                             │
+  │                                                              │
+  │ Output: extraction_queue — ordered list of papers for        │
+  │         Stage 2, with priority scores and reasons            │
+  └────────────────────┬────────────────────────────────────────┘
+                       │ extraction_queue (sorted by priority)
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ STAGE 2 — DEEP EXTRACTION (EXPENSIVE, ~$0.30-2.00/paper)   │
+  │                                                              │
+  │ Existing modules used:                                       │
+  │   • fulltext_retriever.py    → fetch PDF/XML if not cached  │
+  │   • extraction/pipeline.py   → full P0→P7 chain            │
+  │   • p0_triage/runner.py      → classify + route             │
+  │   • AG01-AG11 agents         → multi-agent extraction       │
+  │   • Trust boundary           → numeric validation           │
+  │   • SE calibration           → 7-layer calibration          │
+  │   • Compilers                → write to DB tables           │
+  │                                                              │
+  │ Enhanced with stage metadata:                                │
+  │   • Pass table_hints[] from Stage 1.5 to agents (helps      │
+  │     agents know where to look in the paper)                  │
+  │   • Pass edges_covered_guess[] to P0 triage (pre-identifies │
+  │     which edges to prioritize in extraction)                 │
+  │   • Pass design_guess to P0 (confirms extraction mode)      │
+  │                                                              │
+  │ Output: standard extraction output → DB tables               │
+  │   edge_evidence_v1, instrument_evidence_v1, etc.            │
+  │   + update acquisition_queue_v1 status → EXTRACTED          │
+  └────────────────────┬────────────────────────────────────────┘
+                       │
+                       ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │ POST-STEP: GAP RE-EVALUATION + LOOP CONTROL                │
+  │                                                              │
+  │ Existing module: pathway_evidence_auditor.py                 │
+  │                                                              │
+  │ After each extraction batch:                                 │
+  │   1. Re-grade all edges (AUDIT-1 formula)                   │
+  │   2. Check missingness codes (from Part 6 Step 6):          │
+  │      AGENT_MISS ≥3 → fix agent prompt, not more papers      │
+  │      PARSE_FAILURE ≥3 → fix parser, not more papers         │
+  │      ABSENT_IN_PAPER ≥3 → genuine gap, search more          │
+  │   3. Update remaining gaps for next cycle                    │
+  │   4. Feed back to Stage 0 for next query batch              │
+  │                                                              │
+  │ Loop termination (EX-ACQ-G3 from Part 6):                   │
+  │   • All target edges ≥ Grade C, OR                          │
+  │   • No candidates with APS ≥ 0.40 remain, OR               │
+  │   • Daily budget exhausted, OR                              │
+  │   • Manual stop command                                      │
+  └─────────────────────────────────────────────────────────────┘
+
+
+─── PERSISTENCE MODEL ───
+
+Source of truth: acquisition_queue_v1 table (extended)
+
+Each paper gets ONE row in acquisition_queue_v1 that accumulates
+stage results as it progresses. No separate CSV files as primary
+storage — CSVs are export views for human review.
+
+Extended columns for acquisition_queue_v1:
+
+  -- Stage 0 fields (already exist or add)
+  doi, pmid, pmcid                         -- identifiers
+  title, year, journal, abstract           -- metadata
+  oa_status, best_oa_url, access_route     -- OA routing
+  relevance_label                          -- SCREEN-1 output
+  aps_score, aps_components_json           -- APS output
+  target_edges_json, target_pathways_json  -- workstream targets
+  stage0_status                            -- PASSED/REJECTED/PARKED
+
+  -- Stage 1 fields (NEW)
+  stage1_design_guess                      -- RCT/cohort/etc.
+  stage1_population_guess                  -- cancer_type+phase
+  stage1_instruments_json                  -- instrument IDs guessed
+  stage1_edges_json                        -- edge IDs + confidence
+  stage1_extractability                    -- YES/MAYBE/NO
+  stage1_priority_band                     -- CRITICAL/HIGH/MOD/LOW
+  stage1_status                            -- PROCEED/SKIP/PARK
+  stage1_timestamp                         -- when Stage 1 ran
+
+  -- Stage 1.5 fields (NEW)
+  stage1p5_scan_pass                       -- PASS/FAIL/UNCLEAR
+  stage1p5_markers_json                    -- extractability markers
+  stage1p5_table_hints_json                -- candidate table captions
+  stage1p5_construct_matches_json          -- instruments found in text
+  stage1p5_marker_count                    -- total distinct markers
+  stage1p5_status                          -- PROCEED/FAIL/UNCLEAR
+  stage1p5_timestamp                       -- when Stage 1.5 ran
+
+  -- Extraction queue fields (NEW)
+  extraction_priority                      -- composite priority score
+  extraction_batch_id                      -- which batch it was in
+  why_selected_json                        -- reasons for selection
+  extraction_status                        -- QUEUED/RUNNING/DONE/FAILED
+
+CSV export views (generated on demand, not primary storage):
+
+  python scripts/export_triage_snapshot.py --stage 0    → stage0_snapshot.csv
+  python scripts/export_triage_snapshot.py --stage 1    → stage1_snapshot.csv
+  python scripts/export_triage_snapshot.py --stage 1.5  → stage1p5_snapshot.csv
+  python scripts/export_triage_snapshot.py --queue      → extraction_queue.csv
+  python scripts/export_triage_snapshot.py --all        → full_pipeline_snapshot.csv
+
+These CSVs are for human review/audit. The DB remains the single
+source of truth. No dual-write risk.
+
+
+─── VERTICAL SLICE STRATEGY (IMPLEMENTATION SEQUENCE) ───
+
+DO NOT attempt global retrieval across all 143 edges at once.
+Implement and prove the pipeline on ONE vertical slice first.
+
+Recommended first slice (Sleep/Activity → HPA → Neuroplasticity):
+
+  Target pathways:
+    PW_M08_HPA_AXIS            (HPA dysregulation)
+    PW_M04_NEUROPLASTICITY     (BDNF-mediated plasticity)
+    PW_M01_NEUROINFLAMMATION   (IL-6, CRP, TNF-α)
+
+  Target edges (from EDGE_REGISTRY, ~15-20 edges):
+    All edges where source OR target is in:
+      NODE_BEH_SLEEP, NODE_BEH_PHYS_ACTIVITY,
+      NODE_BIO_HPA, NODE_BIO_CORTISOL,
+      NODE_BIO_BDNF, NODE_BIO_IL6, NODE_BIO_CRP, NODE_BIO_TNF,
+      NODE_COG_WORK_MEM, NODE_COG_PROC_SPEED, NODE_COG_EXEC_FUNC
+
+  Why this slice:
+    • Contains edges at all evidence tiers (k=0 through k>5)
+    • Spans biomarker + behavioral + cognitive layers
+    • Has enough OA literature to test all 4 stages
+    • Small enough (~15-20 edges) to manually verify end-to-end
+    • The HPA→BDNF→cognition chain passes through the most
+      mechanistically interesting part of the model
+
+Slice execution order:
+  1. Run pathway_evidence_auditor.py on these edges → get gap report
+  2. Generate queries for these edges only (query_generator --slice)
+  3. Run Stage 0 → expect ~200-500 candidates
+  4. Run Stage 1 → expect ~80-200 proceed
+  5. Retrieve OA full text for PROCEED candidates
+  6. Run Stage 1.5 → expect ~40-100 PASS
+  7. Run set-cover → select ~15-25 for extraction
+  8. Run Stage 2 on batch → extract
+  9. Re-audit → check which edges improved
+  10. Iterate once more if critical gaps remain
+
+After slice is proven: extend to remaining pathways in priority order
+  (PW_M05_OXIDATIVE → PW_M06_METABOLIC → PW_C01_FATIGUE → etc.)
+
+
+─── NEW MODULES TO BUILD ───
+
+  retrieval/abstract_pre_extractor.py       (Stage 1 — NEW)
+    Input: CandidateMetadata with abstract
+    Output: Stage1Result (categorical metadata, NO numeric claims)
+    Uses: LLM call on abstract. Structured output parsing.
+    Cost: ~$0.01-0.05 per paper (1 short LLM call)
+    Registry context: reads EDGE_REGISTRY, INSTRUMENT_REGISTRY
+    to validate edge/instrument guesses
+
+  retrieval/fulltext_extractability_scanner.py  (Stage 1.5 — NEW)
+    Input: full text string (from cached PDF/XML)
+    Output: ScanResult (markers, table hints, construct matches)
+    Uses: regex only — NO LLM
+    Cost: ~0 (CPU only)
+    Registry context: reads INSTRUMENT_REGISTRY for construct names
+
+  retrieval/extraction_batch_optimizer.py    (Set-cover — NEW)
+    Input: list of PROCEED candidates + gap report
+    Output: ordered extraction_queue with reasons
+    Uses: greedy set-cover algorithm — NO LLM
+    Cost: ~0 (CPU only)
+    Config: weights from shared/config.py
+
+  scripts/run_triage_sweep.py               (Orchestrator — NEW)
+    CLI entry point for the 4-stage pipeline:
+    --stage {0|1|1.5|2|all}
+    --slice {pathway_ids or "all"}
+    --max-papers N
+    --dry-run
+    --export-csv (generate snapshot CSVs)
+
+  scripts/export_triage_snapshot.py         (CSV export — NEW)
+    Exports DB state to CSV for human review
+
+Existing modules that participate (NO modification needed):
+  abstract_screener.py    → Stage 0
+  aps_scorer.py           → Stage 0
+  fulltext_retriever.py   → Stage 1.5 input + Stage 2
+  search_coordinator.py   → Stage 0
+  query_generator.py      → Stage 0
+  pathway_evidence_auditor.py → Post-step + set-cover input
+  extraction/pipeline.py  → Stage 2
+
+
+─── CONFIG ADDITIONS (shared/config.py) ───
+
+  # Stage 1.5 extractability scan
+  EXTRACTABILITY_MARKER_THRESHOLD_PASS = 3
+  EXTRACTABILITY_TABLE_HINT_REQUIRED = True
+  EXTRACTABILITY_MARKERS: list[str] = [
+      "95% confidence interval", "confidence interval",
+      "standard error", "SE =", "SE=",
+      "β =", "beta =", "B =", "regression coefficient",
+      "odds ratio", "OR =", "OR=",
+      "hazard ratio", "HR =", "HR=",
+      "Pearson r", "r =", "r=", "correlation coefficient",
+      "η²", "eta squared", "partial eta",
+      "Cohen", "effect size", "d =", "g =",
+      "Table 2", "Table 3", "Table 4", "Table 5",
+      "mixed-effects", "ANCOVA", "ANOVA",
+      "adjusted for", "controlling for",
+      "mediated by", "mediation analysis", "path coefficient",
+      "multilevel model", "hierarchical linear",
+      "p < 0.0", "p = 0.0", "p<.0", "p=.0",
+      "Supplementary Table", "Supplemental Table",
+  ]
+
+  # Extraction batch optimizer weights (additive, not multiplicative)
+  EXTRACTION_PRIORITY_WEIGHTS: dict[str, float] = {
+      "aps": 0.20,
+      "new_edge_coverage": 0.35,
+      "extractability": 0.20,
+      "design_rank": 0.15,
+      "access_cost_penalty": 0.10,
+  }
+  EXPLORATION_BUDGET_FRACTION = 0.10
+  EXPLORATION_BUDGET_MIN = 3
+
+  # Vertical slice targeting
+  DEFAULT_SLICE_PATHWAYS: list[str] = [
+      "PW_M08_HPA_AXIS",
+      "PW_M04_NEUROPLASTICITY",
+      "PW_M01_NEUROINFLAMMATION",
+  ]
+
+
+─── CROSS-REFERENCES ───
+
+This Part 14 connects to:
+
+  DEEP_RESEARCH_STRATEGY.md
+    The search queries and AI prompts in that document produce the
+    INPUT to Stage 0. After running Deep Research prompts, the user
+    collects DOIs/PMIDs/URLs and feeds them to:
+      python scripts/run_triage_sweep.py --stage all --slice default
+
+  LLM_TASK_ROUTER.md
+    Needs new Task F: "Search for papers / Triage candidates"
+    Route: read DEEP_RESEARCH_STRATEGY.md → collect links →
+           read this Part 14 → run pipeline
+
+  CLAUDE.md
+    Needs new routing arrow: "Search / triage papers" →
+    read DEEP_RESEARCH_STRATEGY.md + this document Part 14
+
+  extraction_ref/02_CHATBOX_CONTEXT.md
+    Needs triage-mode variant: lighter context for Stage 1
+    (abstract pre-extraction only, not full CSV-filling)
+
+  docs/00_navigation/INDEX.md
+    Needs entry for DEEP_RESEARCH_STRATEGY.md under
+    Level 4 "Data Management" section
+
+  extraction_ref/00_INDEX.md
+    Needs entry referencing this pipeline for batch operations
+
+
+─── SESSION TYPES FOR OUTSOURCED CHATBOXES ───
+
+When outsourcing work to different AI chatboxes, each session type
+needs specific context loaded:
+
+SESSION TYPE A: "Discovery Session" (find candidate papers)
+  Context to load:
+    • DEEP_RESEARCH_STRATEGY.md Parts 1-8 (search queries + keywords)
+    • DEEP_RESEARCH_STRATEGY.md Part 9 §9.4 (copy-paste prompt templates)
+    • DEEP_RESEARCH_STRATEGY.md Part 9 §9.5 (controlled vocab bundles)
+    • registries/EDGE_REGISTRY.csv (know what edges exist)
+    • registries/PATHWAY_REGISTRY.csv (know pathway structure)
+    • EXTRACTION_LOG.md (avoid re-discovering extracted papers)
+    • This doc Part 14 vertical slice definition (know priority edges)
+  Workflow:
+    1. Pick 3-5 target edges from the vertical slice gap list
+    2. Copy synonym bundles from §9.5 for those nodes
+    3. Use Prompt A (§9.4) for edge discovery
+    4. Use Prompt B (§9.4) to screen each candidate's abstract
+    5. Record: DOI, title, year, edges covered, OA status
+    6. Stop when each target edge has ≥2 candidates
+  Output: DOI/PMID/title list with edge-mapping guesses + OA status
+  Does NOT need: extraction_ref/, pipeline code, CSV templates
+
+SESSION TYPE B: "Triage Session" (assess candidates — OPTIONAL)
+  Useful when Discovery yielded many candidates and you want to
+  prioritize before spending time on full extraction.
+  Context to load:
+    • This document Part 14 (pipeline stages + gates)
+    • registries/EDGE_REGISTRY.csv (validate edge mapping)
+    • registries/INSTRUMENT_REGISTRY.csv (validate instruments)
+    • registries/NODE_REGISTRY.csv (validate constructs)
+    • EXTRACTION_LOG.md (avoid re-processing known papers)
+  Workflow:
+    1. For each candidate from Session A, check abstract for:
+       - Extractable statistics (β, SE, CI, OR, r, group means±SD)
+       - Cancer-specific vs general population
+       - Sample size (>30 preferred)
+       - Study design (RCT > longitudinal > cross-sectional)
+       - Instruments used (check against INSTRUMENT_REGISTRY)
+    2. Rank candidates by: (a) edges covered (b) extractability
+       (c) design quality (d) population match
+    3. Kill papers with no extractability signals
+  Output: prioritized extraction queue with edge mapping
+  Does NOT need: full extraction_ref/, CSV templates
+
+SESSION TYPE C: "Extraction Session" (full per-paper extraction)
+  THIS IS THE MAIN WORK SESSION — produces actual data for the model.
+  Context to load:
+    • EXTRACTION_PLAYBOOK.md (Steps 0-9 — follow exactly)
+    • extraction_ref/02_CHATBOX_CONTEXT.md (full pinned context)
+    • registries/EDGE_REGISTRY.csv (validate edge IDs)
+    • registries/INSTRUMENT_REGISTRY.csv (validate instrument IDs)
+    • registries/NODE_REGISTRY.csv (validate node IDs)
+    • EXTRACTION_LOG.md (avoid duplicates, see decision conventions)
+    • The paper's PDF (attached or pasted as text)
+    • If available: the Stage A/B metadata (edge mapping from discovery)
+  Workflow:
+    Per paper, follow EXTRACTION_PLAYBOOK.md Steps 0-9:
+    1. Classify paper (DEEP/STANDARD/SHALLOW)
+    2. Check/add edges to EDGE_REGISTRY
+    3. Create folder in data/manual_uploads/structured/[doi-slug]/
+    4. Fill edge_evidence_template.csv (REQUIRED)
+    5. Fill population_norms_template.csv (RECOMMENDED)
+    6. Fill context_priors_template.csv (RECOMMENDED)
+    7. Fill optional templates if data available
+    8. Create meta.json in data/manual_uploads/pdfs/
+    9. Append entry to EXTRACTION_LOG.md
+  Output: filled CSV templates + meta.json + EXTRACTION_LOG entry
+  Human follow-up: copy PDFs, run load_evidence_into_db.py
+
+SESSION TYPE D: "Audit Session" (post-extraction gap review)
+  Context to load:
+    • This document Part 14 (loop control logic)
+    • EXTRACTION_LOG.md (what's been extracted)
+    • DEEP_RESEARCH_STRATEGY.md Appendix B (edge gap list)
+    • Optionally: run pathway_evidence_auditor output
+  Workflow:
+    1. Count evidence rows per edge in the vertical slice
+    2. Identify edges still at k=0
+    3. Identify edges where all evidence is low-quality
+    4. Update priority list for next Discovery session
+    5. Check if any spine papers from §9.3 remain unextracted
+  Output: updated gap priorities, specific queries for next cycle
+
+
+─── MANUAL-FIRST OPERATIONAL STANCE ───
+
+As of 2026-02-27, the automated pipeline (Stages 0-2) is CODED but has
+NEVER been tested against live APIs. The following components are missing
+or unverified:
+
+  NOT BUILT:
+    • abstract_pre_extractor.py (Stage 1 — LLM abstract triage)
+    • fulltext_extractability_scanner.py (Stage 1.5 — regex stat scan)
+    • extraction_batch_optimizer.py (set-cover selection)
+    • scripts/run_triage_sweep.py (CLI orchestrator)
+
+  BUILT BUT UNTESTED AGAINST LIVE APIs:
+    • All 5 source adapters (PubMed, Crossref, OpenAlex, EuropePMC, Unpaywall)
+    • search_coordinator.py (multi-source orchestration)
+    • aps_scorer.py (APS scoring)
+    • query_generator.py (7 workstreams)
+    • fulltext_retriever.py (PMC > Publisher > Unpaywall cascade)
+
+  BLOCKING:
+    • No API keys configured (NCBI_API_KEY, CROSSREF_MAILTO, etc.)
+    • node_search_terms_v1 table is EMPTY (0 rows) — query generator
+      falls back to splitting node IDs into words
+
+THEREFORE: use the Manual Chatbox Retrieval Protocol
+(DEEP_RESEARCH_STRATEGY.md Part 9) as the primary operational workflow.
+The pipeline code is preserved for future activation when:
+  1. node_search_terms_v1 is populated (§9.5 vocab → DB rows)
+  2. API keys are configured
+  3. Stage 1 + Stage 1.5 modules are built
+  4. At least one end-to-end integration test passes
+
+
+─── INTEGRATION AUDIT: RESEARCH ACQUISITION STRATEGY ALIGNMENT ───
+
+Date: 2026-02-27
+Prompted by review of proposed research acquisition strategy against
+actual codebase. Findings:
+
+ALREADY SOLVED (do not rebuild):
+  1. Query Registry concept = node_search_terms_v1 + query_generator.py
+  2. APS scoring = aps_scorer.py (formula matches strategy exactly)
+  3. Gap auditing / coverage matrix = pathway_evidence_auditor.py
+  4. Edge evidence schema = edge_evidence_v1 (71 columns, superset of
+     the strategy's PAPER_PACKET template)
+  5. Spine paper pathway = data/manual_uploads/ (operational, 18 rows)
+
+GAPS TO ADDRESS (when moving to automation):
+  1. Populate node_search_terms_v1 for vertical slice nodes (~100-200 rows)
+     This is the single highest-ROI pre-automation task.
+  2. Add extractability trigger terms to generate_edge_queries():
+     AND ("95% CI" OR "standard error" OR "β" OR "effect size"
+      OR "odds ratio" OR "regression" OR "mixed-effects")
+  3. Add Workstream 8: Proxy Validity to query_generator.py
+     Target: peripheral↔central biomarker R², especially BDNF
+  4. Wire Unpaywall as automatic post-step in search_coordinator.py
+  5. Build abstract_pre_extractor.py + fulltext_extractability_scanner.py
+  6. Add is_sufficient(edge_id, min_grade) method to auditor
+
+DO NOT BUILD (redundant with existing system):
+  • Template A (Protocol Header) — belongs in docs/ as markdown
+  • Template D (Chain Assembly) — algorithm layer already handles this
+  • Separate "EDGE_PACKET" format — use existing edge_ontology_v1 +
+    node_search_terms_v1 tables instead
 
 
 ═══════════════════════════════════════════════════════════════════════════

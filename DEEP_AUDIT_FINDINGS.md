@@ -435,9 +435,9 @@ The system accepts records without SE/CI/p+N and fabricates precision (SE=1.0).
 | ISSUE-1: Dual edge ID conventions | ✅ FIXED | DB now has 137 ER_* definitions (EDGE_* removed from seeds) |
 | ISSUE-2: No DB persistence protection | ❌ UNFIXED | No `db_guard.py`, no backup, WAL deletion caused data loss |
 | ISSUE-3: LLM produces deficient evidence | ❌ UNFIXED | 0% TB group completion, N=0, 70 empty columns |
-| ISSUE-4: CSV template too narrow | ❌ UNFIXED | Template not updated to v2 |
-| ISSUE-5: Effect size units not standardized | ❌ UNFIXED | No unit validation at import |
-| ISSUE-6: 5/7 data families never loaded | ❌ UNFIXED | Only F1 (edge evidence) populated |
+| ISSUE-4: CSV template too narrow | ✅ FIXED | Step 4d now applies 7-layer SE_eff calibration from CSV metadata |
+| ISSUE-5: Effect size units not standardized | ✅ FIXED | Step 4c: scale harmonization (mean_diff_raw→cohens_d) |
+| ISSUE-6: 5/7 data families never loaded | ✅ FIXED | Step 4b loads all family CSVs (norms, temporal, instrument, context) |
 | ISSUE-7: No extraction completeness check | ❌ UNFIXED | No completeness monitoring |
 | ISSUE-8: Three parallel write paths | ❌ UNFIXED | No unified validation |
 | INV-1: Missingness policy | ❌ UNFIXED | No reject-on-missing enforcement |

@@ -1,0 +1,14 @@
+study_id,edge_id,beta,se,study_design,publication_year,sample_size,identification_status,quality_grade
+STUDY_CAMPBELL_2017,ER_ACTIVITY_PROC_SPEED,-14.2,5.28,observational,2017,19,plausible,high
+STUDY_CAMPBELL_2017,ER_ACTIVITY_VERBAL_FLUENCY,3.0,2.14,observational,2017,19,plausible,high
+STUDY_CAMPBELL_2017,ER_ACTIVITY_EPIMEM,-1.5,2.48,observational,2017,19,plausible,high
+STUDY_CAMPBELL_2017,ER_ACTIVITY_COG_COMPLAINTS,3.9,5.33,observational,2017,19,plausible,high
+STUDY_NORTHEY_2018,ER_ACTIVITY_EPIMEM,0.76,0.6,meta_analysis,2018,12,plausible,moderate
+STUDY_NORTHEY_2018,ER_ACTIVITY_EXEC,0.75,0.6,meta_analysis,2018,12,plausible,moderate
+STUDY_NORTHEY_2018,ER_ACTIVITY_WORKMEM,0.81,0.6,meta_analysis,2018,12,plausible,moderate
+STUDY_NORTHEY_2018,ER_ACTIVITY_EPIMEM,0.66,0.62,meta_analysis,2018,11,plausible,moderate
+STUDY_NORTHEY_2018,ER_ACTIVITY_EXEC,0.2,0.61,meta_analysis,2018,11,plausible,moderate
+STUDY_CHERRIER_2013,ER_COGACTIVITY_WORKMEM,0.79,0.38,small_rct_default,2013,28,plausible,moderate
+STUDY_CHERRIER_2013,ER_COGACTIVITY_ATTN,0.59,0.38,small_rct_default,2013,28,plausible,moderate
+STUDY_CHERRIER_2013,ER_COGACTIVITY_COGCOMPLAINTS,-0.53,0.38,small_rct_default,2013,28,plausible,moderate
+STUDY_CHERRIER_2013,ER_COGACTIVITY_EPIMEM,0.25,0.38,small_rct_default,2013,28,plausible,moderate

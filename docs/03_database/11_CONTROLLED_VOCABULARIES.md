@@ -338,7 +338,56 @@ Several enums have multiple variants across tables that should be reconciled:
 
 ---
 
-*End of Controlled Vocabularies v1.0*
+## 8. Search Vocabulary (`node_search_terms_v1`)
 
-**Supersedes:** No prior document (new).
+**Status: LOCKED** — 504 terms across 63/63 nodes.
+
+### 8.1 `term_type` enum
+
+| Value | Count | Description |
+|-------|------:|-------------|
+| `primary` | 63 | Canonical node label (1 per node) |
+| `synonym` | 230 | Alternate names, lay terms, expanded forms |
+| `abbreviation` | 29 | Standard abbreviations (BDNF, CRP, CAR, etc.) |
+| `mesh_heading` | 40 | NLM Medical Subject Headings |
+| `instrument` | 119 | Assessment instrument names, auto-generated from `instrument_definitions_v1` |
+| `exclude` | 23 | False-positive filters — terms that look relevant but indicate different clinical contexts |
+
+### 8.2 Exclude terms by node
+
+| Node | Exclude Terms | Rationale |
+|------|--------------|-----------|
+| NODE_BEH_PHYSICAL_ACTIVITY | physical therapy, rehabilitation | Therapeutic, not volitional exercise |
+| NODE_BEH_SLEEP_QUALITY | sleep apnea | Different mechanism (obstructive) |
+| NODE_BIO_BDNF | BDNF gene therapy, BDNF knockout | Preclinical / genetic manipulation |
+| NODE_BIO_CORTISOL | cortisol injection, hydrocortisone therapy | Pharmacological, not endogenous |
+| NODE_BIO_IL6 | tocilizumab, IL-6 receptor antagonist | Drug effect, not endogenous levels |
+| NODE_BIO_TNF | infliximab, etanercept, anti-TNF therapy | Drug effect, not endogenous levels |
+| NODE_COG_EPISODIC_MEM | Alzheimer disease, dementia | Neurodegenerative, not cancer-related |
+| NODE_PATH_HPA | Cushing syndrome, Addison disease | Primary endocrine disorder |
+| NODE_PATH_OIC | traumatic brain injury, multiple sclerosis | Different neuroinflammatory etiology |
+| NODE_SYM_DEPRESSION | bipolar disorder, schizophrenia | Primary psychiatric disorder |
+| NODE_SYM_FATIGUE | chronic fatigue syndrome, myalgic encephalomyelitis | Different diagnostic entity |
+| NODE_SYM_SLEEP_DISRUPTION | sleep apnea | Different mechanism (obstructive) |
+
+### 8.3 Measurement caveats (9 biomarker nodes)
+
+Stored in `scripts/generate_derived_seeds.py :: NODE_SEARCH_CAVEATS`. Key differences:
+
+- **BDNF**: Plasma vs serum (serum reflects platelet degranulation)
+- **Cortisol**: Slope vs CAR vs AUC are distinct constructs
+- **IL-6 / CRP**: High-sensitivity assays preferred
+- **TNF**: Short half-life; timing matters
+- **Shannon diversity**: Metric varies by pipeline (16S vs shotgun)
+
+### 8.4 Canonical source
+
+`scripts/generate_derived_seeds.py` → `node_search_terms_v1` table (via `_upsert_search_term()`).
+Instrument terms auto-generated from `instrument_definitions_v1` (67 instruments; `INST_CLINICAL_*` skipped).
+
+---
+
+*End of Controlled Vocabularies v1.1*
+
+**Supersedes:** v1.0 (added §8 — search vocabulary).
 **Action items:** See §7.1 for reconciliation recommendations. These should be resolved before schema migration.

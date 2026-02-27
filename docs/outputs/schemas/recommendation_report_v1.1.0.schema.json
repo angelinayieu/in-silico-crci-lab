@@ -1,7 +1,7 @@
 {
   "$defs": {
     "ClinicalRiskProfile": {
-      "description": "Clinical CRCI risk assessment with domain decomposition.\n\nThis is a MODEL-DERIVED probability, not a clinically calibrated rate.\nSee calibration_status field and \u00a75.3 of IMPLEMENTATION_PLAN_RISK_PERCENTAGE.\n\nProduced by: risk_estimator.py (F4)\nConsumed by: report_assembler.py \u2192 risk_dashboard.py (PRES)",
+      "description": "CRCI Risk Percentage output \u2014 probability of meeting ICCTF criteria.\n\nComputed by Chain F4 (risk_estimator.py) from Monte Carlo draws.",
       "properties": {
         "risk_pct": {
           "title": "Risk Pct",
@@ -16,14 +16,17 @@
           "type": "number"
         },
         "risk_range_text": {
+          "default": "",
           "title": "Risk Range Text",
           "type": "string"
         },
         "risk_tier": {
+          "default": "UNKNOWN",
           "title": "Risk Tier",
           "type": "string"
         },
         "interval_method": {
+          "default": "jeffreys",
           "title": "Interval Method",
           "type": "string"
         },
@@ -42,21 +45,6 @@
           "title": "N Draws Used",
           "type": "integer"
         },
-        "criteria": {
-          "default": "ICCTF_Wefel2011_domain_level",
-          "title": "Criteria",
-          "type": "string"
-        },
-        "domain_aggregation": {
-          "default": "mean",
-          "title": "Domain Aggregation",
-          "type": "string"
-        },
-        "calibration_status": {
-          "default": "uncalibrated_model_derived",
-          "title": "Calibration Status",
-          "type": "string"
-        },
         "coverage_fraction": {
           "default": 0.0,
           "title": "Coverage Fraction",
@@ -66,18 +54,6 @@
           "default": false,
           "title": "Low Coverage Warning",
           "type": "boolean"
-        },
-        "conditioning": {
-          "default": "posterior_at_t",
-          "title": "Conditioning",
-          "type": "string"
-        },
-        "thresholds": {
-          "additionalProperties": {
-            "type": "number"
-          },
-          "title": "Thresholds",
-          "type": "object"
         },
         "domain_breakdown": {
           "items": {
@@ -90,10 +66,7 @@
       "required": [
         "risk_pct",
         "risk_lower_pct",
-        "risk_upper_pct",
-        "risk_range_text",
-        "risk_tier",
-        "interval_method"
+        "risk_upper_pct"
       ],
       "title": "ClinicalRiskProfile",
       "type": "object"
@@ -151,6 +124,35 @@
           "default": "index_mode",
           "title": "Calibration Mode",
           "type": "string"
+        },
+        "cochrans_Q": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cochrans Q"
+        },
+        "I_squared": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "I Squared"
+        },
+        "random_effects_applied": {
+          "default": false,
+          "title": "Random Effects Applied",
+          "type": "boolean"
         }
       },
       "required": [
@@ -233,8 +235,8 @@
       "title": "DecisionTraceEntry",
       "type": "object"
     },
-    "DiffEffectSummary": {
-      "description": "Differential intervention effect between two contexts (F5-M4).",
+    "DifferentialEffectSummary": {
+      "description": "Pairwise intervention effect comparison across two contexts.",
       "properties": {
         "intervention_id": {
           "title": "Intervention Id",
@@ -260,21 +262,10 @@
           "title": "Delta C Diff Ci Upper",
           "type": "number"
         },
-        "baseline_contribution": {
-          "title": "Baseline Contribution",
-          "type": "number"
-        },
-        "mechanism_contribution": {
-          "title": "Mechanism Contribution",
-          "type": "number"
-        },
         "practically_different": {
+          "default": false,
           "title": "Practically Different",
           "type": "boolean"
-        },
-        "decomposition_scoring_policy": {
-          "title": "Decomposition Scoring Policy",
-          "type": "string"
         }
       },
       "required": [
@@ -283,17 +274,13 @@
         "context_b",
         "delta_C_diff_mean",
         "delta_C_diff_ci_lower",
-        "delta_C_diff_ci_upper",
-        "baseline_contribution",
-        "mechanism_contribution",
-        "practically_different",
-        "decomposition_scoring_policy"
+        "delta_C_diff_ci_upper"
       ],
-      "title": "DiffEffectSummary",
+      "title": "DifferentialEffectSummary",
       "type": "object"
     },
     "DomainRiskBreakdown": {
-      "description": "Per-domain risk decomposition for clinical display.\n\nThree complementary views per domain (\u00a72.5):\n  A. marginal_risk_pct \u2014 P(this domain is impaired) (Formula F4-4)\n  B. trigger_share_pct \u2014 trigger-share attribution (NOT Shapley, \u00a72.5B)\n  C. ivw_weight_pct   \u2014 precision influence (separate from risk, \u00a72.5C)",
+      "description": "Per-domain risk attribution for the CRCI Risk Percentage.",
       "properties": {
         "domain_id": {
           "title": "Domain Id",
@@ -339,6 +326,7 @@
           "type": "number"
         },
         "is_directly_observed": {
+          "default": false,
           "title": "Is Directly Observed",
           "type": "boolean"
         },
@@ -357,8 +345,7 @@
         "mean_z",
         "sd_z",
         "z_5th",
-        "z_95th",
-        "is_directly_observed"
+        "z_95th"
       ],
       "title": "DomainRiskBreakdown",
       "type": "object"
@@ -508,6 +495,52 @@
       "title": "EvidenceGapReport",
       "type": "object"
     },
+    "ExtractionQualitySummary": {
+      "description": "Aggregated extraction quality metrics across all studies in a session.\n\nComputed by check_paper_completeness() in completeness_checker.py,\naggregated across all studies used in the run, and threaded through\nto the presentation layer for quality disclosure.",
+      "properties": {
+        "study_count": {
+          "default": 0,
+          "title": "Study Count",
+          "type": "integer"
+        },
+        "overall_completeness": {
+          "default": 0.0,
+          "title": "Overall Completeness",
+          "type": "number"
+        },
+        "total_defaults_fired": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Aggregate defaults per layer: {'L1': 0, 'L4': 2, 'L6': 5, ...}",
+          "title": "Total Defaults Fired",
+          "type": "object"
+        },
+        "missing_families_summary": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Family code \u2192 count of studies missing it: {'F4': 3}",
+          "title": "Missing Families Summary",
+          "type": "object"
+        },
+        "blocking_issue_count": {
+          "default": 0,
+          "title": "Blocking Issue Count",
+          "type": "integer"
+        },
+        "quality_caveats": {
+          "description": "Human-readable quality warnings for presentation layer",
+          "items": {
+            "type": "string"
+          },
+          "title": "Quality Caveats",
+          "type": "array"
+        }
+      },
+      "title": "ExtractionQualitySummary",
+      "type": "object"
+    },
     "NodeTrajectory": {
       "description": "Trajectory for a single node under a scenario.",
       "properties": {
@@ -584,6 +617,54 @@
           ],
           "default": null,
           "title": "Evidence Quality"
+        },
+        "evidence_density": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Density"
+        },
+        "distinction_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Distinction Score"
+        },
+        "edge_coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edge Coverage"
+        },
+        "is_adequate": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Adequate"
         }
       },
       "required": [
@@ -646,8 +727,8 @@
       "title": "ReportOutputMode",
       "type": "string"
     },
-    "RiskDiffSummary": {
-      "description": "Risk differential between two contexts (F5).\n\nrisk_diff_pct = risk_A - risk_B, so positive means A has higher risk.",
+    "RiskDifferentialSummary": {
+      "description": "Pairwise CRCI risk comparison across two contexts.",
       "properties": {
         "context_a": {
           "title": "Context A",
@@ -668,13 +749,6 @@
         "risk_diff_ci_upper": {
           "title": "Risk Diff Ci Upper",
           "type": "number"
-        },
-        "domain_diffs": {
-          "additionalProperties": {
-            "type": "number"
-          },
-          "title": "Domain Diffs",
-          "type": "object"
         }
       },
       "required": [
@@ -684,7 +758,7 @@
         "risk_diff_ci_lower",
         "risk_diff_ci_upper"
       ],
-      "title": "RiskDiffSummary",
+      "title": "RiskDifferentialSummary",
       "type": "object"
     },
     "ScheduleAction": {
@@ -858,6 +932,77 @@
           ],
           "default": null,
           "title": "Cri 95 Upper"
+        },
+        "safe_a_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safe A Score"
+        },
+        "safe_a_cri_lower": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safe A Cri Lower"
+        },
+        "safe_a_cri_upper": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safe A Cri Upper"
+        },
+        "p_net_benefit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "P Net Benefit"
+        },
+        "safety_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safety Status"
+        },
+        "synergy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SynergyMetrics"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -867,6 +1012,78 @@
         "plan_type"
       ],
       "title": "SchedulePlan",
+      "type": "object"
+    },
+    "SensitivityIndexItem": {
+      "description": "Single edge sensitivity index from D4c.",
+      "properties": {
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        },
+        "elasticity": {
+          "title": "Elasticity",
+          "type": "number"
+        },
+        "se_eff": {
+          "title": "Se Eff",
+          "type": "number"
+        },
+        "discovery_score": {
+          "title": "Discovery Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "edge_id",
+        "source_node_id",
+        "target_node_id",
+        "elasticity",
+        "se_eff",
+        "discovery_score"
+      ],
+      "title": "SensitivityIndexItem",
+      "type": "object"
+    },
+    "SensitivityReport": {
+      "description": "Sensitivity analysis report \u2014 which edges most influence the ranking.\n\nBuilt from D4c sensitivity indices (Sobol-style elasticities).",
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "sensitivity_indices": {
+          "items": {
+            "$ref": "#/$defs/SensitivityIndexItem"
+          },
+          "title": "Sensitivity Indices",
+          "type": "array"
+        },
+        "top_discovery_edges": {
+          "items": {
+            "$ref": "#/$defs/SensitivityIndexItem"
+          },
+          "title": "Top Discovery Edges",
+          "type": "array"
+        },
+        "n_edges_analyzed": {
+          "default": 0,
+          "title": "N Edges Analyzed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "SensitivityReport",
       "type": "object"
     },
     "SeverityTier": {
@@ -892,46 +1109,15 @@
       "type": "string"
     },
     "SubpopulationComparisonSummary": {
-      "description": "Presentation-ready F5 output (JSON-serializable).\n\nFull SubpopulationComparisonResult from F5 contains raw numpy arrays\nand internal hashes not suitable for serialization. This summary\nbridges the gap for the presentation layer.\n\nProduced by: report_assembler.py (via _build_subpop_summary)\nConsumed by: presentation layer (comparison panel)",
+      "description": "Presentation-ready summary of F5 subpopulation comparison.\n\nMapped from SubpopulationComparisonResult (algorithm internal type)\nby report_assembler.py.",
       "properties": {
-        "contexts_compared": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Contexts Compared",
-          "type": "array"
-        },
-        "n_contexts": {
+        "n_contexts_compared": {
           "default": 0,
-          "title": "N Contexts",
+          "title": "N Contexts Compared",
           "type": "integer"
         },
-        "rank_concordance_matrix": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "type": "object"
-          },
-          "title": "Rank Concordance Matrix",
-          "type": "object"
-        },
-        "risk_differentials": {
-          "items": {
-            "$ref": "#/$defs/RiskDiffSummary"
-          },
-          "title": "Risk Differentials",
-          "type": "array"
-        },
-        "differential_effects": {
-          "items": {
-            "$ref": "#/$defs/DiffEffectSummary"
-          },
-          "title": "Differential Effects",
-          "type": "array"
-        },
         "comparison_valid": {
-          "default": true,
+          "default": false,
           "title": "Comparison Valid",
           "type": "boolean"
         },
@@ -942,18 +1128,76 @@
           "title": "Validity Notes",
           "type": "array"
         },
-        "crn_coverage": {
-          "default": "full",
-          "title": "Crn Coverage",
-          "type": "string"
+        "context_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Context Labels",
+          "type": "array"
         },
-        "seed_used": {
-          "default": 0,
-          "title": "Seed Used",
-          "type": "integer"
+        "pairwise_differentials": {
+          "items": {
+            "$ref": "#/$defs/DifferentialEffectSummary"
+          },
+          "title": "Pairwise Differentials",
+          "type": "array"
+        },
+        "risk_differentials": {
+          "items": {
+            "$ref": "#/$defs/RiskDifferentialSummary"
+          },
+          "title": "Risk Differentials",
+          "type": "array"
+        },
+        "rank_concordance": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Rank Concordance",
+          "type": "object"
         }
       },
       "title": "SubpopulationComparisonSummary",
+      "type": "object"
+    },
+    "SynergyMetrics": {
+      "description": "Synergy diagnostics for a bundle schedule.\n\nSurfaces JPO, CCS, and \u03b3 from D3 synergy analysis so the\npresentation layer can explain intervention interactions.",
+      "properties": {
+        "bundle_id": {
+          "title": "Bundle Id",
+          "type": "string"
+        },
+        "member_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Member Ids",
+          "type": "array"
+        },
+        "mean_delta_C": {
+          "default": 0.0,
+          "title": "Mean Delta C",
+          "type": "number"
+        },
+        "interaction_completeness": {
+          "default": 1.0,
+          "title": "Interaction Completeness",
+          "type": "number"
+        },
+        "pairwise": {
+          "description": "[{action_a, action_b, jpo, ccs, gamma_empirical}, ...]",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Pairwise",
+          "type": "array"
+        }
+      },
+      "required": [
+        "bundle_id"
+      ],
+      "title": "SynergyMetrics",
       "type": "object"
     },
     "TemporalTrajectory": {
@@ -1087,6 +1331,14 @@
           ],
           "default": null,
           "title": "Dominant Source"
+        },
+        "per_edge_contributions": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "edge_id \u2192 variance contribution (absolute). From F3 per_edge_variance_contrib.",
+          "title": "Per Edge Contributions",
+          "type": "object"
         }
       },
       "required": [
@@ -1096,13 +1348,8 @@
       "type": "object"
     }
   },
-  "description": "Top-level output contract \u2014 everything the presentation layer needs.\n\nThis is the single object that flows from Runtime to Presentation.\nSCHEMA VERSION: see config.OUTPUT_SCHEMA_VERSION.\nBump on any field addition/removal/rename (see \u00a79.2 versioning rules).",
+  "description": "Top-level output contract \u2014 everything the presentation layer needs.\n\nThis is the single object that flows from Runtime to Presentation.",
   "properties": {
-    "output_schema_version": {
-      "default": "v1.1.0",
-      "title": "Output Schema Version",
-      "type": "string"
-    },
     "run_id": {
       "title": "Run Id",
       "type": "string"
@@ -1126,28 +1373,6 @@
       },
       "title": "Alternative Schedules",
       "type": "array"
-    },
-    "clinical_risk": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ClinicalRiskProfile"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
-    "subpopulation_comparison": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/SubpopulationComparisonSummary"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
     },
     "pathway_profile": {
       "anyOf": [
@@ -1193,6 +1418,50 @@
       "anyOf": [
         {
           "$ref": "#/$defs/DecisionTrace"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "clinical_risk": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ClinicalRiskProfile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "extraction_quality": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExtractionQualitySummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "subpopulation_comparison": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SubpopulationComparisonSummary"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "sensitivity_report": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SensitivityReport"
         },
         {
           "type": "null"

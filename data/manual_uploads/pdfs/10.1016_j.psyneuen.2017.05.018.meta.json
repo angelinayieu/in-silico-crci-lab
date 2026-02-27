@@ -1,0 +1,37 @@
+{
+  "doi": "10.1016/j.psyneuen.2017.05.018",
+  "title": "Diurnal Cortisol Slopes and Mental and Physical Health Outcomes: A Systematic Review and Meta-analysis",
+  "authors": ["Adam EK", "Quinn ME", "Tavernier R", "McQuillan MT", "Dahlke KA", "Gilbert KE"],
+  "year": 2017,
+  "journal": "Psychoneuroendocrinology",
+  "pmid": "28578301",
+  "study_design": "systematic_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "intervention_type": null,
+  "n_total": 36823,
+  "n_unique_participants": 26167,
+  "k_studies": 80,
+  "k_associations": 179,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_CORTISOL_HPA",
+    "ER_HPA_OIC",
+    "ER_HPA_DEPRESSION",
+    "ER_HPA_FATIGUE",
+    "ER_HPA_ANXIETY"
+  ],
+  "meta_analysis_note": "Systematic review + meta-analysis of 80 studies (179 associations). All effect sizes reported as r (correlation). Converted to Cohen's d via d=2r/√(1-r²). Random effects model. I²=83.23% overall. Egger test p=.002 but trim-and-fill found 0 missing studies. Cross-sectional=91.1% of findings. DCS measured as decline slope over day; flatter slope = worse. 12 health outcome subtypes analysed.",
+  "risk_of_bias": {
+    "note": "Systematic review rated using AMSTAR-like criteria. Mixed underlying study quality. 91.1% cross-sectional (limits causal inference). High heterogeneity (I²=83.23). Publication bias detected (Egger p=.002) but trim-and-fill suggests minimal impact.",
+    "overall": "moderate"
+  },
+  "effect_size_notes": {
+    "overall_health": "r=.147 (.112–.183) p<.001 — pooled DCS↔all health outcomes",
+    "inflammation": "r=.288 (.091–.464) p=.005 — LARGEST subgroup effect",
+    "depression": "r=.106 (.047–.165) p<.001 — most common outcome (k=52)",
+    "fatigue": "r=.167 (.048–.281) p=.006",
+    "anxiety": "r=-.084 (-.173–.006) p=.066 — NOT SIGNIFICANT",
+    "cancer": "r=.231 (.113–.343) p<.001 — mapped to overall ER_CORTISOL_HPA (not separate row)"
+  }
+}

@@ -1054,7 +1054,7 @@ COMMENT ON TABLE question_observation_models_v1 IS
 CREATE TABLE IF NOT EXISTS node_search_terms_v1 (
     node_id             TEXT        NOT NULL,
     term                TEXT        NOT NULL,
-    term_type           TEXT        NOT NULL,  -- {primary, synonym, abbreviation, mesh_heading}
+    term_type           TEXT        NOT NULL,  -- {primary, synonym, abbreviation, mesh_heading, instrument, exclude}
     active              INTEGER     NOT NULL DEFAULT 1,  -- {0,1}
     PRIMARY KEY (node_id, term)
 );

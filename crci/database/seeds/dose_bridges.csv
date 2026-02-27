@@ -1,0 +1,11 @@
+bridge_id,action_id,output_mode,output_feature_id,output_node_id,maps_to_node_id,dose_type,dose_unit,dose_min,dose_max,dose_step,dose_reference,dose_response_family,dose_response_params_json,bridge_effect_sign,bridge_gain,bridge_noise_sd,time_step_unit,temporal_family,lag_steps,half_life_steps,scope_json,provenance,version,active
+BRIDGE_AEROBIC_PA,ACT_EXERCISE_AEROBIC,node,,NODE_BEH_PHYSICAL_ACTIVITY,,continuous,minutes,0,90,5,30,hill,"{""e_max"": 0.8, ""ec50"": 25, ""h"": 1.5}",1,1.0,0.1,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_AEROBIC_NEURO,ACT_EXERCISE_AEROBIC,node,,NODE_BIO_BDNF,,continuous,minutes,0,90,5,30,linear,"{""slope"": 0.02}",1,0.6,0.15,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_RESISTANCE_PA,ACT_EXERCISE_RESISTANCE,node,,NODE_BEH_PHYSICAL_ACTIVITY,,continuous,minutes,0,60,5,20,hill,"{""e_max"": 0.7, ""ec50"": 20, ""h"": 1.3}",1,0.9,0.1,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_RESISTANCE_INFLAM,ACT_EXERCISE_RESISTANCE,node,,NODE_BIO_INFLAMMATION,,continuous,minutes,0,60,5,20,linear,"{""slope"": -0.015}",-1,0.5,0.15,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_COGTRAIN_COG,ACT_COGNITIVE_TRAINING,node,,NODE_BEH_COG_ACTIVITY,,continuous,minutes,0,60,5,20,hill,"{""e_max"": 0.6, ""ec50"": 15, ""h"": 1.2}",1,1.0,0.12,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_MINDFULNESS_STRESS,ACT_MINDFULNESS,node,,NODE_BEH_STRESS_MGMT,,continuous,minutes,0,45,5,15,hill,"{""e_max"": 0.65, ""ec50"": 12, ""h"": 1.4}",1,1.0,0.1,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_SLEEP_QUALITY,ACT_SLEEP_HYGIENE,node,,NODE_BEH_SLEEP_QUALITY,,binary,,0,1,,1,linear,"{""slope"": 0.5}",1,1.0,0.15,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_LIGHT_CIRCADIAN,ACT_LIGHT_AM,node,,NODE_BEH_LIGHT_EXPOSURE,,continuous,minutes,0,30,5,10,linear,"{""slope"": 0.04}",1,1.0,0.12,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_SOCIAL_ENGAGE,ACT_SOCIAL_ENGAGE,node,,NODE_BEH_SOCIAL_ENGAGE,,continuous,minutes,0,180,15,60,hill,"{""e_max"": 0.5, ""ec50"": 45, ""h"": 1.1}",1,1.0,0.12,day,delta,0,,{},CATEGORY_A_CURATED,1,1
+BRIDGE_NUTRITION_INFLAM,ACT_NUTRITION_ANTI_INFLAM,node,,NODE_BEH_DIET,,binary,,0,1,,1,linear,"{""slope"": 0.4}",-1,0.8,0.15,day,delta,0,,{},CATEGORY_A_CURATED,1,1

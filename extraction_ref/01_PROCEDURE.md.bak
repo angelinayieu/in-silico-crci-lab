@@ -1,0 +1,222 @@
+# Extraction Procedure — Step by Step
+
+> Canonical procedure for extracting one paper into the CRCI system.
+> Each step produces specific outputs. Skip only what the paper doesn't provide.
+
+---
+
+## Step 0 — Classify the Paper
+
+Read the abstract + methods. Assign extraction mode:
+
+| Condition | Mode | Templates to Fill |
+|-----------|------|------------------|
+| RCT + cancer population + cognitive **primary** outcome | **DEEP** | All 6 CSVs + meta.json |
+| Cohort/observational + cognitive outcomes | **STANDARD** | edge_evidence + population_norms + meta.json |
+| Case report / animal / biomarker-only | **SHALLOW** | edge_evidence only + meta.json |
+| Unknown | **STANDARD** | Default |
+
+**DEEP triggers:** `study_design ∈ {RCT, crossover_RCT}` AND `cancer_type ≠ null` AND any cognitive instrument used as primary outcome.
+
+---
+
+## Step 1 — Check Registries
+
+Before extracting ANY data, verify the paper's edges, nodes, and instruments exist:
+
+### 1a. Edge Check
+Open `registries/EDGE_REGISTRY.csv`. For each causal relationship the paper tests:
+- If edge exists → note the `edge_relation_id`
+- If edge is NEW → add a row to EDGE_REGISTRY.csv first (see column spec in `04_CONTROLLED_VOCAB.md`)
+
+### 1b. Instrument Check
+Open `registries/INSTRUMENT_REGISTRY.csv`. For each cognitive test or questionnaire used:
+- If instrument exists → note the `instrument_id`
+- If instrument is NEW → add to INSTRUMENT_REGISTRY.csv first
+
+### 1c. Node Check
+Open `registries/NODE_REGISTRY.csv`. Verify that the paper's constructs map to existing nodes.
+- If a construct has NO corresponding node → flag as `REVIEW_TASK` (do NOT invent nodes)
+
+---
+
+## Step 2 — Create Paper Subfolder
+
+```bash
+# DOI convention: replace / with _
+mkdir -p data/manual_uploads/structured/10.xxxx_j.JOURNAL.YEAR.ISSUE.PAGE
+```
+
+Copy blank templates from `data/templates/` into this folder:
+```bash
+# Core templates (always copy)
+cp data/templates/edge_evidence_template.csv \
+   data/templates/population_norms_template.csv \
+   data/templates/context_priors_template.csv \
+   data/templates/temporal_evidence_template.csv \
+   data/templates/instrument_evidence_template.csv \
+   data/templates/correlation_template.csv \
+   data/manual_uploads/structured/<doi-slug>/
+
+# Extended templates (copy for DEEP mode or when data is available)
+cp data/templates/dose_evidence_template.csv \
+   data/templates/subgroup_evidence_template.csv \
+   data/templates/study_cohort_profile_template.csv \
+   data/manual_uploads/structured/<doi-slug>/
+```
+
+---
+
+## Step 3 — Fill edge_evidence_template.csv ← REQUIRED
+
+One row per causal/associational relationship reported. This is the **core** evidence table.
+
+For each reported effect:
+1. Identify the `edge_id` from EDGE_REGISTRY.csv
+2. Extract or compute `beta_raw` (standardized effect size — prefer Cohen's d)
+3. Extract or derive `se_raw` (see `03_SE_DERIVATION.md`)
+4. Record `effect_type_original` (what the paper actually reports)
+5. Record design, sample size, cancer type, treatment phase
+
+**Full column spec:** see `06_CSV_TEMPLATES.md` §edge_evidence
+
+### When beta_raw is Not Directly Available
+
+Convert to Cohen's d using:
+```
+From means ± SD:
+  SD_pooled = √[(SD_tx² + SD_ctrl²) / 2]
+  d = (mean_tx_change - mean_ctrl_change) / SD_pooled
+
+From F-statistic (1 df numerator):
+  d = 2 × √(F / N)
+
+From t-statistic:
+  d = 2t / √(df)
+
+From odds ratio:
+  d = ln(OR) × √3 / π
+
+From correlation r:
+  d = 2r / √(1 - r²)
+```
+
+---
+
+## Step 4 — Fill population_norms_template.csv ← RECOMMENDED
+
+Baseline descriptive statistics for the control/reference group.
+
+For each cognitive/symptom measure at baseline:
+1. Record `node_id` + `instrument_id`
+2. Extract control group baseline `mean` and `sd`
+3. Record `sample_size` (control group N)
+
+This feeds the population norms layer and enables z-score context priors.
+
+---
+
+## Step 5 — Fill context_priors_template.csv ← RECOMMENDED
+
+Convert population norms to z-scores:
+```
+z = (observed_mean - population_mean) / population_SD
+```
+
+Use published norms as the reference. If unavailable, use the control group baseline and flag `source_type = local_control_group`.
+
+---
+
+## Step 6 — Fill Optional Templates
+
+| Template | Fill When... | DB Table |
+|----------|-------------|----------|
+| `temporal_evidence_template.csv` | Paper has ≥2 longitudinal timepoints | `temporal_evidence_v1` |
+| `instrument_evidence_template.csv` | Paper reports Cronbach's α, test-retest ICC, or split-half | `instrument_evidence_v1` |
+| `correlation_template.csv` | Paper reports inter-domain correlations (e.g., IL-6 × fatigue r) | `biomarker_correlations_v1` |
+| `dose_evidence_template.csv` | Paper reports dose-response data | `dose_evidence_v1` |
+| `subgroup_evidence_template.csv` | Paper reports subgroup/interaction analyses (e.g., APOE × treatment) | `subgroup_evidence_v1` |
+| `study_cohort_profile_template.csv` | DEEP mode — detailed cohort demographics | `study_cohort_profiles_v1` |
+
+---
+
+## Step 7 — Create meta.json
+
+Save to `data/manual_uploads/pdfs/<doi-slug>.meta.json`:
+
+```json
+{
+  "doi": "10.xxxx/...",
+  "title": "Full paper title",
+  "authors": ["Last1 FM", "Last2 FM"],
+  "year": 2024,
+  "journal": "Journal Name",
+  "pmid": "12345678",
+  "study_design": "RCT",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "intervention_type": "exercise",
+  "n_total": 50,
+  "n_treatment": 25,
+  "n_control": 25,
+  "extraction_mode": "DEEP",
+  "targeted_edges": ["ER_ACTIVITY_PROC_SPEED"],
+  "risk_of_bias": {
+    "randomization": "low",
+    "allocation_concealment": "low",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "low",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "other": "none",
+    "overall": "low"
+  },
+  "notes": ""
+}
+```
+
+---
+
+## Step 8 — Load Into DB
+
+```bash
+cd /workspaces/in-silico-crci-lab
+python scripts/load_evidence_into_db.py --verbose
+```
+
+This runs 12 pipeline steps automatically:
+- **Step 1:** Reseeds edge_relations from EDGE_REGISTRY.csv
+- **Step 1b:** Reseeds nodes + instruments from NODE_REGISTRY.csv / INSTRUMENT_REGISTRY.csv
+- **Step 1c:** Reseeds measures + pathways from MEASURE_REGISTRY.csv / PATHWAY_REGISTRY.csv
+- **Step 2:** Cleans up legacy entries
+- **Step 3:** Registers the study in study_registry_v1
+- **Step 4:** Loads edge_evidence CSVs → edge_evidence_v1
+- **Step 4b:** Loads all auxiliary family CSVs (norms, temporal, instruments, context priors, correlations, dose, subgroup, cohort profiles, data streams, timepoints, ontology links) — 11 importers
+- **Step 4c:** Harmonizes scales to Cohen's d (SD borrowing)
+- **Step 4d:** Applies 7-layer SE_eff calibration (Formula P3-8)
+- **Step 5:** Seeds action_catalog_v1 + dose_bridges_v1
+- **Step 6:** Compiles evidence → edges_v1 (IVW aggregation)
+- **Step 7:** Verifies final counts
+
+---
+
+## Step 9 — Update Extraction Log
+
+Add a new `## EXT-YYYY-NNNN` section to `extraction_ref/EXTRACTION_LOG.md` with:
+- Extraction metadata (ID, timestamp, extractor)
+- Source document details
+- Study characteristics
+- Evidence values extracted (table for each CSV)
+- Extraction decisions (risk-rated, categorized)
+- Verification checklist
+- Files created
+
+---
+
+## Verification
+
+After loading:
+```bash
+python scripts/report_status.py --schema   # Check DB counts
+python scripts/report_status.py --evidence # Check per-edge detail
+```

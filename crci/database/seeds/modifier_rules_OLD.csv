@@ -1,0 +1,16 @@
+rule_id,condition_variable,condition_operator,condition_value,target_edge_id,multiplier,grade,category
+MOD_AGE_GT65,age,>,65,,0.85,B,demographic
+MOD_AGE_GT75,age,>,75,,0.75,C,demographic
+MOD_APOE_E4,apoe_status,==,e4_carrier,,0.80,C,genetic
+MOD_EDUCATION_HIGH,education_years,>,16,,1.15,B,demographic
+MOD_DEPRESSION,depression_comorbidity,==,yes,,0.85,B,comorbidity
+MOD_ANXIETY,anxiety_comorbidity,==,yes,,0.90,B,comorbidity
+MOD_CHEMO_CYCLES_GT6,prior_chemo_cycles,>,6,,0.80,C,treatment_history
+MOD_TIME_POST_TX_GT24,months_since_treatment,>,24,,1.10,B,treatment_history
+MOD_TIME_POST_TX_GT12,months_since_treatment,>,12,,1.05,B,treatment_history
+MOD_EXERCISE_HABIT,exercise_habit,==,regular,,1.10,B,lifestyle
+MOD_SLEEP_POOR,sleep_quality,==,poor,,0.90,B,lifestyle
+MOD_HORMONAL_TX,hormonal_therapy,==,yes,,0.90,C,treatment_history
+MOD_MENOPAUSAL,menopausal_status,==,post,,0.92,C,demographic
+MOD_BMI_OBESE,bmi,>,30,,0.90,B,health_status
+MOD_DIABETES,diabetes,==,yes,,0.88,C,comorbidity

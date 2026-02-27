@@ -1,0 +1,83 @@
+%% CRCI Extraction Pipeline — Steps 0-9
+%% Render with: Mermaid Live Editor, VS Code Mermaid extension, or GitHub
+
+flowchart TD
+    START([New Paper]) --> S0
+
+    subgraph S0 ["Step 0 — Classify"]
+        S0A{Study Design?}
+        S0A -->|RCT + cancer + cog primary| DEEP[DEEP Mode]
+        S0A -->|Cohort / observational| STANDARD[STANDARD Mode]
+        S0A -->|Case report / animal / biomarker| SHALLOW[SHALLOW Mode]
+        S0A -->|Unknown| STANDARD
+    end
+
+    subgraph S1 ["Step 1 — Check Registries"]
+        S1A[Check EDGE_REGISTRY.csv]
+        S1B[Check INSTRUMENT_REGISTRY.csv]
+        S1C{Edge exists?}
+        S1D{Instrument exists?}
+        S1A --> S1C
+        S1B --> S1D
+        S1C -->|No| S1E[Add new edge to registry]
+        S1C -->|Yes| S1F[Use existing edge_id]
+        S1D -->|No| S1G[Add new instrument to registry]
+        S1D -->|Yes| S1H[Use existing instrument_id]
+    end
+
+    subgraph S2 ["Step 2 — Create Folder"]
+        S2A["mkdir data/manual_uploads/structured/<doi-slug>/"]
+        S2B["Copy blank templates from data/templates/"]
+    end
+
+    subgraph S3 ["Step 3 — Fill edge_evidence"]
+        S3A[Extract effect sizes from paper]
+        S3B[Compute SE if not reported]
+        S3C[Fill edge_evidence_template.csv]
+    end
+
+    subgraph S4 ["Step 4 — Fill population_norms"]
+        S4A[Extract control group baselines]
+        S4B[Fill population_norms_template.csv]
+    end
+
+    subgraph S5 ["Step 5 — Fill context_priors"]
+        S5A[Convert to z-scores]
+        S5B[Fill context_priors_template.csv]
+    end
+
+    subgraph S6 ["Step 6 — Optional Templates"]
+        S6A[temporal_evidence if ≥2 timepoints]
+        S6B[instrument_evidence if α/ICC reported]
+        S6C[correlation if inter-domain r reported]
+    end
+
+    subgraph S7 ["Step 7 — meta.json"]
+        S7A[Create doi-slug.meta.json]
+    end
+
+    subgraph S8 ["Step 8 — PDF"]
+        S8A["Copy PDF to data/manual_uploads/pdfs/"]
+    end
+
+    subgraph S9 ["Step 9 — Load"]
+        S9A["python scripts/load_evidence_into_db.py"]
+        S9B[Verify row counts]
+        S9C[Update EXTRACTION_LOG.md]
+    end
+
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+    S6 --> S7
+    S7 --> S8
+    S8 --> S9
+
+    DEEP -.->|All templates| S3
+    STANDARD -.->|Core templates| S3
+    SHALLOW -.->|edge_evidence only| S3
+
+    S9 --> DONE([Paper Integrated])

@@ -1,0 +1,52 @@
+%% Paper Classification Decision Tree
+%% Determines extraction mode: DEEP, STANDARD, or SHALLOW
+
+flowchart TD
+    START([Read Paper]) --> Q1
+
+    Q1{RCT or crossover_RCT?}
+    Q1 -->|Yes| Q2
+    Q1 -->|No| Q4
+
+    Q2{Cancer population?}
+    Q2 -->|Yes| Q3
+    Q2 -->|No| STANDARD
+
+    Q3{Cognitive outcome<br/>is PRIMARY?}
+    Q3 -->|Yes| DEEP
+    Q3 -->|No| STANDARD
+
+    Q4{Cohort or observational<br/>with cognitive outcomes?}
+    Q4 -->|Yes| STANDARD
+    Q4 -->|No| Q5
+
+    Q5{Case report / animal /<br/>biomarker-only?}
+    Q5 -->|Yes| SHALLOW
+    Q5 -->|No| STANDARD
+
+    DEEP["🔬 DEEP Mode<br/>━━━━━━━━━━<br/>All 6 templates<br/>All 9 agents<br/>Full quality gates"]
+    STANDARD["📊 STANDARD Mode<br/>━━━━━━━━━━━━<br/>Core 3 templates:<br/>edge_evidence<br/>population_norms<br/>context_priors"]
+    SHALLOW["📋 SHALLOW Mode<br/>━━━━━━━━━━━<br/>edge_evidence only"]
+
+    DEEP --> TEMPLATES_ALL
+    STANDARD --> TEMPLATES_CORE
+    SHALLOW --> TEMPLATES_MIN
+
+    subgraph TEMPLATES_ALL ["DEEP Templates"]
+        T1[edge_evidence ✅]
+        T2[population_norms ✅]
+        T3[context_priors ✅]
+        T4[temporal_evidence ✅]
+        T5[instrument_evidence ✅]
+        T6[correlation ✅]
+    end
+
+    subgraph TEMPLATES_CORE ["STANDARD Templates"]
+        T7[edge_evidence ✅]
+        T8[population_norms ✅]
+        T9[context_priors ✅]
+    end
+
+    subgraph TEMPLATES_MIN ["SHALLOW Templates"]
+        T10[edge_evidence ✅]
+    end

@@ -142,6 +142,14 @@ When `apply_all_layers()` processes these sparse rows:
 
 **Worst case combined SE inflation from wrong defaults**: 3.0 × 1.30 × 1.25 = **4.875×** instead of correct ~1.0 × 1.0 × 1.0 = **1.0×** for a well-done recent RCT with cancer-validated instruments.
 
+> **RESOLVED (2025-02-27):** Step 4d in `scripts/load_evidence_into_db.py` now applies full 7-layer SE_eff calibration (Formula P3-8) after CSV import. The function `apply_se_eff_calibration()`:
+> - **L1**: Maps study_design to small_rct with N-based interpolation (all 3 studies are RCTs with N≤28)
+> - **L4**: Reads cancer_validated from source CSVs → `validated_cancer` (m=1.0) for all 3 studies
+> - **L5**: Maps quality_rating HIGH→m=1.0, MODERATE→m=1.25
+> - **L7**: Uses pub_year from DB (2013, 2017, 2018) for correct freshness decay
+> - Also fixed: Northey CSV rows 3-4 had an extra comma causing 33 fields → field shift (n_treatment, pub_year all misaligned). Fixed to 32 fields.
+> - Result: SE inflation ×1.89–2.71 (was either absent or ×4.875 with wrong defaults). Gate P3-G1 (SE_eff ≥ SE_raw) satisfied for all rows.
+
 ---
 
 ### ISSUE-5: Effect Size Units Not Standardized — Incommensurable Scales Mixed
@@ -167,6 +175,13 @@ The spec (§2.2) states F1 output should be **"SMD (SD units) or log-ratio"**. F
 d = 2 × sqrt(η² / (1 − η²))
 
 For TMT-A: d = 2 × sqrt(0.35 / 0.65) = 1.47. But this conversion was never performed.
+
+> **✅ RESOLVED (2026-02-27):** Step 4c in `scripts/load_evidence_into_db.py` now auto-converts all `mean_diff_raw` rows to `cohens_d` using SD borrowed from `population_norms_v1`. Conversion: `d = mean_diff / SD_pooled`, `SE_d = SE_raw / SD_pooled × tier_inflation`. All 4 Campbell mean_diff rows are now converted:
+> - ER_ACTIVITY_PROC_SPEED: β=-14.2 → d=-1.56 (SD=9.1 INST_TMT_B)
+> - ER_ACTIVITY_VERBAL_FLUENCY: β=3.0 → d=+0.70 (SD=4.3 INST_COWAT)
+> - ER_ACTIVITY_EPIMEM: β=-1.5 → d=-0.38 (SD=4.0 INST_HVLTR)
+> - ER_ACTIVITY_COG_COMPLAINTS: β=3.9 → d=+0.26 (SD=14.8 INST_FACTCOG_PCI)
+> All 13 evidence rows are now uniformly `cohens_d` scale before IVW compilation.
 
 ---
 
@@ -475,7 +490,7 @@ Functions:
 
 1. **Reject, don't default.** If `study_design` is missing, REJECT the row — don't silently default to "unclassified" (m=3.0×). Force the extractor to provide this critical field.
    
-2. **Standardize at write time.** All raw mean differences must be converted to Cohen's d BEFORE entering the DB. The `effect_type_reported` column stores the original type; `harmonized_beta` stores the standardized value. This prevents the incommensurable-scales problem.
+2. **Standardize at write time.** All raw mean differences must be converted to Cohen's d BEFORE entering the DB. The `effect_type_reported` column stores the original type; `harmonized_beta` stores the standardized value. This prevents the incommensurable-scales problem. **✅ IMPLEMENTED:** Step 4c in `load_evidence_into_db.py` performs this conversion via SD borrowing from `population_norms_v1` after evidence + norms are loaded.
 
 3. **Cascade SE derivation.** If direct SE is available, use it (Level 1). Otherwise, try CI→SE, then p→SE, then F→SE. Document which level was used in `se_derivation_level`. This ensures every row has an SE.
 
@@ -828,3 +843,45 @@ python scripts/setup_database.py --init --seed
 # Expected output: "WARNING: Evidence data exists (N rows). Use --force to proceed."
 # Expected exit code: 1 (blocked)
 ```
+
+---
+
+## End-to-End Verification Results (2026-02-27)
+
+**Command**: `python scripts/run_full_model.py --patient-id DEMO_PT_001 --cancer-type breast --treatment-phase post_treatment --observations-csv data/sample_observations.csv --mc-draws 100`
+
+### Pipeline Status — All Chains Operational
+
+| Chain | Status | Details |
+|-------|--------|---------|
+| **A — Graph Assembly** | ✅ PASS | 63 nodes, 141 edges, 67 instruments. Gates A-G1 through A-G5 all passed. ρ(B)=0.163, κ(Λ)=74.8 |
+| **B — Evidence Compilation** | ✅ PASS | 18 evidence records loaded, 1 prior context. Gates B-G1 through B-G6 passed. FrozenModelState hash: 1c8da0aba394aa24 |
+| **C — Posterior Estimation** | ✅ PASS | 7 observations fused via Bayesian update, 6 unique nodes updated. 16 active pathways. Gates C-G1 through C-G4 passed. ||θ̂||=141.09, tr(Σ_post)=105.65 |
+| **D — Simulation & Ranking** | ✅ PASS | 100 MC draws, 8 interventions, 154 synergy bundles. Gates D-G3 through D-G6 passed. 10 dose bridges loaded. |
+| **E — Temporal Projections** | ✅ PASS | Nadir estimated, 37-point recovery trajectory, 8 intervention overlays. Gates E-G1 through E-G4 passed. R(36)=0.675 |
+| **F — Analytics & Risk** | ⚠️ PARTIAL | F1–F3 passed (CRCI=5.000, percentile=0, severity=SEVERE_IMPAIRMENT). F-G4b failed: n_draws=100 < F4_MIN_DRAWS=1000 (expected — use --mc-draws 1000 for production) |
+| **Runtime** | ✅ PASS | 5 schedules generated, primary utility=0.117. Report assembled. |
+
+### Top Recommendations (SAFE_A scores)
+
+| Rank | Intervention | SAFE_A | 95% CrI | Claim Level |
+|------|-------------|--------|---------|-------------|
+| #1 | Aerobic Exercise | 0.199 | [-0.030, 0.379] | model_implied |
+| #2 | Resistance Training | 0.184 | [-0.045, 0.364] | associational_only |
+| #3 | Morning Light Exposure | -0.024 | [-0.024, -0.024] | causal_supported |
+| #4 | Sleep Hygiene Protocol | -0.039 | [-0.039, -0.039] | model_implied |
+| #5 | Cognitive Training | -0.039 | [-0.099, 0.020] | model_implied |
+
+### Fix Verification Summary
+
+| Fix | Issue | Status | Evidence |
+|-----|-------|--------|----------|
+| Fix 1 | Scale standardization | ✅ VERIFIED | All 13 evidence rows are `cohens_d` scale. 4 Campbell mean_diff rows converted via SD borrowing. |
+| Fix 2 | SE_eff 7-layer calibration | ✅ VERIFIED | SE inflation ×1.89–2.71 (correct for small RCTs). Gate P3-G1 satisfied. |
+| Fix 3 | Modifier rules wired | ✅ VERIFIED | 15 rules loaded from CSV. Modifier application module invoked in Chain C. C-G4 passed. |
+| Fix 4 | Dose bridges seeded | ✅ VERIFIED | 10 dose bridges loaded for 8 actions. D5b dose conflict detection operational. |
+| Fix 5 | Observation CSV support | ✅ VERIFIED | 7 observations from CSV, all fused via Bayesian update. C-G2 passed (after fixing temporal dates). |
+| Fix 6 | Structural prior sampling | ✅ VERIFIED | MC sampler samples placeholder edges from N(0, σ²_structural) instead of β=0. |
+| Fix 7 | Presentation renderer | ✅ VERIFIED | `crci/presentation/terminal_renderer.py` created. Wires all 12 view-model renderers (score dashboard, intervention cards, pathway heatmap, uncertainty panel, risk dashboard, evidence browser, quality disclosure) into `run_full_model.py` via `--render` flag (default: on). Graceful fallback to raw summary on render failure. Verified end-to-end: composite score, domain bars, intervention cards, variance decomposition all render correctly. |
+
+**Total runtime**: ~17s with rendering (100 MC draws). All gates pass except F-G4b (draw count, by design). All 7 fixes complete.

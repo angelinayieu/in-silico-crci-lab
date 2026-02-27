@@ -79,15 +79,19 @@ $$g = d \times J, \quad J = 1 - \frac{3}{4(N-2) - 1}$$
 - Post-intervention: effect = Hedges' g value
 - Cherrier: 7-week intervention; Campbell: 24-week intervention
 
-### P9: SE Over-Inflation from Layer Defaults — ✅ FIXED
-**Problem**: `layers.py::apply_all_layers()` uses `getattr(rec, "study_design", "unclassified")` — when NULL, defaults to m_design=3.0 (should be ~1.66–1.93 for small RCTs).  
-**Fix**: All 8 rows now have study_design="RCT", N_effect correctly populated. 
+### P9: SE Over-Inflation from Layer Defaults — ✅ FIXED (fully resolved)
+**Problem**: `layers.py::apply_all_layers()` uses `getattr(rec, "study_design", "unclassified")` — when NULL, defaults to m_design=3.0 (should be ~1.45–1.47 for small RCTs).  
+**Fix**: All 13 rows now have proper SE_eff calibration via Step 4d `apply_se_eff_calibration()` in `load_evidence_into_db.py`. 
 
-**Impact quantified**:
-| Edge | SE_g | m_design (old) | m_design (new) | m_scale (old) | m_scale (new) | SE_eff (old) | SE_eff (new) | Reduction |
-|------|------|----------------|----------------|---------------|---------------|-------------|-------------|-----------|
-| Campbell edges | 0.44–0.51 | 3.00 | 1.93 | 1.00 | 1.00/1.25 | 1.32–1.52 | 0.85–1.22 | 1.2–1.6× |
-| Cherrier edges | 0.37–0.39 | 3.00 | 1.66 | 1.00 | 1.00/1.25 | 1.11–1.17 | 0.63–0.81 | 1.4–1.8× |
+**Updated SE_eff values (post Step 4d)**:
+| Study | Edge | SE_raw | m_design | m_scale | m_grade | w_fresh | SE_eff | ×inflation |
+|-------|------|--------|----------|---------|---------|---------|--------|-----------|
+| Campbell (N=19, HIGH, pub2017) | COG_COMPLAINTS | 0.3601 | 1.45 | 1.00 | 1.00 | 0.88 | 0.8223 | ×2.28 |
+| Campbell (N=19, HIGH, pub2017) | EPIMEM | 0.6200 | 1.45 | 1.00 | 1.00 | 0.88 | 1.1705 | ×1.89 |
+| Campbell (N=19, HIGH, pub2017) | PROC_SPEED | 0.5802 | 1.45 | 1.00 | 1.00 | 0.88 | 1.1136 | ×1.92 |
+| Campbell (N=19, HIGH, pub2017) | VERBAL_FLUENCY | 0.4977 | 1.45 | 1.00 | 1.00 | 0.88 | 0.9988 | ×2.01 |
+| Northey (N=11-12, MOD, pub2018) | EPIMEM/EXEC/WORKMEM | 0.60-0.62 | 1.47 | 1.00 | 1.25 | 0.895 | 1.35-1.47 | ×2.25 |
+| Cherrier (N=28, MOD, pub2013) | ATTN/COG/EP/WM | 0.38 | 1.43 | 1.00 | 1.25 | 0.82 | 1.0286 | ×2.71 |
 
 ---
 
@@ -168,7 +172,7 @@ The loader (`scripts/load_evidence_into_db.py`) uses `entered_by='manual_csv_imp
 
 **Recommendation**: The loader should be updated to handle sign flips based on instrument direction metadata. Currently, sign correction is applied post-hoc.
 
-### R3: P2 Harmonization Pipeline Bypass
+### R3: P2 Harmonization Pipeline Bypass — PARTIALLY RESOLVED
 Manually loaded data bypasses the P2 orientation_aligner.py pipeline. This means:
 - The `reported_direction_positive` flag isn't set automatically
 - The orientation_confidence isn't computed
@@ -176,8 +180,12 @@ Manually loaded data bypasses the P2 orientation_aligner.py pipeline. This means
 
 **Recommendation**: Add instrument direction metadata to INSTRUMENT_REGISTRY.csv (`scoring_direction` column: higher_better or lower_better) so both manual and automated paths can resolve sign correctly.
 
-### R4: GRADE Quality Level Not Stored
-L5 defaults to `grade_level='MODERATE'` (m_grade=1.0). Neither study has a formal GRADE assessment stored. For pilot RCTs with small samples and risk of bias, a more conservative assessment might be warranted:
+> **Partial fix (2025-02-27):** Step 4c in `scripts/load_evidence_into_db.py` now performs **scale harmonization** (mean_diff_raw → cohens_d via SD borrowing from `population_norms_v1`) after CSV import. This closes the most critical gap (incommensurable scales being IVW-pooled). Orientation alignment still bypasses the P2 pipeline for manually imported data.
+>
+> **Further fix (2025-02-27):** Step 4d now applies full **7-layer SE_eff calibration** (Formula P3-8) via `apply_se_eff_calibration()`. All 13 evidence rows now have properly inflated SE values (×1.89–2.71) based on: study design (L1: small RCT N-interpolation), cancer validation (L4: from CSV cancer_validated), GRADE quality (L5: from quality_rating), and freshness (L7: from pub_year). Also fixed Northey CSV extra-comma field-shift bug.
+
+### R4: GRADE Quality Level Not Stored — RESOLVED
+L5 defaults to `grade_level='MODERATE'` (m_grade=1.25). ~~Neither study has a formal GRADE assessment stored.~~ Step 4d now maps quality_rating to GRADE levels: Campbell HIGH (m=1.0), Northey/Cherrier MODERATE (m=1.25). For pilot RCTs with small samples and risk of bias, a more conservative assessment might be warranted:
 - Cherrier: ROB=moderate, n=28, no blinding → GRADE might be LOW
 - Campbell: ROB=low_to_moderate, n=19, single-blind → GRADE might be LOW-MODERATE
 

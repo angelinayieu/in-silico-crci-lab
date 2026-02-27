@@ -1,7 +1,7 @@
 {
   "$defs": {
     "DomainRiskBreakdown": {
-      "description": "Per-domain risk decomposition for clinical display.\n\nThree complementary views per domain (\u00a72.5):\n  A. marginal_risk_pct \u2014 P(this domain is impaired) (Formula F4-4)\n  B. trigger_share_pct \u2014 trigger-share attribution (NOT Shapley, \u00a72.5B)\n  C. ivw_weight_pct   \u2014 precision influence (separate from risk, \u00a72.5C)",
+      "description": "Per-domain risk attribution for the CRCI Risk Percentage.",
       "properties": {
         "domain_id": {
           "title": "Domain Id",
@@ -47,6 +47,7 @@
           "type": "number"
         },
         "is_directly_observed": {
+          "default": false,
           "title": "Is Directly Observed",
           "type": "boolean"
         },
@@ -65,14 +66,13 @@
         "mean_z",
         "sd_z",
         "z_5th",
-        "z_95th",
-        "is_directly_observed"
+        "z_95th"
       ],
       "title": "DomainRiskBreakdown",
       "type": "object"
     }
   },
-  "description": "Clinical CRCI risk assessment with domain decomposition.\n\nThis is a MODEL-DERIVED probability, not a clinically calibrated rate.\nSee calibration_status field and \u00a75.3 of IMPLEMENTATION_PLAN_RISK_PERCENTAGE.\n\nProduced by: risk_estimator.py (F4)\nConsumed by: report_assembler.py \u2192 risk_dashboard.py (PRES)",
+  "description": "CRCI Risk Percentage output \u2014 probability of meeting ICCTF criteria.\n\nComputed by Chain F4 (risk_estimator.py) from Monte Carlo draws.",
   "properties": {
     "risk_pct": {
       "title": "Risk Pct",
@@ -87,14 +87,17 @@
       "type": "number"
     },
     "risk_range_text": {
+      "default": "",
       "title": "Risk Range Text",
       "type": "string"
     },
     "risk_tier": {
+      "default": "UNKNOWN",
       "title": "Risk Tier",
       "type": "string"
     },
     "interval_method": {
+      "default": "jeffreys",
       "title": "Interval Method",
       "type": "string"
     },
@@ -113,21 +116,6 @@
       "title": "N Draws Used",
       "type": "integer"
     },
-    "criteria": {
-      "default": "ICCTF_Wefel2011_domain_level",
-      "title": "Criteria",
-      "type": "string"
-    },
-    "domain_aggregation": {
-      "default": "mean",
-      "title": "Domain Aggregation",
-      "type": "string"
-    },
-    "calibration_status": {
-      "default": "uncalibrated_model_derived",
-      "title": "Calibration Status",
-      "type": "string"
-    },
     "coverage_fraction": {
       "default": 0.0,
       "title": "Coverage Fraction",
@@ -137,18 +125,6 @@
       "default": false,
       "title": "Low Coverage Warning",
       "type": "boolean"
-    },
-    "conditioning": {
-      "default": "posterior_at_t",
-      "title": "Conditioning",
-      "type": "string"
-    },
-    "thresholds": {
-      "additionalProperties": {
-        "type": "number"
-      },
-      "title": "Thresholds",
-      "type": "object"
     },
     "domain_breakdown": {
       "items": {
@@ -161,10 +137,7 @@
   "required": [
     "risk_pct",
     "risk_lower_pct",
-    "risk_upper_pct",
-    "risk_range_text",
-    "risk_tier",
-    "interval_method"
+    "risk_upper_pct"
   ],
   "title": "ClinicalRiskProfile",
   "type": "object"

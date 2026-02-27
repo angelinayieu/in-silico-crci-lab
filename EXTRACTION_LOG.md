@@ -204,6 +204,8 @@ categorized decisions with risk levels. Most recent extraction at top.
 | 3 | ER_ACTIVITY_EPIMEM | −1.5 | 2.48 | mean_diff_raw_score | 19 | Table 2, p.270, row "HVLT-R Total Recall" | SE = (3.4 − (−6.2)) / (2 × 1.96) |
 | 4 | ER_ACTIVITY_COG_COMPLAINTS | +3.9 | 5.33 | mean_diff_raw_score | 19 | Table 2, p.270, row "FACT-Cog PCI" | SE = (14.3 − (−6.6)) / (2 × 1.96) |
 
+> **Scale harmonization note (2026-02-27):** These 4 `mean_diff` rows are auto-converted to Cohen's d at import time (Step 4c of `load_evidence_into_db.py`) using SD borrowed from `population_norms_v1`. The `effect_type_original` column preserves the original metric; `harmonized_beta` and `harmonized_scale` store the standardized values (d = mean_diff / SD_pooled). All evidence is uniform `cohens_d` scale in the DB.
+
 **Formula applied:** `SE = (CI_upper − CI_lower) / (2 × 1.96)` per SYS_EXTRACTION §EX-P1.1
 
 #### population_norms_template.csv (6 rows)

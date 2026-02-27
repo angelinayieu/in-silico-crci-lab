@@ -2,7 +2,54 @@
 
 **Purpose:** Single-file reference for adding a new paper to the system.  
 **Audience:** Human researchers + AI agents performing per-paper extraction.  
-**Authoritative spec:** `docs/01_v2_master/CRCI_Master_Spec_v2.0.md`
+**Authoritative spec:** `docs/01_v2_master/CRCI_Master_Spec_v2.0.md`  
+**Master routing doc:** [`LLM_TASK_ROUTER.md`](LLM_TASK_ROUTER.md) — start here if unsure which instructions to follow.
+
+> **Batch import note (50+ papers):** This playbook works for one paper at a time.
+> For batch imports, repeat Steps 0-8 for each paper (in any order), then run
+> Step 9 once. The loader processes all papers in `data/manual_uploads/structured/`
+> automatically — no code changes needed per paper. Study IDs are auto-derived
+> from folder names (DOI slugs).
+
+---
+
+## How This Playbook Connects to Paper Discovery
+
+**This playbook covers extraction (Steps 0-9).** It assumes you already have a PDF.
+
+To find papers worth extracting, see:
+- [`DEEP_RESEARCH_STRATEGY.md` Part 9](DEEP_RESEARCH_STRATEGY.md#part-9-manual-chatbox-retrieval-protocol) — **Manual Chatbox Retrieval Protocol**  
+  Full workflow: chatbox discovery → extractability screening → PDF acquisition → hand off to this playbook
+- [`DEEP_RESEARCH_STRATEGY.md` Parts 1-8](DEEP_RESEARCH_STRATEGY.md) — Search queries organized by pathway  
+- [`docs/05_data_management/AUTOMATED_RETRIEVAL_PLAN.md`](docs/05_data_management/AUTOMATED_RETRIEVAL_PLAN.md) Part 14 — Automated pipeline (when operational)
+
+**Workflow at a glance:**
+```
+DEEP_RESEARCH_STRATEGY.md §9    THIS PLAYBOOK           Database
+ (chatbox discovery)        (per-paper extraction)     (compiled model)
+                                                       
+ Phase A: Find papers ──→  Step 0: Classify paper       
+ Phase B: Screen      ──→  Step 1: Check EDGE_REGISTRY  
+ Phase C: Get PDFs    ──→  Step 2: Create folder         
+                           Step 3: Fill edge_evidence ──→ edge_evidence_v1
+                           Step 4: Fill pop norms     ──→ population_norms_v1
+                           Step 5: Fill context priors──→ context_priors_v1
+                           Step 6: Optional templates ──→ auxiliary tables
+                           Step 7: Create meta.json   ──→ study_registry_v1
+                           Step 8: Copy PDF              
+                           Step 9: Run import         ──→ edges_v1 (compiled)
+```
+
+---
+
+## Pre-Extraction Checklist (read BEFORE starting)
+
+Before extracting ANY paper, verify you have read:
+- [ ] This playbook (especially Step 3 column reference)
+- [ ] [`EXTRACTION_LOG.md`](EXTRACTION_LOG.md) — avoid re-extracting papers already in system
+- [ ] [`registries/NODE_REGISTRY.csv`](registries/NODE_REGISTRY.csv) — valid node IDs
+- [ ] [`registries/EDGE_REGISTRY.csv`](registries/EDGE_REGISTRY.csv) — existing edges (don't create duplicates)
+- [ ] [`registries/INSTRUMENT_REGISTRY.csv`](registries/INSTRUMENT_REGISTRY.csv) — valid instrument IDs
 
 ---
 
@@ -67,7 +114,7 @@ mkdir -p data/manual_uploads/pdfs/
 |--------|----------|-------|
 | `doi` | YES | e.g. `10.1016/j.lfs.2013.08.011` |
 | `edge_id` | YES | Must exist in `registries/EDGE_REGISTRY.csv` |
-| `beta_raw` | YES | Cohen's d, OR, Beta, or whatever metric they report |
+| `beta_raw` | YES | Effect size value as reported (Cohen's d, mean diff, OR, etc.). Raw mean differences are auto-converted to Cohen's d at import time via SD borrowing from `population_norms_v1` (Step 4c of `load_evidence_into_db.py`). |
 | `se_raw` | YES | SE of the effect size |
 | `effect_type_original` | YES | What the paper reports: `cohen_d`, `mean_diff`, `odds_ratio`, etc. |
 | `effect_size_type` | YES | `BETWEEN_GROUP` / `WITHIN_GROUP` / `PRE_POST_CHANGE` |
@@ -190,10 +237,19 @@ cp /path/to/paper.pdf data/manual_uploads/pdfs/10.1016_j.lfs.2013.08.011.pdf
 
 ```bash
 cd /workspaces/in-silico-crci-lab
-python scripts/run_manual_import.py --type csv --verbose
+python scripts/load_evidence_into_db.py --verbose
+# Or to wipe and reload cleanly:
+python scripts/load_evidence_into_db.py --reset --verbose
 ```
 
-Expected output per CSV: `"Would import [N] rows from [file]"` (actual DB write pending Trust Boundary pipeline completion).
+The import pipeline performs these steps automatically:
+1. Reseed edge/node/instrument definitions from registries
+2. Register studies, load CSV evidence into `edge_evidence_v1`
+3. Load auxiliary families (context_priors, instruments, norms, temporal)
+4. **Scale harmonization (Step 4c):** Converts `mean_diff_raw` → `cohens_d` by borrowing SD from `population_norms_v1` (Tier 1: same study SD, no inflation; Tier 2: cross-study SD, 1.15× SE inflation)
+5. Seed actions, compile IVW edges
+
+> **Important:** Population norms must be loaded (Step 4b) BEFORE scale harmonization (Step 4c) can borrow SD values. Always fill `population_norms_template.csv` when extracting papers that report raw mean differences.
 
 ---
 
@@ -286,6 +342,48 @@ Expected output per CSV: `"Would import [N] rows from [file]"` (actual DB write 
 
 ---
 
+## Chatbox Extraction Session Setup
+
+When using a chatbox (Claude or other LLM) for extraction, load this context
+at the start of the session:
+
+**Always load (pin these):**
+1. This playbook (EXTRACTION_PLAYBOOK.md)
+2. `extraction_ref/02_CHATBOX_CONTEXT.md` — full extraction context
+3. `registries/EDGE_REGISTRY.csv` — all valid edge IDs
+4. `registries/INSTRUMENT_REGISTRY.csv` — all valid instrument IDs
+5. `registries/NODE_REGISTRY.csv` — all valid node IDs
+6. `EXTRACTION_LOG.md` — what's already extracted (avoid duplicates)
+
+**Load per paper:**
+7. The paper's PDF (attached or pasted as text)
+8. If already screened: the edge-mapping guesses from discovery phase
+
+**Session instruction preamble (paste at session start):**
+```
+You are extracting quantitative evidence from a research paper into the CRCI
+Bayesian Causal Model. Follow EXTRACTION_PLAYBOOK.md Steps 0-9. For every
+value extracted:
+  - Record the EXACT source location (table, page, row)
+  - Record the derivation method (reported directly, computed from CI, etc.)
+  - Flag any judgment calls as extraction decisions with risk levels
+  - Use ONLY edge IDs from EDGE_REGISTRY.csv
+  - Use ONLY instrument IDs from INSTRUMENT_REGISTRY.csv
+  - Use ONLY node IDs from NODE_REGISTRY.csv
+  - If an instrument/edge doesn't exist in the registry, flag it and propose
+    a new ID following the naming convention
+
+Output format: filled CSV templates + meta.json + EXTRACTION_LOG entry.
+```
+
+**What the chatbox CANNOT do (human must verify):**
+- Compute PDF SHA-256 hash
+- Run `load_evidence_into_db.py`
+- Verify values against the physical PDF (if working from pasted text)
+- Sign-off on extraction decisions marked MEDIUM or HIGH risk
+
+---
+
 ## Where Things Live
 
 ```
@@ -327,6 +425,8 @@ docs/
 
 | Task | Read |
 |------|------|
+| **Start here (task routing)** | [`LLM_TASK_ROUTER.md`](LLM_TASK_ROUTER.md) |
+| **Category A tables (kernels, dose bridges, safety)** | [`CATEGORY_A_RESEARCH_GUIDE.md`](CATEGORY_A_RESEARCH_GUIDE.md) |
 | Understand extraction modes (DEEP/STANDARD/SHALLOW) | `docs/01_v2_master/CRCI_Master_Spec_v2.0.md` §2-3 |
 | CSV column definitions | `docs/01_v2_master/CRCI_Checklists_Templates_v2.0.md` §T1 |
 | effect_size_type enum | `docs/01_v2_master/CRCI_Engineering_Appendix_v2.0.md` §A.1 |

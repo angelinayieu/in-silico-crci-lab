@@ -1,0 +1,13 @@
+map_id,variable_id,input_token,transform,transform_params_json,precedence_rank,required_inputs_json,missing_input_policy,default_value,validity_check,scope_json,version,active,notes
+MAP_AGE_YEARS,VAR_AGE,age_years,identity,,1,"[""age_years""]",use_default,55,,"{""applies_to"":""all""}",1,1,Age in years maps directly
+MAP_BMI_KG,VAR_BMI,bmi_kg_m2,identity,,1,"[""bmi_kg_m2""]",use_default,25,,"{""applies_to"":""all""}",1,1,BMI in kg/m^2 maps directly
+MAP_CHEMO_CYCLES,VAR_CHEMO_CYCLES,chemo_cycle_count,identity,,1,"[""chemo_cycle_count""]",use_default,6,,"{""applies_to"":""chemotherapy""}",1,1,Chemotherapy cycle count
+MAP_TIME_POST_TX,VAR_TIME_SINCE_TX,months_post_treatment,months_to_days,"{""multiplier"":30.44}",1,"[""months_post_treatment""]",use_default,180,,"{""applies_to"":""all""}",1,1,Convert months post-treatment to days
+MAP_EXERCISE_MIN,VAR_EXERCISE_FREQ,exercise_min_per_week,identity,,1,"[""exercise_min_per_week""]",use_default,0,,"{""applies_to"":""all""}",1,1,Weekly exercise minutes
+MAP_SLEEP_HOURS,VAR_SLEEP_QUALITY,sleep_hours_per_night,identity,,1,"[""sleep_hours_per_night""]",use_default,7,,"{""applies_to"":""all""}",1,1,Average sleep hours per night
+MAP_EDU_YEARS,VAR_EDUCATION,education_years,identity,,1,"[""education_years""]",use_default,14,,"{""applies_to"":""all""}",1,1,Years of formal education
+MAP_APOE_STATUS,VAR_APOE_E4,apoe_e4_carrier,binary_encode,"{""true_value"":1,""false_value"":0}",1,"[""apoe_e4_carrier""]",use_default,0,,"{""applies_to"":""genetic""}",1,1,APOE epsilon-4 carrier status
+MAP_DEPRESSION_SCORE,VAR_DEPRESSION,phq9_score,identity,,1,"[""phq9_score""]",use_default,5,range_0_27,"{""applies_to"":""all""}",1,1,PHQ-9 depression score
+MAP_ANXIETY_SCORE,VAR_ANXIETY,gad7_score,identity,,1,"[""gad7_score""]",use_default,4,range_0_21,"{""applies_to"":""all""}",1,1,GAD-7 anxiety score
+MAP_MENOPAUSE,VAR_MENOPAUSE,menopausal_status,categorical_encode,"{""pre"":0,""peri"":1,""post"":2}",1,"[""menopausal_status""]",use_default,2,,"{""applies_to"":""female""}",1,1,Menopausal status encoding
+MAP_HORMONE_TX,VAR_HORMONE_THERAPY,hormone_therapy_type,categorical_encode,"{""none"":0,""tamoxifen"":1,""ai"":2}",1,"[""hormone_therapy_type""]",use_default,0,,"{""applies_to"":""breast""}",1,1,Hormonal therapy type

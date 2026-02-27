@@ -20,7 +20,9 @@ from sqlalchemy.orm import Session
 from crci.shared.db import get_session
 from crci.shared.models.tables import (
     ActionCatalog,
+    ActionContraindicationLink,
     Base,
+    BaselineModifierDefinition,
     BiomarkerCorrelation,
     BiomarkerNodeDefinition,
     ContraindicationEscalationPolicy,
@@ -42,6 +44,7 @@ from crci.shared.models.tables import (
     ObservationNoise,
     Pathway,
     PathwayInteraction,
+    PredictorAlignmentRule,
     QuestionBank,
     QuestionObservationModel,
     RecoveryTrajectory,
@@ -49,6 +52,7 @@ from crci.shared.models.tables import (
     TriangulationSet,
     ValidationRule,
     VariableDefinition,
+    VariableToInputMap,
 )
 from crci.shared.validators import run_class_a_validation
 
@@ -212,7 +216,7 @@ SEED_TABLE_MAP: dict[str, tuple[type[Base], str]] = {
     "contraindication_rules.csv": (ContraindicationRule, "rule_id"),
     "validation_rules.csv": (ValidationRule, "rule_id"),
     "variables.csv": (VariableDefinition, "variable_id"),
-    "modifiers.csv": (None, "modifier_id"),  # requires custom loader (below)
+    "modifier_rules.csv": (BaselineModifierDefinition, "modifier_id"),
     "features.csv": (DerivedFeatureDefinition, "feature_id"),
     "triangulation_sets.csv": (TriangulationSet, "triangulation_id"),
     "triangulation_members.csv": (TriangulationMember, "triangulation_id"),
@@ -230,6 +234,9 @@ SEED_TABLE_MAP: dict[str, tuple[type[Base], str]] = {
     "feedback_loops.csv": (FeedbackLoop, "loop_id"),
     "intervention_kernels.csv": (InterventionKernel, "kernel_id"),
     "mid_thresholds.csv": (MIDThreshold, "domain_id"),
+    "predictor_alignment_rules.csv": (PredictorAlignmentRule, "align_id"),
+    "action_contraindication_links.csv": (ActionContraindicationLink, "link_id"),
+    "variable_to_input_map.csv": (VariableToInputMap, "map_id"),
 }
 
 # Dependency order: ROOT tables first, then dependent tables
@@ -238,6 +245,7 @@ LOAD_ORDER: list[str] = [
     "nodes.csv",
     "description_templates.csv",
     "actions.csv",
+    "modifier_rules.csv",
     "contraindication_escalation.csv",
     "recovery_trajectories.csv",
     "harmonization_rules.csv",
@@ -265,8 +273,11 @@ LOAD_ORDER: list[str] = [
     "pathway_interactions.csv",
     "synergy.csv",
     "question_bank.csv",
+    "predictor_alignment_rules.csv",
+    "variable_to_input_map.csv",
     # Level 3
     "triangulation_members.csv",
+    "action_contraindication_links.csv",
 ]
 
 
@@ -318,10 +329,11 @@ def _parse_csv_value(value: str, column_name: str) -> Any:
         except (ValueError, TypeError):
             return None
 
-    # JSONB columns — parse JSON strings to Python objects
+    # JSONB columns — validate JSON but keep as string for SQLite TEXT columns
     if column_name.endswith("_json"):
         try:
-            return json.loads(value)
+            json.loads(value)  # validate it's valid JSON
+            return value       # store as string, not parsed object
         except (json.JSONDecodeError, TypeError):
             return value
 
@@ -446,18 +458,6 @@ def _do_load(
             continue
 
         model_class, pk_column = entry
-        if model_class is None:
-            # Custom loader for modifiers.csv — log and skip for now
-            csv_path = seeds_dir / csv_name
-            if csv_path.exists():
-                logger.info(
-                    "Skipping %s (requires custom modifier loader — "
-                    "modifiers are compiled by P7-C5 from subgroup_evidence_v1)",
-                    csv_name,
-                )
-            results[csv_name] = 0
-            continue
-
         csv_path = seeds_dir / csv_name
         count = load_csv_to_table(
             session, csv_path, model_class, pk_column, upsert=upsert

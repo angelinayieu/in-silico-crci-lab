@@ -1,0 +1,48 @@
+%% CSV → Database Data Flow
+%% Shows how each CSV template flows through the load script into DB tables
+
+flowchart LR
+    subgraph CSV ["CSV Templates (per paper)"]
+        EE[edge_evidence_template.csv]
+        PN[population_norms_template.csv]
+        CP[context_priors_template.csv]
+        TE[temporal_evidence_template.csv]
+        IE[instrument_evidence_template.csv]
+        CR[correlation_template.csv]
+    end
+
+    subgraph LOAD ["scripts/load_evidence_into_db.py"]
+        A1[A1: Reseed edges from registry]
+        A2[A2: Register studies from meta.json]
+        A3[A3: Load edge evidence CSVs]
+        A4[A4: Load population norm CSVs]
+        A5[A5: Load other evidence CSVs]
+        A6[A6: Compile edges_v1]
+        A7[A7: Verify integrity]
+    end
+
+    subgraph DB ["crci_dev.db Tables"]
+        DB_EE[(edge_evidence_v1)]
+        DB_PN[(population_norms_v1)]
+        DB_CP[(context_priors_v1)]
+        DB_TE[(temporal_evidence_v1)]
+        DB_IE[(instrument_evidence_v1)]
+        DB_CR[(correlation_evidence_v1)]
+        DB_SR[(study_registry_v1)]
+        DB_E[(edges_v1)]
+        DB_NP[(node_priors_v1)]
+    end
+
+    EE --> A3 --> DB_EE
+    PN --> A4 --> DB_PN
+    CP --> A5 --> DB_CP
+    TE --> A5 --> DB_TE
+    IE --> A5 --> DB_IE
+    CR --> A5 --> DB_CR
+
+    A2 --> DB_SR
+    A6 --> DB_E
+    DB_PN --> DB_NP
+    DB_CP --> DB_NP
+
+    DB_EE -->|"Pooled by edge_relation_id"| A6

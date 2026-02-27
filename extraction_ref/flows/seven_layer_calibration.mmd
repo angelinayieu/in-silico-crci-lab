@@ -1,0 +1,67 @@
+%% Seven-Layer Calibration Pipeline
+%% How raw extracted evidence flows through the algorithm layers
+
+flowchart TD
+    subgraph INPUT ["Extraction Input"]
+        RAW[Raw CSV Evidence<br/>beta_raw, se_raw, effect_type_original]
+    end
+
+    subgraph L1 ["Layer 1 — Trust Boundary"]
+        L1A[Validate IDs exist in registries]
+        L1B[Check required fields present]
+        L1C[Apply sign convention rules]
+        L1D{Pass gates?}
+        L1D -->|No| REJECT[BLOCKED — reason logged]
+        L1D -->|Yes| L1OUT[Validated Evidence]
+    end
+
+    subgraph L2 ["Layer 2 — Unit Harmonization"]
+        L2A[Convert effect_type to Cohen's d]
+        L2B[Apply instrument scoring_direction]
+        L2C[Compute harmonized_beta, harmonized_se]
+    end
+
+    subgraph L3 ["Layer 3 — Quality Rating"]
+        L3A[Risk of bias assessment]
+        L3B[Study design weighting]
+        L3C[Cancer validation status]
+        L3D[Assign quality_rating]
+    end
+
+    subgraph L4 ["Layer 4 — Meta-Analysis"]
+        L4A[Group by edge_relation_id + profile]
+        L4B["IVW pooling:<br/>β̂ = Σ(βᵢ/SEᵢ²) / Σ(1/SEᵢ²)"]
+        L4C[Compute I², τ²]
+        L4D[Publication bias: E-value]
+    end
+
+    subgraph L5 ["Layer 5 — Bayesian Update"]
+        L5A[Load context priors from node_priors_v1]
+        L5B["Posterior = Prior × Likelihood<br/>β_post = (β_prior/σ²_prior + β_data/σ²_data) / (1/σ²_prior + 1/σ²_data)"]
+        L5C[Monte Carlo sampling]
+    end
+
+    subgraph L6 ["Layer 6 — Temporal Integration"]
+        L6A[Apply temporal decay curves]
+        L6B[Time-step projection]
+    end
+
+    subgraph L7 ["Layer 7 — Composite Scoring"]
+        L7A[Aggregate cognitive domain effects]
+        L7B[Compute CRCI composite score]
+        L7C[Generate recommendations]
+    end
+
+    RAW --> L1A
+    L1A --> L1B --> L1C --> L1D
+    L1OUT --> L2A --> L2B --> L2C
+    L2C --> L3A --> L3B --> L3C --> L3D
+    L3D --> L4A --> L4B --> L4C --> L4D
+    L4D --> L5A --> L5B --> L5C
+    L5C --> L6A --> L6B
+    L6B --> L7A --> L7B --> L7C
+
+    L7C --> OUTPUT([Personalized Report<br/>Risk scores + Action plan])
+
+    style REJECT fill:#ff6b6b,color:#fff
+    style OUTPUT fill:#51cf66,color:#fff

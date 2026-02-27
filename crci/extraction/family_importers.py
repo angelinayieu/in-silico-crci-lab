@@ -30,12 +30,19 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from crci.shared.models.tables import (
+    BiomarkerCorrelation,
     BiomarkerNodeDefinition,
+    DoseEvidence,
     EdgeRelationsDefinition,
     InstrumentDefinition,
     InstrumentEvidence,
     NodePrior,
+    OntologyLink,
     PopulationNorms,
+    ProfileDataStream,
+    StreamTimepoint,
+    StudyCohortProfile,
+    SubgroupEvidence,
     TemporalEvidence,
 )
 
@@ -470,3 +477,483 @@ def import_instrument_evidence(
         cronbachs_alpha, test_retest_reliability,
     )
     return inst_ev_id
+
+
+# ============================================================================
+# import_correlation
+# ============================================================================
+
+def import_correlation(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one correlation row into biomarker_correlations_v1.
+
+    Args:
+        session: SQLAlchemy session.
+        row: Dict from correlation_template.csv.
+        study_id: Resolved study_id.
+
+    Returns:
+        Deterministic correlation_id.
+
+    Raises:
+        ValueError: If validation fails (missing fields, bad values, FK miss).
+    """
+    # ---- Validate required fields ----
+    node_a = _require_str(row, "biomarker_id_1")
+    node_b = _require_str(row, "biomarker_id_2")
+
+    correlation_r = _safe_float(row.get("correlation_r", ""), "correlation_r")
+    if correlation_r is None:
+        raise ValueError("correlation_r: required but missing or empty")
+    if correlation_r < -1.0 or correlation_r > 1.0:
+        raise ValueError(f"correlation_r: must be in [-1, 1], got {correlation_r}")
+
+    sample_size = _safe_int(row.get("sample_size", ""), "sample_size")
+    if sample_size is None or sample_size <= 0:
+        raise ValueError("sample_size: required and must be > 0")
+
+    partial_or_zero = row.get("partial_or_zero", "").strip() or "zero_order"
+    if partial_or_zero not in ("partial", "zero_order"):
+        raise ValueError(
+            f"partial_or_zero: must be 'partial' or 'zero_order', got '{partial_or_zero}'"
+        )
+
+    # ---- FK checks: both node IDs ----
+    if session.get(BiomarkerNodeDefinition, node_a) is None:
+        raise ValueError(
+            f"biomarker_id_1 '{node_a}' not found in biomarker_node_definitions_v1"
+        )
+    if session.get(BiomarkerNodeDefinition, node_b) is None:
+        raise ValueError(
+            f"biomarker_id_2 '{node_b}' not found in biomarker_node_definitions_v1"
+        )
+
+    # ---- Deterministic ID ----
+    correlation_id = _deterministic_id(
+        "CORR_",
+        study_id,
+        node_a,
+        node_b,
+    )
+
+    # ---- Derive SE from sample size: SE(r) ≈ (1 - r²) / √(n - 2) ----
+    import math
+    n_minus_2 = sample_size - 2
+    if n_minus_2 > 0:
+        rho_se = (1.0 - correlation_r ** 2) / math.sqrt(n_minus_2)
+    else:
+        rho_se = None
+
+    # ---- Determine d_block from node layer letters ----
+    # e.g. node_a=BIO_IL6 → layer "B", node_b=COG_PROC_SPEED → layer "C"
+    # d_block = sorted pair like "BC"
+    d_block = "XX"  # fallback
+    _LAYER_MAP = {
+        "BIO": "B", "NEURO": "N", "COG": "C", "FUNC": "F",
+        "SYMPTOM": "S", "PRO": "P", "LIFESTYLE": "L",
+    }
+    for prefix, layer in _LAYER_MAP.items():
+        if node_a.startswith(prefix):
+            for prefix2, layer2 in _LAYER_MAP.items():
+                if node_b.startswith(prefix2):
+                    d_block = "".join(sorted([layer, layer2]))
+                    break
+            break
+
+    population = row.get("population", "").strip() or None
+    provenance_ref = row.get("provenance_ref", "").strip() or None
+    doi = row.get("doi", "").strip() or ""
+    source_citation = provenance_ref or f"doi:{doi}"
+
+    notes_parts = []
+    notes_parts.append(f"partial_or_zero={partial_or_zero}")
+    notes_parts.append(f"n={sample_size}")
+    if population:
+        notes_parts.append(f"population={population}")
+
+    # ---- Build ORM object ----
+    orm_obj = BiomarkerCorrelation(
+        correlation_id=correlation_id,
+        node_a_id=node_a,
+        node_b_id=node_b,
+        rho=correlation_r,
+        rho_se=rho_se,
+        d_block=d_block,
+        source_citation=source_citation,
+        is_decision_critical=0,
+        version=1,
+        active=1,
+        notes="; ".join(notes_parts),
+    )
+
+    session.add(orm_obj)
+    logger.info(
+        "Imported correlation %s: %s %s↔%s r=%.3f n=%d",
+        correlation_id, study_id, node_a, node_b, correlation_r, sample_size,
+    )
+    return correlation_id
+
+
+# ============================================================================
+# import_study_cohort_profile  (B2: study_cohort_profiles_v1)
+# ============================================================================
+
+def import_study_cohort_profile(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one study cohort profile row.
+
+    Args:
+        session: DB session.
+        row: Dict from study_cohort_profile_template.csv.
+        study_id: Study identifier.
+
+    Returns:
+        Generated profile_id.
+    """
+    cohort_label = row.get("cohort_label", "").strip() or "main"
+    analysis_tp = row.get("analysis_timepoint", "").strip() or "baseline"
+
+    profile_id = row.get("profile_id", "").strip()
+    if not profile_id:
+        profile_id = _deterministic_id("PROF_", study_id, cohort_label, analysis_tp)
+
+    # Check for duplicates
+    existing = session.get(StudyCohortProfile, profile_id)
+    if existing is not None:
+        logger.debug("Profile %s already exists, skipping", profile_id)
+        return profile_id
+
+    orm_obj = StudyCohortProfile(
+        profile_id=profile_id,
+        study_id=study_id,
+        cohort_label=cohort_label,
+        analysis_timepoint=analysis_tp,
+        N_analyzed=_safe_int(row.get("N_analyzed"), "N_analyzed"),
+        N_enrolled=_safe_int(row.get("N_enrolled"), "N_enrolled"),
+        recruitment_region=row.get("recruitment_region", "").strip() or None,
+        recruitment_sites=row.get("recruitment_sites", "").strip() or None,
+        collection_calendar_start=row.get("collection_calendar_start", "").strip() or None,
+        collection_calendar_end=row.get("collection_calendar_end", "").strip() or None,
+        enrollment_window_text=row.get("enrollment_window_text", "").strip() or None,
+        eligibility_inclusion=row.get("eligibility_inclusion", "").strip() or None,
+        eligibility_exclusion=row.get("eligibility_exclusion", "").strip() or None,
+        sex_female_pct=_safe_float(row.get("sex_female_pct"), "sex_female_pct"),
+        age_mean=_safe_float(row.get("age_mean"), "age_mean"),
+        age_sd=_safe_float(row.get("age_sd"), "age_sd"),
+        education_years_mean=_safe_float(row.get("education_years_mean"), "education_years_mean"),
+        education_years_sd=_safe_float(row.get("education_years_sd"), "education_years_sd"),
+        bmi_mean=_safe_float(row.get("bmi_mean"), "bmi_mean"),
+        bmi_sd=_safe_float(row.get("bmi_sd"), "bmi_sd"),
+        cancer_type=row.get("cancer_type", "").strip() or None,
+        treatment_phase=row.get("treatment_phase", "").strip() or None,
+        time_since_treatment_text=row.get("time_since_treatment_text", "").strip() or None,
+        notes=row.get("notes", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info("Imported cohort profile %s for study %s", profile_id, study_id)
+    return profile_id
+
+
+# ============================================================================
+# import_profile_data_stream  (B3: profile_data_streams_v1)
+# ============================================================================
+
+def import_profile_data_stream(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one profile data stream row.
+
+    Args:
+        session: DB session.
+        row: Dict from profile_data_stream_template.csv.
+        study_id: Study identifier (used for ID generation).
+
+    Returns:
+        Generated stream_id.
+    """
+    profile_id = _require_str(row, "profile_id")
+    stream_label = row.get("stream_label", "").strip() or "unknown"
+
+    stream_id = row.get("stream_id", "").strip()
+    if not stream_id:
+        stream_id = _deterministic_id("STRM_", profile_id, stream_label)
+
+    existing = session.get(ProfileDataStream, stream_id)
+    if existing is not None:
+        logger.debug("Stream %s already exists, skipping", stream_id)
+        return stream_id
+
+    # FK check: profile must exist
+    profile = session.get(StudyCohortProfile, profile_id)
+    if profile is None:
+        raise ValueError(f"FK violation: profile_id '{profile_id}' not found")
+
+    orm_obj = ProfileDataStream(
+        stream_id=stream_id,
+        profile_id=profile_id,
+        stream_label=stream_label,
+        analyte_or_target=row.get("analyte_or_target", "").strip() or None,
+        modality_type=row.get("modality_type", "").strip() or None,
+        capture_method=row.get("capture_method", "").strip() or None,
+        instrument_id=row.get("instrument_id", "").strip() or None,
+        measure_id=row.get("measure_id", "").strip() or None,
+        administration_setting=row.get("administration_setting", "").strip() or None,
+        administration_role=row.get("administration_role", "").strip() or None,
+        instrument_version=row.get("instrument_version", "").strip() or None,
+        language=row.get("language", "").strip() or None,
+        visit_context=row.get("visit_context", "").strip() or None,
+        recall_window_iso=row.get("recall_window_iso", "").strip() or None,
+        schedule_pattern=row.get("schedule_pattern", "").strip() or None,
+        collection_time_unit=row.get("collection_time_unit", "").strip() or None,
+        scheduled_duration_value=_safe_float(row.get("scheduled_duration_value"), "scheduled_duration_value"),
+        primary_time_anchor=row.get("primary_time_anchor", "").strip() or None,
+        quality_controls_summary=row.get("quality_controls_summary", "").strip() or None,
+        notes=row.get("notes", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info("Imported data stream %s for profile %s", stream_id, profile_id)
+    return stream_id
+
+
+# ============================================================================
+# import_stream_timepoint  (B4: stream_timepoints_v1)
+# ============================================================================
+
+def import_stream_timepoint(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one stream timepoint row.
+
+    Args:
+        session: DB session.
+        row: Dict from stream_timepoint_template.csv.
+        study_id: Study identifier (used for ID generation).
+
+    Returns:
+        Generated timepoint_id.
+    """
+    stream_id = _require_str(row, "stream_id")
+    tp_label = row.get("timepoint_label", "").strip() or "unknown"
+
+    timepoint_id = row.get("timepoint_id", "").strip()
+    if not timepoint_id:
+        timepoint_id = _deterministic_id("TP_", stream_id, tp_label)
+
+    existing = session.get(StreamTimepoint, timepoint_id)
+    if existing is not None:
+        logger.debug("Timepoint %s already exists, skipping", timepoint_id)
+        return timepoint_id
+
+    # FK check: stream must exist
+    stream = session.get(ProfileDataStream, stream_id)
+    if stream is None:
+        raise ValueError(f"FK violation: stream_id '{stream_id}' not found")
+
+    orm_obj = StreamTimepoint(
+        timepoint_id=timepoint_id,
+        stream_id=stream_id,
+        timepoint_label=tp_label,
+        timepoint_type=row.get("timepoint_type", "").strip() or None,
+        anchor_event=row.get("anchor_event", "").strip() or None,
+        timepoint_minutes=_safe_int(row.get("timepoint_minutes"), "timepoint_minutes"),
+        clock_time_hhmm=row.get("clock_time_hhmm", "").strip() or None,
+        allowable_window_min=_safe_int(row.get("allowable_window_min"), "allowable_window_min"),
+        required=_safe_int(row.get("required", "1"), "required") or 1,
+        maps_to_measure=row.get("maps_to_measure", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info("Imported timepoint %s for stream %s", timepoint_id, stream_id)
+    return timepoint_id
+
+
+# ============================================================================
+# import_ontology_link  (B5: ontology_links_v1)
+# ============================================================================
+
+def import_ontology_link(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one ontology link row.
+
+    Args:
+        session: DB session.
+        row: Dict from ontology_link_template.csv.
+        study_id: Study identifier.
+
+    Returns:
+        Generated link_id.
+    """
+    target_table = _require_str(row, "target_table")
+    target_id = _require_str(row, "target_id")
+
+    link_id = row.get("link_id", "").strip()
+    if not link_id:
+        link_id = _deterministic_id("ONT_", study_id, target_table, target_id)
+
+    existing = session.get(OntologyLink, link_id)
+    if existing is not None:
+        logger.debug("Ontology link %s already exists, skipping", link_id)
+        return link_id
+
+    orm_obj = OntologyLink(
+        link_id=link_id,
+        target_table=target_table,
+        target_id=target_id,
+        study_id=study_id,
+        support_type=row.get("support_type", "").strip() or None,
+        evidence_strength=row.get("evidence_strength", "").strip() or None,
+        snippet=row.get("snippet", "").strip() or None,
+        locator=row.get("locator", "").strip() or None,
+        notes=row.get("notes", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+        active=_safe_int(row.get("active", "1"), "active") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info("Imported ontology link %s (%s→%s) for study %s", link_id, target_table, target_id, study_id)
+    return link_id
+
+
+# ============================================================================
+# import_dose_evidence  (dose_evidence_v1)
+# ============================================================================
+
+def import_dose_evidence(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one dose-response evidence row.
+
+    Args:
+        session: DB session.
+        row: Dict from dose_evidence_template.csv.
+        study_id: Study identifier.
+
+    Returns:
+        Generated dose evidence ID.
+    """
+    from datetime import datetime, timezone
+
+    action_id = row.get("action_id", "").strip() or None
+    dose_level = _safe_float(row.get("dose_level"), "dose_level")
+    if dose_level is None:
+        raise ValueError("dose_level is required")
+
+    dose_id = row.get("id", "").strip()
+    if not dose_id:
+        dose_id = _deterministic_id(
+            "DOSE_", study_id, action_id or "", str(dose_level)
+        )
+
+    existing = session.get(DoseEvidence, dose_id)
+    if existing is not None:
+        logger.debug("Dose evidence %s already exists, skipping", dose_id)
+        return dose_id
+
+    orm_obj = DoseEvidence(
+        id=dose_id,
+        study_id=study_id,
+        extraction_run_id=row.get("extraction_run_id", "").strip() or None,
+        action_id=action_id,
+        intervention_type=row.get("intervention_type", "").strip() or None,
+        dose_level=dose_level,
+        dose_unit=row.get("dose_unit", "").strip() or None,
+        effect=_safe_float(row.get("effect"), "effect"),
+        se=_safe_float(row.get("se"), "se"),
+        N=_safe_int(row.get("N"), "N"),
+        dose_response_shape=row.get("dose_response_shape", "").strip() or None,
+        effective_dose_range=row.get("effective_dose_range", "").strip() or None,
+        maximum_tolerated_dose=row.get("maximum_tolerated_dose", "").strip() or None,
+        provenance_status=row.get("provenance_status", "").strip() or "manual",
+        provenance_ref=row.get("provenance_ref", "").strip() or row.get("doi", ""),
+        created_at=datetime.now(timezone.utc),
+        notes=row.get("notes", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info("Imported dose evidence %s for study %s (dose=%.1f)", dose_id, study_id, dose_level)
+    return dose_id
+
+
+# ============================================================================
+# import_subgroup_evidence  (subgroup_evidence_v1)
+# ============================================================================
+
+def import_subgroup_evidence(
+    session: Session,
+    row: dict,
+    study_id: str,
+) -> str:
+    """Validate and insert one subgroup/moderator evidence row.
+
+    Args:
+        session: DB session.
+        row: Dict from subgroup_evidence_template.csv.
+        study_id: Study identifier.
+
+    Returns:
+        Generated subgroup evidence ID.
+    """
+    from datetime import datetime, timezone
+
+    modifier_variable = _require_str(row, "modifier_variable")
+    modifier_value = _require_str(row, "modifier_value")
+
+    sub_id = row.get("id", "").strip()
+    if not sub_id:
+        sub_id = _deterministic_id(
+            "SUB_", study_id, modifier_variable, modifier_value
+        )
+
+    existing = session.get(SubgroupEvidence, sub_id)
+    if existing is not None:
+        logger.debug("Subgroup evidence %s already exists, skipping", sub_id)
+        return sub_id
+
+    orm_obj = SubgroupEvidence(
+        id=sub_id,
+        study_id=study_id,
+        extraction_run_id=row.get("extraction_run_id", "").strip() or None,
+        edge_id=row.get("edge_id", "").strip() or None,
+        modifier_variable=modifier_variable,
+        modifier_value=modifier_value,
+        interaction_beta=_safe_float(row.get("interaction_beta"), "interaction_beta"),
+        interaction_se=_safe_float(row.get("interaction_se"), "interaction_se"),
+        interaction_p=_safe_float(row.get("interaction_p"), "interaction_p"),
+        subgroup_effect=_safe_float(row.get("subgroup_effect"), "subgroup_effect"),
+        subgroup_se=_safe_float(row.get("subgroup_se"), "subgroup_se"),
+        subgroup_n=_safe_int(row.get("subgroup_n"), "subgroup_n"),
+        provenance_status=row.get("provenance_status", "").strip() or "manual",
+        provenance_ref=row.get("provenance_ref", "").strip() or row.get("doi", ""),
+        created_at=datetime.now(timezone.utc),
+        notes=row.get("notes", "").strip() or None,
+        version=_safe_int(row.get("version", "1"), "version") or 1,
+    )
+
+    session.add(orm_obj)
+    logger.info(
+        "Imported subgroup evidence %s for study %s (%s=%s)",
+        sub_id, study_id, modifier_variable, modifier_value,
+    )
+    return sub_id
+
