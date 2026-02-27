@@ -23,6 +23,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from crci.shared.models.enums import PaperSubtype
 from crci.shared.models.tables import EdgeEvidence, ExtractionRun
 
 logger = logging.getLogger(__name__)
@@ -34,14 +35,14 @@ logger = logging.getLogger(__name__)
 
 # Paper subtypes that cannot produce evidence rows (MINIMAL-mode only)
 _EVIDENCE_BLOCKED_SUBTYPES: set[str] = {
-    "review_narrative",
-    "case_report",
-    "qualitative",
-    "umbrella_review",
-    "mechanistic_in_vitro",
-    "editorial",
-    "protocol",
-    "erratum",
+    PaperSubtype.REVIEW_NARRATIVE.value,
+    PaperSubtype.CASE_REPORT.value,
+    PaperSubtype.QUALITATIVE.value,
+    PaperSubtype.UMBRELLA_REVIEW.value,
+    PaperSubtype.MECHANISTIC_IN_VITRO.value,
+    PaperSubtype.EDITORIAL.value,
+    PaperSubtype.PROTOCOL.value,
+    "erratum",  # No PaperSubtype enum member yet; keep as string literal
 }
 
 
@@ -111,6 +112,7 @@ def write_evidence_rows(
     harmonized_records: list[Any],
     study_id: str,
     profile_id: str | None = None,
+    paper_subtype: str | None = None,
 ) -> int:
     """Persist P2 harmonized claims to edge_evidence_v1.
 
@@ -131,10 +133,18 @@ def write_evidence_rows(
         harmonized_records: List of ScaledNumeric objects from P2.
         study_id: The study_id for all evidence rows.
         profile_id: Optional cohort profile ID. Defaults to study_id if None.
+        paper_subtype: Paper subtype string for R2 gate enforcement.
 
     Returns:
         Number of evidence rows successfully written.
+
+    Raises:
+        GateViolation: If paper_subtype is in _EVIDENCE_BLOCKED_SUBTYPES (R2.2).
     """
+    # R2.2: Block evidence rows for MINIMAL-mode subtypes (defense-in-depth)
+    if paper_subtype:
+        _check_evidence_row_allowed(paper_subtype)
+
     if not harmonized_records:
         logger.info("No harmonized records to persist for study %s", study_id)
         return 0

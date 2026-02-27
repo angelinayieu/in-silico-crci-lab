@@ -433,6 +433,39 @@ def run_p2_harmonization(
         family_counts,
     )
 
+    # ── R2.3: Apply subtype-specific quality caps ──
+    for record in aligned_list:
+        raw_quality = getattr(record, "quality_rating", "moderate")
+        capped_quality = _apply_subtype_quality_caps(raw_quality, subtype_str or "")
+        if capped_quality != raw_quality:
+            logger.info(
+                "R2-CAP: %s quality capped %s←%s for subtype %s",
+                getattr(record, "span_id", "?"), capped_quality, raw_quality, subtype_str,
+            )
+        if hasattr(record, "quality_rating"):
+            record.quality_rating = capped_quality
+        elif isinstance(record, dict):
+            record["quality_rating"] = capped_quality
+
+    # ── R2.4/R2.5: Apply subtype-specific identification rules ──
+    for id_result in scored_list:
+        raw_status = getattr(id_result, "identification_status", None)
+        if raw_status is None:
+            continue
+        raw_str = raw_status.value if hasattr(raw_status, "value") else str(raw_status)
+        meta_flag = getattr(id_result, "meta_source_flag", None)
+        meta_flag_str = meta_flag.value if hasattr(meta_flag, "value") else meta_flag
+        capped_status = _apply_subtype_identification_rules(
+            raw_str, subtype_str or "", meta_flag_str,
+        )
+        if capped_status != raw_str:
+            logger.info(
+                "R2-ID: identification capped %s←%s for subtype %s",
+                capped_status, raw_str, subtype_str,
+            )
+        if hasattr(id_result, "identification_status"):
+            id_result.identification_status = capped_status
+
     # ── P2-EW: Persist Evidence to edge_evidence_v1 ──
     # Write harmonized records to database for downstream queries and
     # report_status.py visibility. This bridges the in-memory→DB gap.
@@ -445,6 +478,7 @@ def run_p2_harmonization(
             run=run,
             harmonized_records=aligned_list,
             study_id=study_id,
+            paper_subtype=subtype_str,
         )
         context["evidence_rows_written"] = evidence_count
         logger.info("P2-EW: Persisted %d evidence rows to edge_evidence_v1", evidence_count)

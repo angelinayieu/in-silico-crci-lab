@@ -60,6 +60,15 @@ def test_new_subtypes_present():
     assert not missing, f"Missing new subtypes: {missing}"
 
 
+def test_extraction_mode_values():
+    """R1.1: All 4 extraction modes exist with correct values."""
+    from crci.shared.models.enums import ExtractionMode
+
+    expected = {"MINIMAL", "SHALLOW", "STANDARD", "DEEP"}
+    actual = {m.value for m in ExtractionMode}
+    assert actual == expected
+
+
 # ═══════════════════════════════════════════════════════════════
 #  R2: ENFORCEMENT GATES
 # ═══════════════════════════════════════════════════════════════
@@ -93,17 +102,57 @@ def test_evidence_block_gate_raises():
 def test_evidence_block_gate_allows_rct():
     """R2.2: _check_evidence_row_allowed passes for RCT subtypes."""
     from crci.extraction.evidence_writer import _check_evidence_row_allowed
-
     from crci.shared.models.enums import PaperSubtype
+
     # Should not raise
     _check_evidence_row_allowed(PaperSubtype.RCT_EXERCISE.value)
+
+
+def test_write_evidence_rows_blocks_umbrella_review():
+    """R2.1/R2.2: write_evidence_rows raises GateViolation for umbrella review."""
+    from crci.extraction.evidence_writer import write_evidence_rows
+    from crci.shared.models.intermediate_states import GateViolation
+    from crci.shared.models.enums import PaperSubtype
+    from unittest.mock import MagicMock
+
+    mock_session = MagicMock()
+    mock_run = MagicMock()
+
+    with pytest.raises(GateViolation, match="R2.2"):
+        write_evidence_rows(
+            session=mock_session,
+            run=mock_run,
+            harmonized_records=[{"beta": 0.5}],
+            study_id="test_study",
+            paper_subtype=PaperSubtype.UMBRELLA_REVIEW.value,
+        )
+
+
+def test_write_evidence_rows_allows_rct():
+    """R2.2: write_evidence_rows does NOT raise for RCT subtype."""
+    from crci.extraction.evidence_writer import write_evidence_rows
+    from crci.shared.models.enums import PaperSubtype
+    from unittest.mock import MagicMock
+
+    mock_session = MagicMock()
+    mock_run = MagicMock()
+
+    # Should return 0 (no valid records) but not raise
+    result = write_evidence_rows(
+        session=mock_session,
+        run=mock_run,
+        harmonized_records=[],
+        study_id="test_study",
+        paper_subtype=PaperSubtype.RCT_EXERCISE.value,
+    )
+    assert result == 0
 
 
 def test_pilot_rct_quality_cap():
     """R2.3: Pilot RCT 'strong' quality is capped to 'moderate'."""
     from crci.extraction.p2_harmonization.runner import _apply_subtype_quality_caps
-
     from crci.shared.models.enums import PaperSubtype
+
     assert _apply_subtype_quality_caps("strong", PaperSubtype.PILOT_RCT.value) == "moderate"
     assert _apply_subtype_quality_caps("moderate", PaperSubtype.PILOT_RCT.value) == "moderate"
     assert _apply_subtype_quality_caps("strong", PaperSubtype.RCT_EXERCISE.value) == "strong"
@@ -112,8 +161,8 @@ def test_pilot_rct_quality_cap():
 def test_cross_sectional_identification_demotion():
     """R2.4: Cross-sectional always NOT_IDENTIFIED."""
     from crci.extraction.p2_harmonization.runner import _apply_subtype_identification_rules
-
     from crci.shared.models.enums import PaperSubtype
+
     result = _apply_subtype_identification_rules("identified", PaperSubtype.CROSS_SECTIONAL.value)
     assert result == "not_identified"
 
@@ -121,8 +170,8 @@ def test_cross_sectional_identification_demotion():
 def test_retrospective_identification_cap():
     """R2.4: Retrospective cohort capped at PARTIALLY_IDENTIFIED."""
     from crci.extraction.p2_harmonization.runner import _apply_subtype_identification_rules
-
     from crci.shared.models.enums import PaperSubtype
+
     result = _apply_subtype_identification_rules("identified", PaperSubtype.RETROSPECTIVE_COHORT.value)
     assert result == "partially_identified"
 
@@ -186,15 +235,6 @@ def test_nma_pairwise_overlap_no_warning_without_both():
 
     warnings = detect_nma_pairwise_overlap([nma_claim], "edge_001")
     assert len(warnings) == 0
-
-
-def test_extraction_mode_values():
-    """R1.1: All 4 extraction modes exist with correct values."""
-    from crci.shared.models.enums import ExtractionMode
-
-    expected = {"MINIMAL", "SHALLOW", "STANDARD", "DEEP"}
-    actual = {m.value for m in ExtractionMode}
-    assert actual == expected
 
 
 # ═══════════════════════════════════════════════════════════════
