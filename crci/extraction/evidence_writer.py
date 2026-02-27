@@ -21,9 +21,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from crci.shared.models.enums import PaperSubtype
+from crci.shared.models.enums import MetaSourceFlag, PaperSubtype
 from crci.shared.models.tables import EdgeEvidence, ExtractionRun
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,49 @@ def _check_evidence_row_allowed(subtype: str) -> None:
             ),
             context={"subtype": subtype},
         )
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R3.1: FOREST PLOT AUTO-SUPERSEDE
+# ═══════════════════════════════════════════════════════════════
+
+
+def _supersede_forest_plot_entries(
+    session: Session,
+    study_id: str,
+    edge_relation_id: str,
+) -> int:
+    """Deactivate forest plot entries when full primary extraction arrives.
+
+    Spec §3.4: Forest plot entries exist only as placeholders.
+    When the full paper is extracted, the placeholder is superseded.
+
+    Args:
+        session: Active database session.
+        study_id: Study being extracted.
+        edge_relation_id: Edge for which primary evidence is arriving.
+
+    Returns:
+        Number of forest plot entries deactivated.
+    """
+    result = session.execute(
+        update(EdgeEvidence)
+        .where(
+            EdgeEvidence.study_id == study_id,
+            EdgeEvidence.edge_relation_id == edge_relation_id,
+            EdgeEvidence.meta_source_flag == MetaSourceFlag.FOREST_PLOT_ENTRY.value,
+            EdgeEvidence.active == 1,
+        )
+        .values(active=0)
+    )
+    count = result.rowcount
+    if count > 0:
+        logger.info(
+            "R3-SUPERSEDE: deactivated %d forest plot entries for study %s "
+            "edge %s — replaced by full primary extraction.",
+            count, study_id, edge_relation_id,
+        )
+    return count
 
 
 def compute_span_hash(
@@ -233,6 +277,14 @@ def write_evidence_rows(
             updated += 1
             logger.debug("Updated existing evidence row %s", ler_id)
         else:
+            # R3.1: If this is a primary row (no meta_source_flag),
+            # supersede any existing forest plot entries for same study+edge
+            meta_flag = _get_attr(record, "meta_source_flag")
+            if meta_flag is None:
+                _supersede_forest_plot_entries(
+                    session, study_id, edge_relation_id
+                )
+
             # Insert new row
             evidence_row = EdgeEvidence(
                 ler_id=ler_id,

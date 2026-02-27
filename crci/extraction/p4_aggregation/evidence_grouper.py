@@ -19,6 +19,7 @@ import math
 from collections import defaultdict
 
 from crci.shared import config
+from crci.shared.models.enums import MetaSourceFlag
 from crci.shared.models.intermediate_states import (
     GroupedEvidence,
     HarmonizedClaim,
@@ -68,6 +69,12 @@ def group_evidence_by_edge(
     edge_groups: dict[str, list[HarmonizedClaim]] = defaultdict(list)
     for claim in active_claims:
         edge_groups[claim.edge_relation_id].append(claim)
+
+    # Step 2b: R3.2 — Check for correlated subgroup estimates
+    for edge_id, edge_claims in edge_groups.items():
+        subgroup_warnings = _check_subgroup_correlation(edge_claims)
+        for warning in subgroup_warnings:
+            logger.warning(warning)
 
     # Step 3: Build GroupedEvidence per edge
     results: list[GroupedEvidence] = []
@@ -274,3 +281,46 @@ def _apply_diminishing_returns(
         adjusted.append(claim)
 
     return adjusted
+
+
+# ═══════════════════════════════════════════════════════════════
+#  R3.2: SUBGROUP CORRELATION WARNING
+# ═══════════════════════════════════════════════════════════════
+
+
+def _check_subgroup_correlation(
+    claims: list[HarmonizedClaim],
+) -> list[str]:
+    """Warn if subgroup estimates from same MA are being pooled together.
+
+    Subgroup estimates from the same MA share systematic biases.
+    They should inform different scope slices, not be pooled.
+
+    Phase 1: warn-log only. Phase 2: exclude from IVW pooling.
+
+    Args:
+        claims: All claims for a single edge.
+
+    Returns:
+        List of warning strings for any correlated subgroup sets.
+    """
+    warnings: list[str] = []
+
+    # Group subgroup estimates by parent MA study
+    ma_subgroups: dict[str, list[str]] = defaultdict(list)
+    for claim in claims:
+        if (
+            claim.meta_source_flag == MetaSourceFlag.SUBGROUP_ESTIMATE.value
+            and claim.parent_meta_study_id
+        ):
+            ma_subgroups[claim.parent_meta_study_id].append(claim.ler_id)
+
+    for ma_id, ler_ids in ma_subgroups.items():
+        if len(ler_ids) > 1:
+            warnings.append(
+                f"R3-CORR: {len(ler_ids)} subgroup estimates from same MA "
+                f"{ma_id} for edge {claims[0].edge_relation_id}. "
+                f"These are correlated — do not IVW-pool. LERs: {ler_ids}"
+            )
+
+    return warnings

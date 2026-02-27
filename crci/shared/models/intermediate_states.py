@@ -340,6 +340,7 @@ class HarmonizedClaim(BaseModel):
     # P4 verification / meta-analysis source tracking
     se_derivation_level: str | None = None
     meta_source_flag: str | None = None
+    parent_meta_study_id: str | None = None
     # Provenance tracking: records where each field value came from
     layer_fields_provenance: dict[str, str] = Field(default_factory=dict)
     # Computed flag: True when key P3 fields have non-default values
