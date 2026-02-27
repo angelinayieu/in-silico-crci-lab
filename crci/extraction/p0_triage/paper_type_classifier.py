@@ -134,17 +134,25 @@ def _load_and_fill_prompt(paper_text: str) -> str:
             "PTC prompt template not found at %s. Using inline fallback.",
             _PROMPT_TEMPLATE_PATH,
         )
-        # Inline fallback prompt (minimal)
+        # Inline fallback prompt — lists all 42 PaperSubtype values
+        all_subtypes = ", ".join(sorted(member.value for member in PaperSubtype))
         template = (
-            "Classify the following paper into one of the 27 CRCI paper subtypes. "
-            "Valid subtypes: RCT_exercise, RCT_cognitive, RCT_pharmacological, "
-            "RCT_multimodal, meta_analysis, systematic_review, longitudinal_cohort, "
-            "cross_sectional, intensive_longitudinal, mechanistic_animal, "
-            "mechanistic_human, imaging_structural, imaging_functional, "
-            "biomarker_discovery, dose_response, safety_report, guideline, "
-            "case_report, editorial, review_narrative, protocol, qualitative, "
-            "psychometric_validation, normative_cohort, dose_response_study, "
-            "longitudinal_followup, other.\n\n"
+            f"Classify the following paper into one of the CRCI paper subtypes. "
+            f"Valid subtypes: {all_subtypes}.\n\n"
+            "Subtypes grouped by family:\n"
+            "  RCT: RCT_exercise, RCT_cognitive, RCT_pharmacological, RCT_multimodal, "
+            "standard_rct, factorial_rct, pilot_rct, crossover_rct\n"
+            "  Meta-analysis: meta_analysis, pairwise_ma, nma, ipdma, dose_response_ma, "
+            "mega_analysis\n"
+            "  Systematic review: systematic_review, umbrella_review, scoping_review\n"
+            "  Observational: longitudinal_cohort, cross_sectional, prospective_cohort, "
+            "retrospective_cohort, intensive_longitudinal\n"
+            "  Mechanistic: mechanistic_animal, mechanistic_human, mechanistic_in_vitro\n"
+            "  Imaging: imaging_structural, imaging_functional\n"
+            "  Other: biomarker_discovery, dose_response, dose_response_study, "
+            "safety_report, guideline, case_report, editorial, review_narrative, "
+            "protocol, qualitative, psychometric_validation, normative_cohort, "
+            "longitudinal_followup, computational_model, methods_paper, other\n\n"
             "Paper text:\n---\n{paper_text}\n---\n\n"
             "Respond with JSON: "
             '{{\"paper_subtype\": \"<subtype>\", \"confidence\": <float>, '

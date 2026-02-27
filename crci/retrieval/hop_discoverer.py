@@ -58,13 +58,20 @@ logger = logging.getLogger(__name__)
 #  SUBTYPE ALLOWLIST — which study_subtype values are MA/SR
 # ═══════════════════════════════════════════════════════════════
 
+from crci.shared.models.enums import PaperSubtype
+
 _MA_SR_SUBTYPES: set[str] = {
-    # PaperSubtype enum canonical values
-    "meta_analysis",
-    "systematic_review",
-    # Legacy / fine-grained subtypes (future classification)
-    "pairwise_ma", "nma", "ipdma",
-    "dose_response_ma", "mega_analysis",
+    # Original MA/SR subtypes
+    PaperSubtype.META_ANALYSIS.value,
+    PaperSubtype.SYSTEMATIC_REVIEW.value,
+    # Fine-grained MA subtypes (Master Spec §4.1)
+    PaperSubtype.PAIRWISE_MA.value,
+    PaperSubtype.NMA.value,
+    PaperSubtype.IPDMA.value,
+    PaperSubtype.DOSE_RESPONSE_MA.value,
+    PaperSubtype.MEGA_ANALYSIS.value,
+    # Umbrella reviews — their included MAs should be acquired
+    PaperSubtype.UMBRELLA_REVIEW.value,
 }
 
 
