@@ -1,0 +1,92 @@
+{
+  "doi": "10.1002/pon.3456",
+  "pmid": "25393639",
+  "title": "Effects of an Exercise Program on Cognitive Function and Biomarkers in Older Breast Cancer Survivors: A Randomized Trial",
+  "authors": "Irwin ML, et al.",
+  "journal": "Psycho-Oncology",
+  "year": 2014,
+  "volume": null,
+  "pages": null,
+
+  "paper_type": "RCT",
+  "study_design": "RCT",
+  "extraction_mode": "DEEP",
+  "priority": "high",
+
+  "cancer_types": ["breast"],
+  "treatment_phase": "early_recovery",
+
+  "intervention": {
+    "type": "exercise",
+    "format": "supervised",
+    "duration_weeks": 52,
+    "components": ["aerobic_exercise"]
+  },
+
+  "sample": {
+    "n_total": 200,
+    "mean_age": 62,
+    "pct_female": 100,
+    "control_type": "usual_care"
+  },
+
+  "regimen_phase_coverage": {
+    "phases_present": ["T2", "T3"],
+    "timepoints": [
+      {"label": "baseline (≥1y post-chemo)", "phase": "T2"},
+      {"label": "6mo", "phase": "T3"},
+      {"label": "12mo", "phase": "T3"}
+    ]
+  },
+
+  "workstream_hints": ["intervention_rct", "exercise", "bdnf", "memory", "breast_cancer", "longitudinal"],
+
+  "target_edges": [
+    "ER_ACTIVITY_BDNF",
+    "ER_BDNF_EPIMEM",
+    "ER_CRP_COG"
+  ],
+
+  "targeted_edges": [
+    "physical_activity -> BDNF (↑ BDNF in exercise arm)",
+    "BDNF -> memory (higher BDNF associated with HVLT recall)",
+    "CRP -> cognitive (↓CRP predicted less TMT-B worsening)"
+  ],
+
+  "target_instruments": ["INST_TMT_B", "INST_HVLTR", "INST_BDNF_PLASMA", "INST_CRP_HS"],
+
+  "measures_present": {
+    "biomarkers": ["plasma BDNF", "hs-CRP"],
+    "cognition_domains": ["attention_executive", "memory"],
+    "instruments": ["TMT-B", "HVLT-R"]
+  },
+
+  "extractability": {
+    "stats_types": ["mixed-model β (95% CI)"],
+    "uncertainty_present": true,
+    "correlation_matrix_present": false,
+    "timepoints_count": 3,
+    "practice_effects_addressed": true
+  },
+
+  "value_flags": {
+    "multi_edge_yield_est": 3,
+    "longitudinal_value": 3,
+    "multi_cancer_value": false,
+    "subgroup_modifier_value": true
+  },
+
+  "significant_findings": [
+    "Exercise group showed significant increase in plasma BDNF (β=0.15, 95%CI 0.02–0.28)",
+    "Smaller HVLT-R decline in exercise group (p=0.03)",
+    "Mediation analysis indicated BDNF explained part of the exercise–memory link"
+  ],
+  "null_findings": [],
+
+  "extraction_cues": "β=0.15 (95%CI 0.02–0.28) for exercise effect on BDNF; 12mo HVLT difference (p=0.03)",
+  "risks": "Older cohort; broad follow-up but no cortisol measures.",
+  "priority_score": 92,
+
+  "pdf_status": "PENDING_DOWNLOAD",
+  "source": "manual_upload"
+}

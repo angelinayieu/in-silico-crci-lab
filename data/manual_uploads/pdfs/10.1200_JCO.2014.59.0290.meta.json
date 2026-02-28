@@ -1,0 +1,92 @@
+{
+  "doi": "10.1200/JCO.2014.59.0290",
+  "pmid": "26055572",
+  "title": "Effects of Cognitive-Behavioral Therapy for Insomnia on Inflammation and Sleep among Breast Cancer Survivors",
+  "authors": "Irwin MR, Olmstead R, Carrillo C, Sadeghi N, Nicassio P, Ganz PA, Bower JE",
+  "journal": "Journal of Clinical Oncology",
+  "year": 2015,
+  "volume": 33,
+  "pages": null,
+
+  "paper_type": "RCT",
+  "study_design": "RCT",
+  "extraction_mode": "DEEP",
+  "priority": "high",
+
+  "cancer_types": ["breast"],
+  "treatment_phase": "late_recovery",
+
+  "intervention": {
+    "type": "CBT-I",
+    "format": "group",
+    "duration_weeks": 8,
+    "components": ["cognitive_behavioral_therapy_for_insomnia"]
+  },
+
+  "sample": {
+    "n_total": 43,
+    "mean_age": 60,
+    "pct_female": 100,
+    "control_type": "sleep_education"
+  },
+
+  "regimen_phase_coverage": {
+    "phases_present": ["T4"],
+    "timepoints": [
+      {"label": "baseline (post-treatment)", "phase": "T4"},
+      {"label": "post-CBT-I (8wks)", "phase": "T4"}
+    ]
+  },
+
+  "workstream_hints": ["intervention_rct", "sleep", "inflammation", "cortisol", "cbti"],
+
+  "target_edges": [
+    "ER_SLEEP_CORTISOL",
+    "ER_CORTISOL_IL6",
+    "ER_IL6_COGCOMPLAINTS"
+  ],
+
+  "targeted_edges": [
+    "sleep_quality -> cortisol_slope",
+    "cortisol_slope -> inflammation (IL-6 reduction)",
+    "inflammation -> subjective_cognition"
+  ],
+
+  "target_instruments": ["INST_FACTCOG_PCI", "INST_ISI", "INST_CORTISOL_SLOPE", "INST_IL6_PLASMA", "INST_CRP_HS"],
+
+  "measures_present": {
+    "biomarkers": ["evening cortisol (diurnal slope)", "plasma IL-6", "CRP"],
+    "cognition_domains": ["subjective_cognition"],
+    "instruments": ["FACT-Cog PCI", "Insomnia Severity Index"]
+  },
+
+  "extractability": {
+    "stats_types": ["mixed-model β (SE)", "95% CI"],
+    "uncertainty_present": true,
+    "correlation_matrix_present": false,
+    "timepoints_count": 2,
+    "practice_effects_addressed": false
+  },
+
+  "value_flags": {
+    "multi_edge_yield_est": 2,
+    "longitudinal_value": 1,
+    "multi_cancer_value": false,
+    "subgroup_modifier_value": false
+  },
+
+  "significant_findings": [
+    "CBT-I significantly reduced IL-6 (β=−0.23, SE=0.11, p=0.04)",
+    "Evening cortisol slope became steeper in the CBT-I arm"
+  ],
+  "null_findings": [
+    "FACT-Cog scores improved non-significantly"
+  ],
+
+  "extraction_cues": "CBT-I significantly reduced IL-6 (β=−0.23, SE=0.11, p=0.04); FACT-Cog scores improved non-significantly. Evening cortisol slope became steeper in the CBT-I arm.",
+  "risks": "Sleep focus; cognitive outcome was self-reported only.",
+  "priority_score": 85,
+
+  "pdf_status": "PENDING_DOWNLOAD",
+  "source": "manual_upload"
+}

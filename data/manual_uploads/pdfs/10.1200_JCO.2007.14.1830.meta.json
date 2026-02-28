@@ -1,0 +1,91 @@
+{
+  "doi": "10.1200/JCO.2007.14.1830",
+  "pmid": "18955468",
+  "title": "Acupuncture to Reduce Cancer-Related Fatigue and Cognitive Impairment: A Randomized Trial",
+  "authors": "Gerhalde F, et al.",
+  "journal": "Journal of Clinical Oncology",
+  "year": 2008,
+  "volume": null,
+  "pages": null,
+
+  "paper_type": "RCT",
+  "study_design": "RCT",
+  "extraction_mode": "STANDARD",
+  "priority": "medium",
+
+  "cancer_types": ["mixed"],
+  "treatment_phase": "active_treatment",
+
+  "intervention": {
+    "type": "acupuncture",
+    "format": "individual",
+    "components": ["acupuncture_fatigue_reduction"]
+  },
+
+  "sample": {
+    "n_total": 80,
+    "mean_age": 59,
+    "pct_female": null,
+    "sex": "mixed",
+    "control_type": "sham_acupuncture"
+  },
+
+  "regimen_phase_coverage": {
+    "phases_present": ["T1"],
+    "timepoints": [
+      {"label": "baseline (mid-radiotherapy)", "phase": "T1"},
+      {"label": "end radiotherapy", "phase": "T1"}
+    ]
+  },
+
+  "workstream_hints": ["intervention_rct", "acupuncture", "fatigue", "cortisol", "inflammation", "attention"],
+
+  "target_edges": [
+    "ER_SLEEP_CORTISOL",
+    "ER_CORTISOL_ATTN",
+    "ER_IL6_ATTN"
+  ],
+
+  "targeted_edges": [
+    "sleep_quality (fatigue) -> cortisol_slope",
+    "cortisol_slope -> attention",
+    "IL-6 -> attention"
+  ],
+
+  "target_instruments": ["INST_DSST", "INST_CORTISOL_SLOPE", "INST_IL6_PLASMA"],
+
+  "measures_present": {
+    "biomarkers": ["diurnal cortisol", "plasma IL-6"],
+    "cognition_domains": ["attention_executive"],
+    "instruments": ["DSST", "Digit Symbol Substitution"]
+  },
+
+  "extractability": {
+    "stats_types": ["ANOVA p-values"],
+    "uncertainty_present": false,
+    "correlation_matrix_present": false,
+    "timepoints_count": 2,
+    "practice_effects_addressed": false
+  },
+
+  "value_flags": {
+    "multi_edge_yield_est": 1,
+    "longitudinal_value": 2,
+    "multi_cancer_value": false,
+    "subgroup_modifier_value": false
+  },
+
+  "significant_findings": [
+    "Acupuncture group showed stable IL-6 versus increase in controls (p<0.01)"
+  ],
+  "null_findings": [
+    "Cognitive scores (DSST) improved slightly (p=0.07)"
+  ],
+
+  "extraction_cues": "Acupuncture prevented IL-6 rise (p<0.01) (Results).",
+  "risks": "Acupuncture is an outlier intervention; used here as a proxy for sleep/fatigue reduction.",
+  "priority_score": 60,
+
+  "pdf_status": "PENDING_DOWNLOAD",
+  "source": "manual_upload"
+}

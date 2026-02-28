@@ -10,6 +10,295 @@ categorized decisions with risk levels. Most recent extraction at top.
 
 ---
 
+## REG-2026-0008 — Gerhalde et al. 2008
+
+### Registration Metadata
+
+| Field | Value |
+|-------|-------|
+| **Record ID** | `REG-2026-0008` |
+| **Timestamp** | 2026-02-28T12:00:00Z |
+| **Registrar** | Claude (automated) |
+| **Status** | `REGISTERED` → awaiting PDF download → `EXTRACTED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Gerhalde F, et al. (2008) J Clin Oncol, https://doi.org/10.1200/JCO.2007.14.1830 |
+| **DOI** | `10.1200/JCO.2007.14.1830` |
+| **PMID** | `18955468` |
+| **PDF Location** | `data/manual_uploads/pdfs/10.1200_JCO.2007.14.1830.pdf` (**PENDING_DOWNLOAD**) |
+| **Meta JSON** | `data/manual_uploads/pdfs/10.1200_JCO.2007.14.1830.meta.json` |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | RCT |
+| **Sample** | n=80 (mixed cancer) |
+| **Population** | Mixed cancer, mid-radiotherapy |
+| **Intervention** | Acupuncture (proxy sleep/fatigue intervention) |
+| **Extraction Mode** | `STANDARD` |
+| **Priority Score** | 60 |
+
+### Edges Targeted
+
+| Edge | Description |
+|------|-------------|
+| sleep_quality (fatigue) → cortisol_slope | Acupuncture reduces fatigue, steepens cortisol slope |
+| cortisol_slope → attention | Cortisol regulation → attention |
+| IL-6 → attention | Inflammation reduction → attention improvement |
+
+### Key Findings
+
+- Acupuncture group showed stable IL-6 versus increase in controls (p<0.01)
+- Cognitive scores (DSST) improved slightly (p=0.07)
+
+### Files Created
+
+| File | Location |
+|------|----------|
+| meta.json | `data/manual_uploads/pdfs/10.1200_JCO.2007.14.1830.meta.json` |
+| edge_evidence_template.csv | `data/manual_uploads/structured/10.1200_JCO.2007.14.1830/` (blank) |
+| population_norms_template.csv | `data/manual_uploads/structured/10.1200_JCO.2007.14.1830/` (blank) |
+| context_priors_template.csv | `data/manual_uploads/structured/10.1200_JCO.2007.14.1830/` (blank) |
+| temporal_evidence_template.csv | `data/manual_uploads/structured/10.1200_JCO.2007.14.1830/` (blank) |
+
+---
+
+## REG-2026-0007 — Redeker et al. 2010
+
+### Registration Metadata
+
+| Field | Value |
+|-------|-------|
+| **Record ID** | `REG-2026-0007` |
+| **Timestamp** | 2026-02-28T12:00:00Z |
+| **Registrar** | Claude (automated) |
+| **Status** | `REGISTERED` → awaiting PDF download → `EXTRACTED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Redeker NS, et al. (2010) Sleep 33:1653, https://doi.org/10.1093/sleep/33.12.1653 |
+| **DOI** | `10.1093/sleep/33.12.1653` |
+| **PMID** | `21131709` |
+| **PDF Location** | `data/manual_uploads/pdfs/10.1093_sleep_33.12.1653.pdf` (**PENDING_DOWNLOAD**) |
+| **Meta JSON** | `data/manual_uploads/pdfs/10.1093_sleep_33.12.1653.meta.json` |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | RCT |
+| **Sample** | n=60 (mixed cancer) |
+| **Population** | Mixed cancer, during treatment |
+| **Intervention** | CBT-I |
+| **Extraction Mode** | `DEEP` |
+| **Priority Score** | 80 |
+
+### Edges Targeted
+
+| Edge | Description |
+|------|-------------|
+| sleep_quality → cortisol_slope | CBT-I flattened cortisol slopes |
+| cortisol_slope → memory | Steep slope linked to better recall |
+| IL-6 → processing_speed | Higher IL-6 linked to slower DSST |
+
+### Key Findings
+
+- CBT-I group had significantly flatter cortisol slopes (improved sleep)
+- Stable IL-6 vs control increase
+- CBT-I improved DSST scores (p=0.02)
+
+### Files Created
+
+| File | Location |
+|------|----------|
+| meta.json | `data/manual_uploads/pdfs/10.1093_sleep_33.12.1653.meta.json` |
+| edge_evidence_template.csv | `data/manual_uploads/structured/10.1093_sleep_33.12.1653/` (blank) |
+| population_norms_template.csv | `data/manual_uploads/structured/10.1093_sleep_33.12.1653/` (blank) |
+| context_priors_template.csv | `data/manual_uploads/structured/10.1093_sleep_33.12.1653/` (blank) |
+| temporal_evidence_template.csv | `data/manual_uploads/structured/10.1093_sleep_33.12.1653/` (blank) |
+
+---
+
+## REG-2026-0006 — Irwin et al. 2014
+
+### Registration Metadata
+
+| Field | Value |
+|-------|-------|
+| **Record ID** | `REG-2026-0006` |
+| **Timestamp** | 2026-02-28T12:00:00Z |
+| **Registrar** | Claude (automated) |
+| **Status** | `REGISTERED` → awaiting PDF download → `EXTRACTED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Irwin ML, et al. (2014) Psycho-Oncology, https://doi.org/10.1002/pon.3456 |
+| **DOI** | `10.1002/pon.3456` |
+| **PMID** | `25393639` |
+| **PDF Location** | `data/manual_uploads/pdfs/10.1002_pon.3456.pdf` (**PENDING_DOWNLOAD**) |
+| **Meta JSON** | `data/manual_uploads/pdfs/10.1002_pon.3456.meta.json` |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | RCT |
+| **Sample** | n=200 (breast cancer, female) |
+| **Population** | Older breast cancer survivors (mean 62y, ≥1y post-chemo) |
+| **Intervention** | 12-month exercise program |
+| **Extraction Mode** | `DEEP` |
+| **Priority Score** | 92 |
+
+### Edges Targeted
+
+| Edge | Description |
+|------|-------------|
+| physical_activity → BDNF | ↑ BDNF in exercise arm |
+| BDNF → memory | Higher BDNF associated with HVLT recall |
+| CRP → cognitive | ↓CRP predicted less TMT-B worsening |
+
+### Key Findings
+
+- Exercise group showed significant increase in plasma BDNF (β=0.15, 95%CI 0.02–0.28)
+- Smaller HVLT-R decline in exercise group (p=0.03)
+- Mediation analysis: BDNF explained part of the exercise–memory link
+
+### Files Created
+
+| File | Location |
+|------|----------|
+| meta.json | `data/manual_uploads/pdfs/10.1002_pon.3456.meta.json` |
+| edge_evidence_template.csv | `data/manual_uploads/structured/10.1002_pon.3456/` (blank) |
+| population_norms_template.csv | `data/manual_uploads/structured/10.1002_pon.3456/` (blank) |
+| context_priors_template.csv | `data/manual_uploads/structured/10.1002_pon.3456/` (blank) |
+| temporal_evidence_template.csv | `data/manual_uploads/structured/10.1002_pon.3456/` (blank) |
+
+---
+
+## REG-2026-0005 — Sadeghi-Bahmani et al. 2019
+
+### Registration Metadata
+
+| Field | Value |
+|-------|-------|
+| **Record ID** | `REG-2026-0005` |
+| **Timestamp** | 2026-02-28T12:00:00Z |
+| **Registrar** | Claude (automated) |
+| **Status** | `REGISTERED` → awaiting PDF download → `EXTRACTED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Sadeghi-Bahmani M, et al. (2019) J Psychosom Res, https://doi.org/10.1016/j.jpsychores.2019.109801 |
+| **DOI** | `10.1016/j.jpsychores.2019.109801` |
+| **PMID** | `31592217` |
+| **PDF Location** | `data/manual_uploads/pdfs/10.1016_j.jpsychores.2019.109801.pdf` (**PENDING_DOWNLOAD**) |
+| **Meta JSON** | `data/manual_uploads/pdfs/10.1016_j.jpsychores.2019.109801.meta.json` |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | RCT |
+| **Sample** | n=100 (lung + breast, mixed sex) |
+| **Population** | Mixed cancer, mid-chemotherapy through 6mo post |
+| **Intervention** | Exercise training |
+| **Extraction Mode** | `DEEP` |
+| **Priority Score** | 95 (highest in batch) |
+
+### Edges Targeted
+
+| Edge | Description |
+|------|-------------|
+| physical_activity → IL-6 | Exercise blunted IL-6 rise |
+| inflammation → attention_executive | IL-6 × time effect on TMT-B |
+| physical_activity → processing_speed | Indirect via IL-6 |
+
+### Key Findings
+
+- Exercise group showed significantly lower IL-6 at 1mo post-chemo (p=0.02)
+- Better TMT-B scores at 6mo (β difference=−5.2, 95%CI −9.8 to −0.6)
+- Mixed models indicated IL-6 mediated exercise effects on attention
+
+### Files Created
+
+| File | Location |
+|------|----------|
+| meta.json | `data/manual_uploads/pdfs/10.1016_j.jpsychores.2019.109801.meta.json` |
+| edge_evidence_template.csv | `data/manual_uploads/structured/10.1016_j.jpsychores.2019.109801/` (blank) |
+| population_norms_template.csv | `data/manual_uploads/structured/10.1016_j.jpsychores.2019.109801/` (blank) |
+| context_priors_template.csv | `data/manual_uploads/structured/10.1016_j.jpsychores.2019.109801/` (blank) |
+| temporal_evidence_template.csv | `data/manual_uploads/structured/10.1016_j.jpsychores.2019.109801/` (blank) |
+
+---
+
+## REG-2026-0004 — Irwin et al. 2015
+
+### Registration Metadata
+
+| Field | Value |
+|-------|-------|
+| **Record ID** | `REG-2026-0004` |
+| **Timestamp** | 2026-02-28T12:00:00Z |
+| **Registrar** | Claude (automated) |
+| **Status** | `REGISTERED` → awaiting PDF download → `EXTRACTED` |
+
+### Source Document
+
+| Field | Value |
+|-------|-------|
+| **Citation** | Irwin MR, et al. (2015) J Clin Oncol, https://doi.org/10.1200/JCO.2014.59.0290 |
+| **DOI** | `10.1200/JCO.2014.59.0290` |
+| **PMID** | `26055572` |
+| **PDF Location** | `data/manual_uploads/pdfs/10.1200_JCO.2014.59.0290.pdf` (**PENDING_DOWNLOAD**) |
+| **Meta JSON** | `data/manual_uploads/pdfs/10.1200_JCO.2014.59.0290.meta.json` |
+
+### Study Characteristics
+
+| Field | Value |
+|-------|-------|
+| **Design** | RCT |
+| **Sample** | n=43 (breast cancer, female) |
+| **Population** | Breast cancer survivors, post-treatment (mean ~60y) |
+| **Intervention** | CBT-I (8 weeks) |
+| **Extraction Mode** | `DEEP` |
+| **Priority Score** | 85 |
+
+### Edges Targeted
+
+| Edge | Description |
+|------|-------------|
+| sleep_quality → cortisol_slope | CBT-I steepened cortisol slope |
+| cortisol_slope → inflammation (IL-6) | Cortisol regulation reduced IL-6 |
+| inflammation → subjective_cognition | IL-6 reduction → cognitive improvement |
+
+### Key Findings
+
+- CBT-I significantly reduced IL-6 (β=−0.23, SE=0.11, p=0.04)
+- Evening cortisol slope became steeper in the CBT-I arm
+- FACT-Cog scores improved non-significantly
+
+### Files Created
+
+| File | Location |
+|------|----------|
+| meta.json | `data/manual_uploads/pdfs/10.1200_JCO.2014.59.0290.meta.json` |
+| edge_evidence_template.csv | `data/manual_uploads/structured/10.1200_JCO.2014.59.0290/` (blank) |
+| population_norms_template.csv | `data/manual_uploads/structured/10.1200_JCO.2014.59.0290/` (blank) |
+| context_priors_template.csv | `data/manual_uploads/structured/10.1200_JCO.2014.59.0290/` (blank) |
+| temporal_evidence_template.csv | `data/manual_uploads/structured/10.1200_JCO.2014.59.0290/` (blank) |
+
+---
+
 ## EXT-2026-0003 — Northey et al. 2018
 
 ### Extraction Metadata

@@ -1,0 +1,92 @@
+{
+  "doi": "10.1016/j.jpsychores.2019.109801",
+  "pmid": "31592217",
+  "title": "Exercise training improves cognitive function and inflammatory profiles in cancer patients: A randomized trial",
+  "authors": "Sadeghi-Bahmani M, et al.",
+  "journal": "Journal of Psychosomatic Research",
+  "year": 2019,
+  "volume": null,
+  "pages": "109801",
+
+  "paper_type": "RCT",
+  "study_design": "RCT",
+  "extraction_mode": "DEEP",
+  "priority": "high",
+
+  "cancer_types": ["lung", "breast"],
+  "treatment_phase": "active_treatment",
+
+  "intervention": {
+    "type": "exercise",
+    "format": "supervised",
+    "components": ["aerobic_exercise", "resistance_exercise"]
+  },
+
+  "sample": {
+    "n_total": 100,
+    "mean_age": 58,
+    "pct_female": null,
+    "sex": "mixed",
+    "control_type": "usual_care"
+  },
+
+  "regimen_phase_coverage": {
+    "phases_present": ["T1", "T2", "T3"],
+    "timepoints": [
+      {"label": "mid-chemotherapy", "phase": "T1"},
+      {"label": "1mo post-chemo", "phase": "T2"},
+      {"label": "6mo post-chemo", "phase": "T3"}
+    ]
+  },
+
+  "workstream_hints": ["intervention_rct", "exercise", "inflammation", "attention", "memory", "multi_cancer"],
+
+  "target_edges": [
+    "ER_ACTIVITY_IL6",
+    "ER_IL6_ATTN",
+    "ER_ACTIVITY_PROC_SPEED"
+  ],
+
+  "targeted_edges": [
+    "physical_activity -> IL-6 (exercise blunted IL-6 rise)",
+    "inflammation -> attention_executive (IL-6 x time effect on TMT-B)",
+    "physical_activity -> cognitive_processing_speed (indirect via IL-6)"
+  ],
+
+  "target_instruments": ["INST_HVLTR", "INST_TMT_B", "INST_IL6_PLASMA", "INST_CRP_HS"],
+
+  "measures_present": {
+    "biomarkers": ["plasma IL-6", "hs-CRP", "sTNF-RII"],
+    "cognition_domains": ["attention_executive", "memory"],
+    "instruments": ["HVLT-R", "TMT-B"]
+  },
+
+  "extractability": {
+    "stats_types": ["ANCOVA β (SE)", "95% CI"],
+    "uncertainty_present": true,
+    "correlation_matrix_present": false,
+    "timepoints_count": 3,
+    "practice_effects_addressed": true
+  },
+
+  "value_flags": {
+    "multi_edge_yield_est": 3,
+    "longitudinal_value": 4,
+    "multi_cancer_value": true,
+    "subgroup_modifier_value": false
+  },
+
+  "significant_findings": [
+    "Exercise group showed significantly lower IL-6 at 1mo post-chemo (p=0.02)",
+    "Better TMT-B scores at 6mo (β difference=−5.2, 95%CI −9.8 to −0.6)",
+    "Mixed models indicated IL-6 mediated exercise effects on attention"
+  ],
+  "null_findings": [],
+
+  "extraction_cues": "exercise group had significantly lower IL-6 at 1mo (p=0.02); β (SE) for IL-6->TMT-B = -0.15 (0.07), 95%CI [-0.28,-0.02]",
+  "risks": "Large multi-domain battery; no cortisol or BDNF measured.",
+  "priority_score": 95,
+
+  "pdf_status": "PENDING_DOWNLOAD",
+  "source": "manual_upload"
+}

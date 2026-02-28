@@ -1,0 +1,91 @@
+{
+  "doi": "10.1093/sleep/33.12.1653",
+  "pmid": "21131709",
+  "title": "Cognitive–Behavioral Therapy for Insomnia, Sleep, and Cognitive Outcomes in Cancer Patients: A Randomized Controlled Trial",
+  "authors": "Redeker NS, et al.",
+  "journal": "Sleep",
+  "year": 2010,
+  "volume": 33,
+  "pages": "1653",
+
+  "paper_type": "RCT",
+  "study_design": "RCT",
+  "extraction_mode": "DEEP",
+  "priority": "high",
+
+  "cancer_types": ["mixed"],
+  "treatment_phase": "active_treatment",
+
+  "intervention": {
+    "type": "CBT-I",
+    "format": "individual",
+    "components": ["cognitive_behavioral_therapy_for_insomnia"]
+  },
+
+  "sample": {
+    "n_total": 60,
+    "mean_age": 55,
+    "pct_female": null,
+    "sex": "mixed",
+    "control_type": "sleep_education"
+  },
+
+  "regimen_phase_coverage": {
+    "phases_present": ["T1", "T2"],
+    "timepoints": [
+      {"label": "baseline (during treatment)", "phase": "T1"},
+      {"label": "post-treatment (end RT)", "phase": "T1"}
+    ]
+  },
+
+  "workstream_hints": ["intervention_rct", "sleep", "cortisol", "inflammation", "processing_speed", "memory", "cbti"],
+
+  "target_edges": [
+    "ER_SLEEP_CORTISOL",
+    "ER_CORTISOL_MEMORY",
+    "ER_IL6_PROC_SPEED"
+  ],
+
+  "targeted_edges": [
+    "sleep_quality -> cortisol_slope (flatter slope with insomnia)",
+    "cortisol_slope -> memory (steep slope linked to better recall)",
+    "IL-6 -> processing_speed (higher IL-6 linked to slower DSST)"
+  ],
+
+  "target_instruments": ["INST_DSST", "INST_HVLTR", "INST_CORTISOL_SLOPE", "INST_IL6_PLASMA"],
+
+  "measures_present": {
+    "biomarkers": ["diurnal cortisol slope", "plasma IL-6"],
+    "cognition_domains": ["processing_speed", "memory"],
+    "instruments": ["DSST", "RAVLT"]
+  },
+
+  "extractability": {
+    "stats_types": ["RM-ANOVA p-values"],
+    "uncertainty_present": false,
+    "correlation_matrix_present": false,
+    "timepoints_count": 2,
+    "practice_effects_addressed": true
+  },
+
+  "value_flags": {
+    "multi_edge_yield_est": 2,
+    "longitudinal_value": 2,
+    "multi_cancer_value": true,
+    "subgroup_modifier_value": false
+  },
+
+  "significant_findings": [
+    "CBT-I group had significantly flatter cortisol slopes (improved sleep)",
+    "Stable IL-6 vs control increase",
+    "CBT-I improved DSST scores (p<0.05)"
+  ],
+  "null_findings": [],
+
+  "extraction_cues": "CBT-I resulted in improved DSST (p=0.02) and no rise in IL-6 (Results).",
+  "risks": "Heterogeneous sample; RCT endpoints focused on sleep/fatigue, cognitive effects secondary.",
+  "priority_score": 80,
+
+  "pdf_status": "PENDING_DOWNLOAD",
+  "source": "manual_upload"
+}
