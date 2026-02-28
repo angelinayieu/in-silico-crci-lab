@@ -1,0 +1,6 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1016/j.bbi.2019.04.008,NODE_COG_EPISODIC_MEM,INST_HVLTR,41.0,11.3,85,hematologic,pre_treatment,26-73
+10.1016/j.bbi.2019.04.008,NODE_COG_EPISODIC_MEM,INST_BVMTR,47.6,11.0,85,hematologic,pre_treatment,26-73
+10.1016/j.bbi.2019.04.008,NODE_COG_VERBAL_FLUENCY,INST_COWAT,45.6,11.4,85,hematologic,pre_treatment,26-73
+10.1016/j.bbi.2019.04.008,NODE_COG_ATTN_SUSTAINED,INST_DIGIT_SPAN,52.1,7.4,85,hematologic,pre_treatment,26-73
+10.1016/j.bbi.2019.04.008,NODE_COG_EXEC_PLANNING,INST_STROOP,51.0,8.3,85,hematologic,pre_treatment,26-73

@@ -218,6 +218,14 @@ class VarianceDecomposition(BaseModel):
         default_factory=dict,
         description="edge_id → variance contribution (absolute). From F3 per_edge_variance_contrib.",
     )
+    per_study_contributions: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description=(
+            "R4: Per-study variance decomposition within each edge. "
+            "{edge_id: {ler_id: variance_share}}. Weight-proportional "
+            "allocation of edge literature variance to individual studies."
+        ),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -278,6 +286,35 @@ class SensitivityReport(BaseModel):
 # ═══════════════════════════════════════════════════════════════
 
 
+class StudyContribution(BaseModel):
+    """Per-study weight attribution for a single edge (R2 provenance).
+
+    Maps each contributing study to its IVW weight percentage,
+    enabling drill-down from edge → study → paper.
+    """
+
+    ler_id: str
+    study_id: str
+    paper_ref: str | None = None
+    weight_pct: float  # normalised weight as percentage (0–100)
+    beta: float
+    se: float
+
+
+class EdgeInfluence(BaseModel):
+    """Per-edge variance contribution to the recommendation (R3 provenance).
+
+    Derived from D4c sensitivity analysis: elasticity = Corr(β_e, ΔC_top).
+    variance_contribution_pct = elasticity² / Σ(elasticity²) × 100, giving
+    the fraction of recommendation-score variance attributable to this edge.
+    """
+
+    edge_id: str
+    elasticity: float            # Corr(β_e^(m), ΔC_top^(m))
+    discovery_score: float       # |elasticity| × SE_eff
+    variance_contribution_pct: float  # R² fraction as percentage (0–100)
+
+
 class DecisionTraceEntry(BaseModel):
     """Single decision in the audit trail."""
 
@@ -289,11 +326,20 @@ class DecisionTraceEntry(BaseModel):
 
 
 class DecisionTrace(BaseModel):
-    """Full decision audit trail for transparency."""
+    """Full decision audit trail for transparency.
+
+    edge_study_map: edge_id → list of StudyContribution (R2).
+    edge_influences: edge_id → EdgeInfluence (R3).
+    When populated, enables provenance drill-down from
+    critical edges to contributing studies, papers, and
+    per-edge variance attribution.
+    """
 
     run_id: str
     entries: list[DecisionTraceEntry] = Field(default_factory=list)
     decision_critical_edges: list[str] = Field(default_factory=list)
+    edge_study_map: dict[str, list[StudyContribution]] = Field(default_factory=dict)
+    edge_influences: dict[str, EdgeInfluence] = Field(default_factory=dict)
 
 
 # ═══════════════════════════════════════════════════════════════

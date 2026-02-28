@@ -1,0 +1,39 @@
+{
+  "doi": "10.1002/cncr.30742",
+  "title": "Impact of Sleep, Fatigue and Systemic Inflammation on Neurocognitive and Behavioral Outcomes in Long-term Survivors of Childhood Acute Lymphoblastic Leukemia",
+  "authors": ["Cheung YT", "Brinkman TM", "Mulrooney DA", "Mzayek Y", "Liu W", "Banerjee P", "Panoskaltsis-Mortari A", "Srivastava D", "Pui CH", "Robison LL", "Hudson MM", "Krull KR"],
+  "year": 2017,
+  "journal": "Cancer",
+  "pmid": "",
+  "study_design": "cross_sectional",
+  "cancer_type": "pediatric_survivor",
+  "treatment_phase": "long_term_survivorship",
+  "intervention_type": "observational",
+  "n_total": 70,
+  "n_treatment": 70,
+  "n_control": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": ["ER_FATIGUE_PROCSPEED", "ER_FATIGUE_ATTN"],
+  "risk_of_bias": {
+    "randomization": "not_applicable",
+    "allocation_concealment": "not_applicable",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "low",
+    "attrition": "low",
+    "selective_reporting": "moderate",
+    "other": "high",
+    "overall": "high"
+  },
+  "notes": "Cross-sectional study of 70 childhood ALL survivors (50% male, mean age 14.3yr, 7.4yr post-diagnosis) treated on Total Therapy XV at St Jude. Chemo-only (no cranial radiation). Concurrent neurocognitive testing, behavioral ratings, sleep quality, fatigue, and serum biomarkers (IL-1beta, IL-6, TNF-alpha, hsCRP, MDA, MPO, OxLDL). ALL analyses stratified by sex. KEY FINDING: Strong sex-specific effects — females showed fatigue-cognition and inflammation-cognition associations but males did not (except TNF-alpha → organization). Survivors performed below population norms on executive function and processing speed. Inflammatory biomarker-cognition associations (IL-6, IL-1beta, hsCRP → worse exec function/processing speed in females) shown in figures as tertile comparisons only — no continuous effect sizes extractable for OIC edges. NOTE: pediatric sample may not generalize directly to adult CRCI.",
+  "effect_size_notes": "Fatigue-cognition correlations (r) converted to d via 2r/sqrt(1-r^2). N for females estimated at ~35 (half of 70, stratified by sex). Paper uses Z-score adjusted cognitive measures and GLM adjusted for age. The r=0.56 for fatigue-processing speed is from the abstract; the 0.36-0.55 range for attention covers multiple attention subtests. These are within-group associations (no control group).",
+  "inflammatory_findings": {
+    "IL6_exec_function_females": "Higher IL-6 tertile → worse cognitive flexibility and processing speed in females (Figure 3, P's<.05)",
+    "IL1beta_exec_processing_females": "Higher IL-1beta → worse organization and visual-motor processing speed in females (Figure 3, P's<.05)",
+    "hsCRP_multiple_females": "Higher hsCRP → worse executive function, processing speed, attention in females (Figure 3, P's<.05)",
+    "TNFa_organization_males": "Higher TNF-alpha → worse organization in males (P=.03)",
+    "IL1beta_fatigue": "Higher IL-1beta → greater cognitive fatigue in females (P=.002)",
+    "IL1beta_sleep": "Higher IL-1beta → longer sleep duration in females (P<.001)",
+    "note": "All biomarker analyses use tertile comparisons, not continuous regression — cannot extract continuous effect sizes"
+  },
+  "sex_specific_note": "Effects are almost exclusively in females. Extraction uses female-only n≈35, not full sample of 70."
+}

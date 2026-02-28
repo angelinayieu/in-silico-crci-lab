@@ -1,0 +1,28 @@
+{
+  "doi": "10.2196/73393",
+  "pmid": "41730204",
+  "pmcid": null,
+  "title": "The Feasibility and Acceptability of a Remotely Delivered, Combined Exercise Intervention on Cognitive Function in Patients With Breast Cancer Following Chemotherapy: Randomized Controlled Trial",
+  "journal": "JMIR Cancer",
+  "year": 2026,
+  "oa_status": "gold",
+  "publisher": "JMIR Publications Inc.",
+  "source": "manual_link_user_provided",
+  "staged_at": "2026-02-28T03:31:08.887073+00:00",
+  "arxiv_id": null,
+  "openalex_id": null,
+  "authors": "Trinh Linda, Cuda Natalie, Sabiston Catherine M, Warner Ellen, Ryan Jennifer D, Kramer Arthur F, Ha Michelle, Xiao Hui, O'Rourke Sarah, McAuley Edward",
+  "study_design": "randomized_controlled_trial",
+  "cancer_type": "breast",
+  "treatment": "post_chemotherapy_survivorship",
+  "n_total": 21,
+  "population": "Patients with breast cancer following chemotherapy in remotely delivered exercise RCT",
+  "cognitive_measures": [],
+  "biomarkers": [],
+  "extraction_edges": [
+    "ER_ACTIVITY_GLOBAL"
+  ],
+  "extraction_mode": "STANDARD",
+  "templates_filled": [],
+  "extraction_notes": "PDF provided directly by user URL (JMIR Cancer 2026; e73393). Awaiting detailed metric extraction."
+}

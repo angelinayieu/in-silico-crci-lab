@@ -1,0 +1,20 @@
+{
+  "study_id": "STUDY_CARROLL_2023",
+  "doi": "10.1200/JCO.22.00406",
+  "first_author": "Carroll",
+  "year": 2023,
+  "title": "Elevated C-Reactive Protein and Subsequent Patient-Reported Cognitive Problems in Older Breast Cancer Survivors: The Thinking and Living With Cancer Study",
+  "journal": "Journal of Clinical Oncology",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "survivorship",
+  "sample_size": 400,
+  "control_size": 329,
+  "notes": "TLC study: large prospective national cohort, up to 60 months follow-up. Random effect-lagged fluctuation model. Between-person ln-CRP × survivor interaction → FACT-Cog Total: B=-3.43, SE=1.39, p=.014. Survivors with higher CRP had worse self-reported cognition; not seen in controls. FACT-Cog scores 9.5 and 14.2 points lower at CRP of 3.0 and 10.0 mg/L. Objective neuropsych (APE domain, LM domain) NOT significant for CRP interaction. Trails B trend only. Effects unchanged by depression or anxiety. Primary outcome: self-reported cognition (FACT-Cog). Covariates: age, race, site, WRAT4, obesity, comorbidities. Stage I=60.9%, ER+=87.6%. Only 23.3% received chemotherapy.",
+  "extraction_mode": "STANDARD",
+  "null_findings": [
+    "APE (Attention/Processing Speed/Exec) domain: between-person CRP × group interaction p=.922",
+    "LM (Learning/Memory) domain: between-person CRP × group interaction p=.746",
+    "Within-person CRP fluctuations: no significant effect on any outcome"
+  ]
+}

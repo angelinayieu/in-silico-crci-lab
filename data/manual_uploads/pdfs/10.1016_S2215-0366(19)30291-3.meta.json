@@ -1,0 +1,25 @@
+{
+  "doi": "10.1016/S2215-0366(19)30291-3",
+  "title": "Cognitive function following a major depressive episode: a systematic review and meta-analysis",
+  "authors": [
+    "Semkovska M",
+    "Quinlivan L",
+    "O'Grady T"
+  ],
+  "year": 2019,
+  "journal": "Lancet Psychiatry",
+  "pmid": "31422920",
+  "study_design": "meta_analysis",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 7700,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_DEPRESSION_WORKMEM",
+    "ER_DEPRESSION_EXEC"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  },
+  "notes": "MA k=44. Depression\u2192cognition. Medium-large deficits in exec function, processing speed, memory. Relevant to depression\u2192cognition edges. Paywalled."
+}

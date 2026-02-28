@@ -1,0 +1,8 @@
+doi,instrument_id,instrument_name,instrument_subscale,cronbachs_alpha,se_alpha,test_retest_reliability,factor_loading_mean,sem_value,N,cancer_type,treatment_phase,cancer_validated,provenance_ref,notes
+10.1093/oncolo/oyae268,INST_HVLTR,Verbaler Lern- und Merkfähigkeitstest (VLMT),Verbal Learning,,,,,,53,breast,active_treatment,true,Table 1,German equivalent of HVLT-R/AVLT
+10.1093/oncolo/oyae268,INST_BVMTR,Rey-Osterrieth Complex Figure Test,Figural Memory,,,,,,53,breast,active_treatment,true,Table 1,
+10.1093/oncolo/oyae268,INST_TMT_B,Trail Making Test A and B,Attention/Executive,,,,,,53,breast,active_treatment,true,Table 1,
+10.1093/oncolo/oyae268,INST_STROOP,Stroop Color and Word Test,Executive Function,,,,,,53,breast,active_treatment,true,Table 1,
+10.1093/oncolo/oyae268,INST_DIGIT_SPAN,Digit Span Backwards,Working Memory,,,,,,53,breast,active_treatment,true,Table 1,
+10.1093/oncolo/oyae268,INST_FACTCOG_PCI,FACT-Cog,Perceived Cognitive Impairment,,,,,,53,breast,active_treatment,true,Table 1,
+10.1093/oncolo/oyae268,INST_NFL_PLASMA,Neurofilament Light Chain,,,,,,,53,breast,active_treatment,true,Methods,NfL measured in serum

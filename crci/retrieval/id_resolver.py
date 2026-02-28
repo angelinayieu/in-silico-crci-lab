@@ -90,6 +90,9 @@ def _fetch_ncbi_id_mapping(
                 # Use first available ID as key
                 key = record.get("pmid", record.get("pmcid", ""))
             if key:
+                # Normalize key: lowercase DOIs for consistent lookup
+                if id_type == "doi":
+                    key = key.strip().lower()
                 results[key] = {
                     "doi": record.get("doi", ""),
                     "pmid": record.get("pmid", ""),
@@ -352,21 +355,25 @@ def resolve_candidate_ids(
 
     for idx, doi in doi_only:
         resolved = doi_map.get(doi, {})
-        if resolved.get("pmid") or resolved.get("pmcid"):
+        r_pmid = str(resolved.get("pmid", "") or "").strip()
+        r_pmcid = str(resolved.get("pmcid", "") or "").strip()
+        if r_pmid or r_pmcid:
             cand = enriched[idx]
             enriched[idx] = cand.model_copy(update={
-                "pmid": resolved.get("pmid") or cand.pmid,
-                "pmcid": resolved.get("pmcid") or cand.pmcid,
+                "pmid": r_pmid or cand.pmid,
+                "pmcid": r_pmcid or cand.pmcid,
             })
             resolved_count += 1
 
     for idx, pmid in pmid_only:
         resolved = pmid_map.get(pmid, {})
-        if resolved.get("doi") or resolved.get("pmcid"):
+        r_doi = str(resolved.get("doi", "") or "").strip()
+        r_pmcid = str(resolved.get("pmcid", "") or "").strip()
+        if r_doi or r_pmcid:
             cand = enriched[idx]
             enriched[idx] = cand.model_copy(update={
-                "doi": resolved.get("doi") or cand.doi,
-                "pmcid": resolved.get("pmcid") or cand.pmcid,
+                "doi": r_doi or cand.doi,
+                "pmcid": r_pmcid or cand.pmcid,
             })
             resolved_count += 1
 

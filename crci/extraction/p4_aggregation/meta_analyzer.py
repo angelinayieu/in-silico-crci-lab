@@ -29,6 +29,7 @@ from crci.shared.models.intermediate_states import (
     HarmonizedClaim,
     PooledEstimate,
     ResolvedEvidence,
+    StudyWeight,
 )
 
 logger = logging.getLogger(__name__)
@@ -697,6 +698,7 @@ def pool_evidence(
             total_n=resolved.total_n,
             aggregation_method="BLOCKED",
             individual_weights=[],
+            study_weights=[],
         )
         return MetaAnalysisResult(
             pooled_estimate=pooled,
@@ -742,6 +744,7 @@ def pool_evidence(
             total_n=resolved.total_n,
             aggregation_method="BLOCKED",
             individual_weights=[],
+            study_weights=[],
         )
         return MetaAnalysisResult(
             pooled_estimate=pooled,
@@ -759,6 +762,17 @@ def pool_evidence(
         tau_sq = 0.0
         i_sq = 0.0
         weights = [1.0]
+        # R1 provenance: single study gets weight 1.0
+        _study_weights = [
+            StudyWeight(
+                ler_id=valid_claims[0].ler_id,
+                study_id=valid_claims[0].study_id,
+                weight=1.0,
+                weight_normalized=1.0,
+                beta=betas[0],
+                se=ses[0],
+            )
+        ]
         logger.info(
             "Edge %s: k=1 -> DIRECT, beta=%.4f, SE=%.4f",
             edge_id,
@@ -812,6 +826,7 @@ def pool_evidence(
                 total_n=resolved.total_n,
                 aggregation_method="BLOCKED",
                 individual_weights=[],
+                study_weights=[],
             )
             return MetaAnalysisResult(
                 pooled_estimate=pooled,
@@ -876,6 +891,22 @@ def pool_evidence(
         p_inclusion_adjustment=annotation_influence.p_inclusion_adjustment,
     )
 
+    # R1 provenance: build identified study weights for k>=2 paths
+    # (_study_weights already built for k=1 DIRECT path above)
+    if effective_k >= 2:
+        sum_w = sum(weights) if weights else 1.0
+        _study_weights = [
+            StudyWeight(
+                ler_id=c.ler_id,
+                study_id=c.study_id,
+                weight=w,
+                weight_normalized=w / sum_w if sum_w > 0 else 0.0,
+                beta=c.harmonized_beta,
+                se=c.harmonized_se if c.harmonized_se is not None else 0.0,
+            )
+            for c, w in zip(valid_claims, weights)
+        ]
+
     pooled = PooledEstimate(
         edge_relation_id=edge_id,
         beta_pooled=beta_pooled,
@@ -886,6 +917,7 @@ def pool_evidence(
         total_n=resolved.total_n,
         aggregation_method=method,
         individual_weights=weights,
+        study_weights=_study_weights,
     )
 
     sign_conflict = _has_sign_conflict_among_high_quality(valid_claims) if effective_k >= 2 else False

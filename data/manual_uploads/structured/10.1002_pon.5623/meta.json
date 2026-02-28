@@ -1,0 +1,22 @@
+{
+  "doi": "10.1002/pon.5623",
+  "title": "Prevalence of cognitive impairment and change in patients with breast cancer: A systematic review of longitudinal studies",
+  "authors": [
+    "Dijkshoorn ABC",
+    "et al."
+  ],
+  "year": 2021,
+  "journal": "Psycho-Oncology",
+  "study_design": "meta_analysis",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "extraction_mode": "STANDARD",
+  "n_total": 10615,
+  "targeted_edges": [
+    "ER_ATTNSUST_CRCI",
+    "ER_PROCSPD_CRCI"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  }
+}

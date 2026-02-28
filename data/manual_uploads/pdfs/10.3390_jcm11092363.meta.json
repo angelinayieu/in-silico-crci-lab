@@ -1,0 +1,24 @@
+{
+  "doi": "10.3390/jcm11092363",
+  "title": "Chemotherapy-Related Cognitive Impairment in Patients with Breast Cancer Based on Functional Assessment and NIRS Analysis",
+  "authors": [
+    "Dur\u00e1n-G\u00f3mez N",
+    "et al."
+  ],
+  "year": 2022,
+  "journal": "Journal of Clinical Medicine",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "extraction_mode": "STANDARD",
+  "n_total": 180,
+  "n_treatment": 90,
+  "n_control": 90,
+  "targeted_edges": [
+    "ER_DEPRESSION_COGCOMPLAINTS",
+    "ER_OIC_VERBAL"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  }
+}

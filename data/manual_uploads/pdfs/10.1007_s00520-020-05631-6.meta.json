@@ -1,0 +1,24 @@
+{
+  "doi": "10.1007/s00520-020-05631-6",
+  "title": "Path analysis of survivorship care needs, symptom experience, and quality of life among multiethnic cancer survivors",
+  "authors": [
+    "Ang WHD",
+    "Lau Y",
+    "Chong YY"
+  ],
+  "year": 2021,
+  "journal": "Support Care Cancer",
+  "pmid": "32676855",
+  "study_design": "cross_sectional",
+  "cancer_type": "mixed",
+  "treatment_phase": "long_term_survivorship",
+  "n_total": 213,
+  "extraction_mode": "SHALLOW",
+  "targeted_edges": [
+    "ER_FATIGUE_ATTN"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=213 multiethnic cancer survivors. Path model: symptoms\u2192care needs\u2192QoL. Symptom clusters including cognitive. Paywalled."
+}

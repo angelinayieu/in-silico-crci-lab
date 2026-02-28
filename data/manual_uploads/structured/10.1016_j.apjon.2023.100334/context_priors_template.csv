@@ -1,0 +1,3 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1016/j.apjon.2023.100334,NODE_SYM_COG_COMPLAINTS,breast,mixed,-0.40,0.50,published_norm,1,"Clinical review: CRCI affects 30-40% of patients; manifests as memory lapses difficulty concentrating reduced processing speed"
+10.1016/j.apjon.2023.100334,NODE_COG_PROC_SPEED,mixed,mixed,-0.45,0.55,published_norm,1,"Processing speed and executive function most commonly impaired domains in CRCI"

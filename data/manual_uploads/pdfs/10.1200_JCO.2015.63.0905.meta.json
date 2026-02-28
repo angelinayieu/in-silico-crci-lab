@@ -1,0 +1,61 @@
+{
+  "doi": "10.1200/JCO.2015.63.0905",
+  "title": "Cognitive Function in Patients With Colorectal Cancer Who Do and Do Not Receive Chemotherapy: A Prospective, Longitudinal, Controlled Study",
+  "authors": ["Vardy JL", "Dhillon HM", "Pond GR", "Rourke SB", "Bekele T", "Renton C", "Dodd A", "Zhang H", "Beale P", "Clarke S", "Tannock IF"],
+  "year": 2015,
+  "journal": "Journal of Clinical Oncology",
+  "pmid": "",
+  "study_design": "cohort",
+  "cancer_type": "colorectal",
+  "treatment_phase": "active_treatment",
+  "intervention_type": "observational",
+  "n_total": 434,
+  "n_treatment": 362,
+  "n_control": 72,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": ["ER_OIC_PROCSPEED"],
+  "risk_of_bias": {
+    "randomization": "not_applicable",
+    "allocation_concealment": "not_applicable",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "low",
+    "attrition": "moderate",
+    "selective_reporting": "low",
+    "other": "moderate",
+    "overall": "moderate"
+  },
+  "notes": "Large prospective longitudinal controlled study comparing CRC patients (289 localized: 173 CTh+, 116 CTh-; 73 metastatic) to 72 healthy controls. Assessments at baseline, 6, 12, 24 months. Key finding: 43% CRC vs 15% HC cognitively impaired at baseline, persistent at 24mo. NO significant difference between chemotherapy and no-chemotherapy groups on objective cognitive function. Cytokines elevated in CRC vs HC but NOT associated with global cognitive function; ONLY processing speed domain showed cytokine association (IL-6, IL-8, IL-10, IL-12; rho=0.18-0.40). APOE E4 allele not associated with cognitive function. Low estradiol in women associated with cognitive impairment (rho=0.29, P<.001). Self-reported cognitive impairment higher in CTh+ at 6mo (32% vs 16%, P=.007) but not at 12mo. GDS method from HIV/Carey et al. for impairment classification.",
+  "effect_size_notes": "Cytokine-processing speed correlations are Spearman rho, bivariate/unadjusted. Range rho=0.18-0.40 for IL-6, IL-8, IL-10, IL-12 individually with processing speed. Midpoint rho=0.29 used. SE calculated as sqrt((1-r^2)/(N-2)) with N=362. These are individual cytokine correlations used as proxy for composite OIC-processing speed association. Global cognition (GDS) showed NULL association with cytokines.",
+  "null_findings": {
+    "cytokines_vs_global_cognition": "No significant association between cytokine levels and global cognitive function (GDS or CANTAB GDS)",
+    "chemotherapy_vs_cognition": "No significant difference in cognitive impairment between CTh+ and CTh- groups at any timepoint",
+    "APOE_vs_cognition": "No association between E4 allele and any cognitive measure",
+    "cytokines_vs_fatigue_anxiety_QOL": "Fatigue, anxiety/depression, QOL not associated with objective neuropsychological performance (but associated with subjective cognitive symptoms)"
+  },
+  "cytokine_data": {
+    "note": "CRC patients had significantly higher levels of most cytokines vs HCs; CTh+ had highest (higher stage disease). Several cytokines remained elevated long-term without disease recurrence. Specific cytokine levels not reported in main text (in Data Supplement).",
+    "IL6_IL8_IL10_IL12_procspeed_rho_range": "0.18-0.40",
+    "IL6_IL8_IL10_IL12_procspeed_direction": "higher cytokines → lower processing speed"
+  },
+  "cognitive_data": {
+    "CRC_localized_baseline_GlobalT_mean": 45.6,
+    "CRC_localized_baseline_GlobalT_SD": 7.4,
+    "CRC_localized_baseline_GlobalT_N": 289,
+    "HC_baseline_GlobalT_mean": 49.9,
+    "HC_baseline_GlobalT_SD": 6.0,
+    "HC_baseline_GlobalT_N": 72,
+    "CRC_localized_baseline_GDS_mean": 0.62,
+    "CRC_localized_baseline_GDS_SD": 0.60,
+    "HC_baseline_GDS_mean": 0.25,
+    "HC_baseline_GDS_SD": 0.39,
+    "CRC_impairment_rate_baseline_GDS": "43%",
+    "HC_impairment_rate_baseline_GDS": "15%",
+    "domains_impaired": ["processing speed", "verbal learning and memory", "attention and working memory"]
+  },
+  "estradiol_data": {
+    "rho_estradiol_globalcog_women": 0.29,
+    "p_value": "<0.001",
+    "rho_estradiol_procspeed_range": "0.20-0.38",
+    "note": "In women only. Low estradiol associated with impairment. Not extracted as edge evidence because no SEX_HORMONES→COG edge in registry."
+  }
+}

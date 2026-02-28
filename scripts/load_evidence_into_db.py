@@ -144,14 +144,52 @@ _SEED_DOI_MAP = {
 def _doi_slug_to_doi(slug: str) -> str:
     """Convert folder slug (e.g. '10.1002_pon.4370') → DOI ('10.1002/pon.4370').
 
-    Convention: the first '_' after the DOI prefix (e.g. '10.XXXX') is '/',
-    all subsequent underscores stay as-is (some journals have underscores in paths).
-    However, most DOIs use '/' only once, so we replace the first '_' with '/'.
+    First checks for a meta.json in the structured folder — if it contains
+    a 'doi' field, that is authoritative (avoids ambiguity with multi-slash DOIs
+    like 10.1093/jncics/pkaf105 whose slug is 10.1093_jncics_pkaf105).
+
+    Fallback heuristic: replace ALL underscores with '/' then look for known
+    DOI registrant prefixes (10.XXXX/) to reconstruct the DOI.  For simple
+    single-slash DOIs the first '_' is the slash; for OUP-style double-slash
+    DOIs we detect the pattern.
     """
-    # DOI format: 10.XXXX/suffix — the first underscore is always the slash
+    # Authoritative: check meta.json in structured folder first
+    meta_path = (
+        PROJECT_ROOT / "data" / "manual_uploads" / "structured" / slug / "meta.json"
+    )
+    if meta_path.exists():
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+            if "doi" in meta and meta["doi"]:
+                return meta["doi"]
+        except (json.JSONDecodeError, KeyError, OSError):
+            pass
+
+    # Also check flat meta.json in pdfs/ dir (older convention)
+    flat_meta = PROJECT_ROOT / "data" / "manual_uploads" / "pdfs" / f"{slug}.meta.json"
+    if flat_meta.exists():
+        try:
+            with open(flat_meta) as f:
+                meta = json.load(f)
+            if "doi" in meta and meta["doi"]:
+                return meta["doi"]
+        except (json.JSONDecodeError, KeyError, OSError):
+            pass
+
+    # Heuristic fallback: first '_' is always '/'
     idx = slug.find("_")
     if idx >= 0:
-        return slug[:idx] + "/" + slug[idx + 1:]
+        prefix = slug[:idx]  # e.g. "10.1093"
+        suffix = slug[idx + 1:]  # e.g. "jncics_pkaf105"
+        # For known multi-level DOI registrants, also replace 2nd underscore
+        # OUP journals: 10.1093/{journal}/{article}  — always 3-part
+        multi_slash_prefixes = {"10.1093"}
+        if prefix in multi_slash_prefixes:
+            idx2 = suffix.find("_")
+            if idx2 >= 0:
+                return prefix + "/" + suffix[:idx2] + "/" + suffix[idx2 + 1:]
+        return prefix + "/" + suffix
     return slug
 
 
@@ -162,26 +200,31 @@ def _doi_to_study_id(doi: str) -> str:
     otherwise generates from DOI suffix.
     E.g. '10.1002/pon.4370' → 'STUDY_PON_4370'
     """
-    # Check if there's a meta.json in the structured dir for this DOI
     doi_slug = doi.replace("/", "_")
+
+    # Check meta.json in structured dir
     meta_path = PROJECT_ROOT / "data" / "manual_uploads" / "structured" / doi_slug / "meta.json"
-    if meta_path.exists():
-        try:
-            with open(meta_path) as f:
-                meta = json.load(f)
-            if "study_id" in meta:
-                return meta["study_id"]
-            # Auto-derive from first_author + year
-            author = meta.get("first_author", "").upper().replace(" ", "_")
-            year = meta.get("year", "")
-            if author and year:
-                return f"STUDY_{author}_{year}"
-        except (json.JSONDecodeError, KeyError):
-            pass
+    # Also check flat meta.json in pdfs/ dir (older convention)
+    flat_meta = PROJECT_ROOT / "data" / "manual_uploads" / "pdfs" / f"{doi_slug}.meta.json"
+
+    for mp in [meta_path, flat_meta]:
+        if mp.exists():
+            try:
+                with open(mp) as f:
+                    meta = json.load(f)
+                if "study_id" in meta:
+                    return meta["study_id"]
+                # Auto-derive from first_author + year
+                author = meta.get("first_author", "").upper().replace(" ", "_")
+                year = meta.get("year", "")
+                if author and year:
+                    return f"STUDY_{author}_{year}"
+            except (json.JSONDecodeError, KeyError):
+                pass
 
     # Fallback: derive from DOI suffix
     suffix = doi.split("/", 1)[-1] if "/" in doi else doi
-    clean = suffix.upper().replace(".", "_").replace("-", "_")
+    clean = suffix.upper().replace("/", "_").replace(".", "_").replace("-", "_")
     return f"STUDY_{clean}"
 
 
@@ -226,9 +269,19 @@ def _discover_doi_to_study_map() -> dict[str, str]:
             except (json.JSONDecodeError, KeyError):
                 pass
 
-        # No meta.json — check if edge_evidence_template.csv exists
-        csv_path = subdir / "edge_evidence_template.csv"
-        if csv_path.exists():
+        # No meta.json — check if any known evidence CSV exists
+        known_csvs = [
+            "edge_evidence_template.csv",
+            "context_priors_template.csv",
+            "population_norms_template.csv",
+            "temporal_evidence_template.csv",
+            "instrument_evidence_template.csv",
+            "correlation_template.csv",
+            "dose_evidence_template.csv",
+            "subgroup_evidence_template.csv",
+        ]
+        has_csv = any((subdir / csv_name).exists() for csv_name in known_csvs)
+        if has_csv:
             study_id = _doi_to_study_id(doi)
             mapping[doi] = study_id
             logger.info(
@@ -811,7 +864,7 @@ def _discover_studies() -> list[dict]:
                 studies_by_id[study_id] = {
                     "study_id": study_id,
                     "title": meta.get("title", f"Paper {doi}"),
-                    "authors": meta.get("authors", "Unknown"),
+                    "authors": ", ".join(meta["authors"]) if isinstance(meta.get("authors"), list) else meta.get("authors", "Unknown"),
                     "journal": meta.get("journal", "Unknown"),
                     "year": meta.get("year", 0),
                     "doi": doi,
@@ -1846,14 +1899,43 @@ def apply_se_eff_calibration(engine, dry_run: bool = False) -> int:
     cancer_lookup = _build_cancer_validation_lookup()
 
     with engine.begin() as conn:
-        # Fetch all active evidence with harmonized values
+        # ── IDEMPOTENCY FIX: Ensure se_raw_pre_calibration column exists ──
+        # This column stores the original SE value BEFORE any P3-8 calibration.
+        # On repeated runs, we always read from this column (not harmonized_se)
+        # so the calibration is applied exactly once, not compounded.
+        try:
+            conn.execute(text(
+                "ALTER TABLE edge_evidence_v1 "
+                "ADD COLUMN se_raw_pre_calibration REAL"
+            ))
+            logger.info("Added se_raw_pre_calibration column to edge_evidence_v1")
+        except Exception:
+            pass  # Column already exists
+
+        # Snapshot: for any row that hasn't been snapshotted yet,
+        # save the current harmonized_se as the pre-calibration baseline.
+        snapshotted = conn.execute(text("""
+            UPDATE edge_evidence_v1
+            SET se_raw_pre_calibration = harmonized_se
+            WHERE se_raw_pre_calibration IS NULL
+              AND harmonized_se IS NOT NULL
+              AND active = 1
+        """)).rowcount
+        if snapshotted:
+            logger.info(
+                "Snapshotted se_raw_pre_calibration for %d rows", snapshotted
+            )
+
+        # Fetch all active evidence — use se_raw_pre_calibration as SE input.
+        # Skip rows already calibrated (notes contain '[SE_eff P3-8]')
+        # to avoid redundant work and duplicate audit notes on re-runs.
         rows = conn.execute(text("""
             SELECT
                 ee.ler_id,
                 ee.edge_relation_id,
                 ee.study_id,
                 ee.harmonized_beta,
-                ee.harmonized_se,
+                ee.se_raw_pre_calibration,
                 ee.N_effect,
                 ee.quality_rating,
                 ee.study_design,
@@ -1865,8 +1947,9 @@ def apply_se_eff_calibration(engine, dry_run: bool = False) -> int:
             FROM edge_evidence_v1 ee
             WHERE ee.active = 1
               AND ee.harmonized_beta IS NOT NULL
-              AND ee.harmonized_se IS NOT NULL
-              AND ee.harmonized_se > 0
+              AND ee.se_raw_pre_calibration IS NOT NULL
+              AND ee.se_raw_pre_calibration > 0
+              AND (ee.notes IS NULL OR ee.notes NOT LIKE '%[SE_eff P3-8]%')
         """)).fetchall()
 
         if not rows:
@@ -1882,11 +1965,13 @@ def apply_se_eff_calibration(engine, dry_run: bool = False) -> int:
             edge_groups[eid].append(row)
 
         # Per-edge grouped betas/SEs for L3 (DerSimonian-Laird τ²/I²)
+        # CRITICAL: Use se_raw_pre_calibration (col 4), NOT harmonized_se,
+        # so heterogeneity computation uses original uncalibrated SEs.
         edge_betas: dict[str, list[float]] = {}
         edge_ses: dict[str, list[float]] = {}
         for eid, group in edge_groups.items():
             edge_betas[eid] = [r[3] for r in group]  # harmonized_beta
-            edge_ses[eid] = [r[4] for r in group]     # harmonized_se
+            edge_ses[eid] = [r[4] for r in group]     # se_raw_pre_calibration
 
         # Look up DOI for each study_id (for cancer validation CSV lookup)
         study_doi_map: dict[str, str] = {}
@@ -1944,6 +2029,14 @@ def apply_se_eff_calibration(engine, dry_run: bool = False) -> int:
 
             # ── L5: GRADE quality ──
             qr = (quality_rating or "moderate").strip().upper()
+            # Detect year values accidentally stored as quality_rating
+            if qr.isdigit() and len(qr) == 4:
+                logger.warning(
+                    "L5: quality_rating '%s' looks like a year for %s; "
+                    "defaulting to MODERATE",
+                    qr, ler_id,
+                )
+                qr = "MODERATE"
             grade_level = qr if qr in ("HIGH", "MODERATE", "LOW", "VERY_LOW") else "MODERATE"
 
             # ── Build SEEffInput ──

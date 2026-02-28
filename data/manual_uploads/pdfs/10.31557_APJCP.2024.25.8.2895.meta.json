@@ -1,0 +1,14 @@
+{
+  "title": "Effect of Pilates exercise on cortisol awakening response in colorectal cancer patients",
+  "authors": "Thai Clinical Trial (Pilates CRC)",
+  "year": 2024,
+  "journal": "Asian Pacific Journal of Cancer Prevention",
+  "pmcid": "PMC11495429",
+  "cancer_type": "colorectal",
+  "sample_size": 30,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "B"
+  ],
+  "topology_fill": "Slice-1"
+}

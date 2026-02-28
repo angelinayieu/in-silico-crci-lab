@@ -1,0 +1,44 @@
+{
+  "doi": "10.1016/j.jneuroim.2016.11.002",
+  "title": "Relationship of Systemic Cytokine Concentrations to Cognitive Function over Two Years in Women with Early Stage Breast Cancer",
+  "authors": ["Lyon DE", "Cohen R", "Chen H", "Kelly DL", "McCain NL", "Starkweather A", "Sturgill J", "Jackson-Cook CK"],
+  "year": 2016,
+  "journal": "Journal of Neuroimmunology",
+  "pmid": "",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "long_term_survivorship",
+  "intervention_type": "observational",
+  "n_total": 75,
+  "n_treatment": 75,
+  "n_control": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": ["ER_OIC_PROCSPEED", "ER_OIC_ATTNSUST"],
+  "risk_of_bias": {
+    "randomization": "not_applicable",
+    "allocation_concealment": "not_applicable",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "low",
+    "attrition": "moderate",
+    "selective_reporting": "high",
+    "other": "high",
+    "overall": "high"
+  },
+  "notes": "Longitudinal cohort of 75 women with early-stage breast cancer (stages I-IIIA), assessed 5 times over 2 years (pre-chemo through 2yr post-chemo). NO healthy control group. 17-plex cytokine panel (IL-1beta, IL-2, IL-4, IL-5, IL-6, IL-7, IL-8, IL-10, IL-12, IL-13, IL-17, G-CSF, GM-CSF, IFN-gamma, MCP-1, MIP-1beta, TNF-alpha). Cognitive assessment: CNS Vital Signs (CNSVS) computerized battery with domains: psychomotor speed, complex attention, reaction time, cognitive flexibility, executive function, composite memory, verbal memory, visual memory. Backward AIC model selection used — HIGH risk of overfitting and multiple testing (17 cytokines x 7+ domains x 5 timepoints, no correction). Key findings: TNF-alpha and MCP-1 inversely associated with psychomotor speed at 2yr; MCP-1 inversely associated with complex attention at 2yr. Cytokine patterns changed over time with 3 distinct trajectories. NOTE: 79% received radiation, 44% on hormonal therapy by T5. Majority received TAC chemotherapy.",
+  "effect_size_notes": "Betas are from backward AIC regression of log-transformed cytokine concentrations to CNSVS standard scores (mean=100, SD=15). Converted t-values to partial_r via t/sqrt(t^2+df), then to d via 2r/sqrt(1-r^2). N at T5 estimated at ~55 (75 enrolled minus attrition). These are partial/adjusted effects. df estimated from N - predictors - 1.",
+  "cytokine_data": {
+    "panel": "Bio-Plex Human Cytokine 17-plex",
+    "cytokines_measured": ["IL-1beta", "IL-2", "IL-4", "IL-5", "IL-6", "IL-7", "IL-8", "IL-10", "IL-12", "IL-13", "IL-17", "G-CSF", "GM-CSF", "IFN-gamma", "MCP-1", "MIP-1beta", "TNF-alpha"],
+    "six_significant_change_over_time": ["IL-6", "IL-12", "IL-17", "G-CSF", "MIP-1beta", "MCP-1"],
+    "IL6_trajectory": "increased during chemo then decreased below baseline",
+    "IL17_trajectory": "consistently declined from baseline",
+    "MCP1_trajectory": "increased during chemo, still elevated at 2yr relative to baseline"
+  },
+  "cognitive_instrument": "CNS Vital Signs (CNSVS) computerized neurocognitive battery",
+  "timepoints": ["T1: pre-chemo", "T2: mid-chemo", "T3: 6mo post-chemo start", "T4: 1yr post-chemo start", "T5: 2yr post-chemo start"],
+  "extraction_decisions": {
+    "T5_selected": "Used T5 (2-year) results as most relevant for long-term survivorship effects and least confounded by acute treatment effects",
+    "TNF_selected_for_OIC": "TNF-alpha is prototypical OIC component; selected over MCP-1 for ER_OIC_PROCSPEED to avoid double-counting within same study/model",
+    "N_estimate": "N at T5 estimated at 55 based on typical 27% 2-year attrition from N=75; paper does not report exact N at each timepoint"
+  }
+}

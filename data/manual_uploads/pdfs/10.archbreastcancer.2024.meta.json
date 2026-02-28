@@ -1,0 +1,20 @@
+{
+  "doi": "10.archbreastcancer.2024",
+  "title": "Neoadjuvant Chemotherapy Response Prediction in Breast Cancer",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2024,
+  "journal": "Arch Breast Cancer",
+  "pmid": "",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Predicting neoadjuvant chemo tumor response. Not cognitive impairment."
+}

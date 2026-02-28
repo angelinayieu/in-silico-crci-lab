@@ -1,0 +1,15 @@
+{
+  "title": "Yoga retreat and BDNF, cortisol, and inflammatory biomarkers",
+  "authors": "Cahn BR, Goodman MS, Peterson CT, Maturi R, Mills PJ",
+  "year": 2017,
+  "journal": "Frontiers in Human Neuroscience",
+  "pmcid": "PMC5483482",
+  "cancer_type": "healthy_volunteers",
+  "sample_size": 38,
+  "extraction_mode": "SHALLOW",
+  "bridge_edges": [
+    "C"
+  ],
+  "topology_fill": "Slice-1",
+  "notes": "Non-cancer sample \u2014 topology-only evidence for cortisol\u2192BDNF bridge"
+}

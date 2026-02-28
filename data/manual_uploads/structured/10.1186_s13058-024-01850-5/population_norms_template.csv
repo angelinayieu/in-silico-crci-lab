@@ -1,0 +1,6 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1186/s13058-024-01850-5,NODE_COG_EPISODIC_MEM,INST_HVLTR,-0.11,0.81,200,breast,active_treatment,28-83
+10.1186/s13058-024-01850-5,NODE_COG_WORK_MEM,INST_DIGIT_SPAN,-0.46,0.72,200,breast,active_treatment,28-83
+10.1186/s13058-024-01850-5,NODE_COG_PROC_SPEED,INST_TMT_B,-0.34,0.74,200,breast,active_treatment,28-83
+10.1186/s13058-024-01850-5,NODE_COG_ATTN_SUSTAINED,INST_CPT,-0.33,0.92,200,breast,active_treatment,28-83
+10.1186/s13058-024-01850-5,NODE_COG_EXEC_PLANNING,INST_STROOP,-0.09,0.61,200,breast,active_treatment,28-83

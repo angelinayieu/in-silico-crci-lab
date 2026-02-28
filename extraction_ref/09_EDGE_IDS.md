@@ -80,8 +80,10 @@
 |---------|----------------|------|------|
 | `ER_IL6_OIC` | NODE_BIO_IL6 → NODE_PATH_OIC | causal | positive |
 | `ER_CRP_OIC` | NODE_BIO_CRP → NODE_PATH_OIC | assoc | positive |
-| `ER_TNF_OIC` | NODE_BIO_TNF → NODE_PATH_OIC | causal | positive |
-| `ER_8OHDG_OIC` | NODE_BIO_8OHDG → NODE_PATH_OIC | assoc | positive |
+| `ER_TNF_OIC` | NODE_BIO_TNF → NODE_PATH_OIC | causal | positive || `ER_IL8_OIC` | NODE_BIO_IL8 → NODE_PATH_OIC | causal | positive |
+| `ER_IL10_OIC` | NODE_BIO_IL10 → NODE_PATH_OIC | assoc | negative |
+| `ER_MCP1_OIC` | NODE_BIO_MCP1 → NODE_PATH_OIC | causal | positive |
+| `ER_STNFR2_OIC` | NODE_BIO_STNFR2 → NODE_PATH_OIC | assoc | positive || `ER_8OHDG_OIC` | NODE_BIO_8OHDG → NODE_PATH_OIC | assoc | positive |
 | `ER_MDA_OIC` | NODE_BIO_MDA → NODE_PATH_OIC | assoc | positive |
 | `ER_BDNF_NEUROPLAST` | NODE_BIO_BDNF → NODE_PATH_NEUROPLASTICITY | causal | positive |
 | `ER_BDNF_NEUROGENESIS` | NODE_BIO_BDNF → NODE_PATH_NEUROGENESIS | causal | positive |
@@ -92,9 +94,17 @@
 | `ER_GLUCOSE_METABOLIC` | NODE_BIO_GLUCOSE → NODE_PATH_METABOLIC | causal | positive |
 | `ER_NFL_BBB` | NODE_BIO_NFL → NODE_PATH_BBB | assoc | — |
 | `ER_NFL_MYELIN` | NODE_BIO_NFL → NODE_PATH_MYELIN | assoc | negative |
-| `ER_IL6_BDNF_CROSS` | NODE_BIO_IL6 → NODE_BIO_BDNF | assoc | negative |
+## Layer 2 → Layer 2: Biomarker → Biomarker Cross-Edges (6 edges)
 
-## Layer 3 → Layer 3: Pathway → Pathway (6 edges)
+| Edge ID | Source → Target | Type | Sign |
+|---------|----------------|------|------|
+| `ER_IL6_BDNF_CROSS` | NODE_BIO_IL6 → NODE_BIO_BDNF | assoc | negative |
+| `ER_IL4_BDNF_CROSS` | NODE_BIO_IL4 → NODE_BIO_BDNF | assoc | positive |
+| `ER_IFNG_BDNF_CROSS` | NODE_BIO_IFNG → NODE_BIO_BDNF | assoc | negative |
+| `ER_TNF_BDNF_CROSS` | NODE_BIO_TNF → NODE_BIO_BDNF | assoc | negative |
+| `ER_IL10_BDNF_CROSS` | NODE_BIO_IL10 → NODE_BIO_BDNF | assoc | positive |
+
+## Layer 2 → Layer 3: Biomarker → Pathway (18 edges)
 
 | Edge ID | Source → Target | Type | Sign |
 |---------|----------------|------|------|
@@ -122,7 +132,7 @@
 | `ER_OIC_COGCOMPLAINTS` | NODE_PATH_OIC → NODE_SYM_COG_COMPLAINTS | assoc | positive |
 | `ER_METABOLIC_DECONDITIONING` | NODE_PATH_METABOLIC → NODE_SYM_DECONDITIONING | assoc | positive |
 
-## Layer 3 → Layer 5: Pathway → Cognition (12 edges)
+## Layer 3 → Layer 5: Pathway → Cognition (16 edges)
 
 | Edge ID | Source → Target | Type | Sign |
 |---------|----------------|------|------|
@@ -130,8 +140,13 @@
 | `ER_OIC_WORKMEM` | NODE_PATH_OIC → NODE_COG_WORK_MEM | causal | negative |
 | `ER_OIC_EPISODIC` | NODE_PATH_OIC → NODE_COG_EPISODIC_MEM | causal | negative |
 | `ER_OIC_ATTNSUST` | NODE_PATH_OIC → NODE_COG_ATTN_SUSTAINED | causal | negative |
+| `ER_OIC_EXECPLAN` | NODE_PATH_OIC → NODE_COG_EXEC_PLANNING | causal | negative |
+| `ER_OIC_VERBAL` | NODE_PATH_OIC → NODE_COG_VERBAL_FLUENCY | assoc | negative |
+| `ER_OIC_MULTITASK` | NODE_PATH_OIC → NODE_COG_MULTITASKING | causal | negative |
 | `ER_NEUROPLAST_EPISODIC` | NODE_PATH_NEUROPLASTICITY → NODE_COG_EPISODIC_MEM | causal | positive |
 | `ER_NEUROPLAST_WORKMEM` | NODE_PATH_NEUROPLASTICITY → NODE_COG_WORK_MEM | mech | positive |
+| `ER_NEUROPLAST_PROCSPEED` | NODE_PATH_NEUROPLASTICITY → NODE_COG_PROC_SPEED | mech | positive |
+| `ER_NEUROPLAST_ATTN` | NODE_PATH_NEUROPLASTICITY → NODE_COG_ATTN_SUSTAINED | mech | positive |
 | `ER_NEUROGENESIS_EPISODIC` | NODE_PATH_NEUROGENESIS → NODE_COG_EPISODIC_MEM | mech | positive |
 | `ER_SYNAPTIC_PROCSPEED` | NODE_PATH_SYNAPTIC → NODE_COG_PROC_SPEED | mech | positive |
 | `ER_SYNAPTIC_WORKMEM` | NODE_PATH_SYNAPTIC → NODE_COG_WORK_MEM | mech | positive |
@@ -203,7 +218,7 @@
 | `ER_ACTIVITY_WORKMEM` | NODE_BEH_PHYSICAL_ACTIVITY → NODE_COG_WORK_MEM | causal | positive |
 | `ER_ACTIVITY_EXEC` | NODE_BEH_PHYSICAL_ACTIVITY → NODE_COG_EXEC_PLANNING | causal | positive |
 
-## Layer 5 → Layer 6: Cognition → Composite (10 edges)
+## Layer 5 → Layer 6: Cognition → Composite (11 edges)
 
 | Edge ID | Source → Target | Type | Sign |
 |---------|----------------|------|------|
@@ -215,11 +230,12 @@
 | `ER_VERBAL_CRCI` | NODE_COG_VERBAL_FLUENCY → NODE_COMP_CRCI | causal | positive |
 | `ER_EXECPLAN_CRCI` | NODE_COG_EXEC_PLANNING → NODE_COMP_CRCI | causal | positive |
 | `ER_EXECINHIB_CRCI` | NODE_COG_EXEC_INHIBITION → NODE_COMP_CRCI | causal | positive |
+| `ER_MULTITASK_CRCI` | NODE_COG_MULTITASKING → NODE_COMP_CRCI | causal | positive |
 | `ER_VISUOSP_CRCI` | NODE_COG_VISUOSPATIAL → NODE_COMP_CRCI | causal | positive |
 | `ER_LANGUAGE_CRCI` | NODE_COG_LANGUAGE → NODE_COMP_CRCI | causal | positive |
 
 ---
 
-**Total: ~140 edges across 7 layer-crossing groups**
+**Total: ~156 edges across 8 layer-crossing groups**
 
 > If a paper tests a relationship not listed above, add it to `registries/EDGE_REGISTRY.csv` first.

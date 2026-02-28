@@ -1,6 +1,6 @@
 # CSV Template Column Specifications
 
-> **AUTHORITATIVE column reference** for all 12 CSV templates in `data/templates/`.
+> **AUTHORITATIVE column reference** for all 13 CSV templates in `data/templates/`.
 > Every column name matches the target DB table column **exactly**.
 > The only non-DB column is `doi` (resolved to `study_id` by the importer).
 >
@@ -558,6 +558,51 @@ historical mapping for reference only — **DO NOT use old names in templates.**
 | `biomarker_id_2` | `node_b_id` | correlation |
 | `correlation_r` | `rho` | correlation |
 | `sample_size` | `N` | correlation |
+
+---
+
+## 13. node_proposals_template.csv → `review_tasks` (15 extractor columns)
+
+> **Purpose:** Structured proposal for nodes NOT yet in NODE_REGISTRY.csv. Used when a paper references a construct that cannot be mapped to any existing node. Proposals enter the `review_tasks` queue for human adjudication. Do NOT add nodes directly to NODE_REGISTRY during extraction — use this template instead.
+
+```csv
+doi,proposed_node_id,proposed_node_label,proposed_node_layer,proposed_clinical_domain,is_observable,is_latent,proposed_orientation,proposed_unit_of_measure,pathway_membership,proxy_for,justification,related_existing_nodes,example_instruments,source_quote,proposal_status
+```
+
+| # | Column | Required | Type | Notes |
+|---|--------|----------|------|-------|
+| 1 | `doi` | YES | TEXT | Paper DOI proposing this node |
+| 2 | `proposed_node_id` | YES | TEXT | Follows `NODE_[DOMAIN]_[CONSTRUCT]` convention |
+| 3 | `proposed_node_label` | YES | TEXT | Human-readable name |
+| 4 | `proposed_node_layer` | YES | INTEGER | 0=Exogenous, 1=Behavior, 2=Biomarker, 3=Pathway, 4=Symptom, 5=Cognitive, 6=Composite |
+| 5 | `proposed_clinical_domain` | YES | TEXT | e.g., inflammatory, neurotrophic, cognitive |
+| 6 | `is_observable` | YES | INTEGER | 1 if directly measurable, 0 if latent |
+| 7 | `is_latent` | YES | INTEGER | 1 if latent construct, 0 if observable |
+| 8 | `proposed_orientation` | YES | TEXT | POS_UP, POS_DOWN, or CATEGORICAL |
+| 9 | `proposed_unit_of_measure` | — | TEXT | e.g., pg/mL, z-score, hours/week |
+| 10 | `pathway_membership` | — | TEXT | JSON array of pathway IDs, e.g., `["M1","M4"]` |
+| 11 | `proxy_for` | — | TEXT | If this node proxies a latent, which node_id |
+| 12 | `justification` | YES | TEXT | Why no existing node covers this construct |
+| 13 | `related_existing_nodes` | YES | TEXT | Comma-separated list of similar nodes in registry |
+| 14 | `example_instruments` | — | TEXT | Instruments that could measure this construct |
+| 15 | `source_quote` | — | TEXT | Verbatim text from paper defining the construct |
+| 16 | `proposal_status` | — | TEXT | Default: `pending`. Values: pending, approved, rejected, merged |
+
+### Placeholder convention
+
+When an edge CSV references a proposed (not-yet-approved) node, use `NODE_PENDING:<proposed_node_id>` as the node_id value. Example:
+```
+NODE_PENDING:NODE_BIO_IRISIN
+```
+The load pipeline will quarantine rows with `NODE_PENDING:` prefixes until the proposal is resolved.
+
+### Adjudication outcomes
+
+| Outcome | Action |
+|---------|--------|
+| **Approved** | Human adds node to NODE_REGISTRY.csv, replaces `NODE_PENDING:` refs, re-runs loader |
+| **Rejected** | Human removes proposal; `NODE_PENDING:` edge rows are dropped or remapped |
+| **Merged** | Construct is covered by existing node under different name; human remaps edge refs |
 
 ---
 

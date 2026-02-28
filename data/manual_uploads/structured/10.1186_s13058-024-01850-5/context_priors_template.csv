@@ -1,0 +1,6 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1186/s13058-024-01850-5,NODE_COG_EPISODIC_MEM,breast,active_treatment,-0.11,0.5,local_control_group,1,"z-score at diagnosis from CANTO-Cog Table 2"
+10.1186/s13058-024-01850-5,NODE_COG_WORK_MEM,breast,active_treatment,-0.46,0.5,local_control_group,1,"z-score at diagnosis from CANTO-Cog Table 2"
+10.1186/s13058-024-01850-5,NODE_COG_PROC_SPEED,breast,active_treatment,-0.34,0.5,local_control_group,1,"z-score at diagnosis from CANTO-Cog Table 2"
+10.1186/s13058-024-01850-5,NODE_COG_ATTN_SUSTAINED,breast,active_treatment,-0.33,0.5,local_control_group,1,"z-score at diagnosis from CANTO-Cog Table 2"
+10.1186/s13058-024-01850-5,NODE_COG_EXEC_PLANNING,breast,active_treatment,-0.09,0.5,local_control_group,1,"z-score at diagnosis from CANTO-Cog Table 2"

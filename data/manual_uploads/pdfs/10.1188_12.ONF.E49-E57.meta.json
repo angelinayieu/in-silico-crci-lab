@@ -1,0 +1,24 @@
+{
+  "doi": "10.1188/12.ONF.E49-E57",
+  "title": "A path analysis: a model of depression in Korean women with breast cancer-mediating effects of self-esteem and hope",
+  "authors": [
+    "Tae YS",
+    "Heitkemper M",
+    "Kim MY"
+  ],
+  "year": 2012,
+  "journal": "Oncol Nurs Forum",
+  "pmid": "22201668",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 214,
+  "extraction_mode": "SHALLOW",
+  "targeted_edges": [
+    "ER_OIC_DEPRESSION"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=214 Korean BC women. Path model of depression: cancer\u2192distress\u2192self-esteem\u2192hope\u2192depression. Not primary CRCI study. Paywalled."
+}

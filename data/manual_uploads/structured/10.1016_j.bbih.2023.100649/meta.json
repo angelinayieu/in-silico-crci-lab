@@ -1,0 +1,23 @@
+{
+  "study_id": "STUDY_BARANDOUZI_2023",
+  "doi": "10.1016/j.bbih.2023.100649",
+  "first_author": "Barandouzi",
+  "year": 2023,
+  "title": "Associations of inflammation with neuropsychological symptom cluster in patients with Head and neck cancer: A longitudinal study",
+  "journal": "Brain, Behavior, & Immunity - Health",
+  "study_design": "cohort",
+  "cancer_type": "head_and_neck",
+  "treatment_phase": "during_and_post_treatment",
+  "sample_size": 147,
+  "extraction_mode": "META_ONLY",
+  "notes": "NPS cluster composite outcome (fatigue+depression+pain+sleep+cognitive_impairment); NOT individual cognitive domains. Linear mixed-effects + GEE models. 4 timepoints: pre-treatment, end-RT, 3mo post, 1yr post. 56% received chemoradiotherapy. Biomarkers: CRP, TNF-alpha, sTNFR2, IL-1beta, IL-6, IL-10, MCP-1, IL-1RA. Covariates: age, sex, race, BMI, marital status, alcohol, smoking, antidepressants, anti-inflammation use, cancer stage, HPV, treatment, feeding. CRP (est=3.189, p<0.001), sTNFR2 (est=7.203, p=0.003), IL-6 (est=4.289, p<0.001), IL-1RA (est=7.115, p<0.001) all associated with higher NPS cluster. Individual symptom-level coefficients in supplementary tables (not in PDF).",
+  "extraction_status": "NO_EDGE_EVIDENCE — composite NPS cluster outcome cannot be decomposed into individual cognitive domains without supplementary tables",
+  "qualitative_findings": {
+    "CRP_NPS_cluster": "estimate=3.189 p<0.001 (mixed-effect model, continuous NPS cluster)",
+    "IL6_NPS_cluster": "estimate=4.289 p<0.001",
+    "sTNFR2_NPS_cluster": "estimate=7.203 p=0.003",
+    "IL1RA_NPS_cluster": "estimate=7.115 p<0.001",
+    "one_year_persistence": "CRP p=0.001, sTNFR2 p=0.006, IL-1RA p=0.043 at 1yr post-treatment",
+    "cognitive_component": "PRO-CTCAE 2 items measured cognitive impairment (self-report), included in NPS cluster but not analyzed individually in main paper"
+  }
+}

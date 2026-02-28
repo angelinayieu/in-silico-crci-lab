@@ -1,0 +1,38 @@
+{
+  "doi": "10.1093/jnci/djv131",
+  "title": "Inflammatory Biomarkers, Comorbidity, and Neurocognition in Women With Newly Diagnosed Breast Cancer",
+  "authors": ["Patel SK", "Wong AL", "Wong FL", "Breen EC", "Hurria A", "Smith M", "Kinjo C", "Paz IB", "Kruper L", "Somlo G", "Mortimer JE", "Palomares MR", "Irwin MR", "Bhatia S"],
+  "year": 2015,
+  "journal": "JNCI Journal of the National Cancer Institute",
+  "pmid": "",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "pre_treatment",
+  "intervention_type": "observational",
+  "n_total": 262,
+  "n_treatment": 174,
+  "n_control": 88,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": ["ER_OIC_EPISODIC"],
+  "risk_of_bias": {
+    "randomization": "not_applicable",
+    "allocation_concealment": "not_applicable",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "low",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "other": "moderate",
+    "overall": "moderate"
+  },
+  "notes": "Pre-treatment cross-sectional study. Cytokines measured before surgery. sTNF-RII (soluble TNF receptor type II, proxy for TNF activity) was only cytokine independently predicting memory. IL-1ra elevated in patients vs controls (P=.007) but not predictor of cognition. Comorbidity predicted executive function and processing speed (P=.03 each). Instruments: DKEF battery approximated to Stroop (exec inhibition), WAIS-IV PSI approximated to TMT-B (processing speed), HVLT direct match. sTNF-RII is not identical to TNF-alpha — it's the soluble receptor which reflects TNF system activation.",
+  "effect_size_notes": "Regression B for log(sTNF-RII) → memory T-scores converted to partial r via t-stat, then to d via 2r/sqrt(1-r^2). Partial r = -0.162 after adjusting for 10 covariates. d = -0.329. This is a partial/adjusted effect — represents unique variance explained by sTNF-RII after removing shared variance with covariates.",
+  "cytokine_data": {
+    "IL1ra_patients_mean_pg_mL": 375,
+    "IL1ra_patients_sd": 239,
+    "IL1ra_controls_mean_pg_mL": 291,
+    "IL1ra_controls_sd": 169,
+    "IL1ra_group_diff_p": 0.007,
+    "sTNFRII_group_diff_p": "NS",
+    "IL6_group_diff_p": "NS"
+  }
+}

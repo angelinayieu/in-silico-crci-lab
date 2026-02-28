@@ -1,0 +1,21 @@
+{
+  "doi": "10.1007/s00520-022-06964-8",
+  "title": "The Role of Cytokines in Cancer-Related Cognitive Impairment: A Systematic Review",
+  "authors": [
+    "Tyagi K",
+    "Tandel A"
+  ],
+  "year": 2023,
+  "journal": "Support Care Cancer",
+  "pmid": "35249524",
+  "study_design": "systematic_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "SR of cytokines in CRCI. PAYWALLED. Abstract only."
+}

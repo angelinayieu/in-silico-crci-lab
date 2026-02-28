@@ -7,7 +7,9 @@ studies) and the extraction pipeline (which processes PDFs). It:
 
 1. Reads queued candidates from acquisition_queue_v1 (status='queued')
 2. Resolves PMIDs → DOI + PMCID via NCBI ID converter
-3. Attempts PDF retrieval via Europe PMC (OA) → Unpaywall
+3. Attempts PDF retrieval via the full 8-source FulltextRetriever chain:
+   OpenAlex → Europe PMC → PMC XML → Unpaywall → arXiv → CORE →
+   Semantic Scholar → manual
 4. For retrieved PDFs: runs the full extraction pipeline
 5. Updates queue status: 'retrieved'/'extracted'/'failed'
 
@@ -18,7 +20,7 @@ Usage:
 
 Requires:
     - ANTHROPIC_API_KEY in .env (for extraction)
-    - Network access (for NCBI, Europe PMC, Unpaywall)
+    - Network access (for NCBI, Europe PMC, Unpaywall, etc.)
 """
 from __future__ import annotations
 
@@ -49,6 +51,8 @@ if _env_path.exists():
 
 from crci.shared.db import get_session, init_db
 from crci.shared.models.tables import AcquisitionQueue
+from crci.retrieval.fulltext_retriever import FulltextRetriever
+from crci.retrieval.models import RetrievalStatus
 
 logger = logging.getLogger(__name__)
 
@@ -421,35 +425,60 @@ def process_hop_queue(
                 report["details"].append(detail)
                 continue
 
-            # Step 2: Retrieve PDF
-            print(f"  Retrieving PDF...", end=" ", flush=True)
-            pdf_path = try_retrieve_pdf(pmid, doi, pmcid, pdf_dir)
+            # Step 2: Retrieve PDF via full 8-source chain
+            print(f"  Retrieving via 8-source chain...", end=" ", flush=True)
+            retriever = FulltextRetriever(session)
+            if doi:
+                ret_result = retriever.retrieve_by_doi(doi, title=title, stage=True)
+            elif pmid:
+                ret_result = retriever.retrieve_by_pmid(pmid, title=title, stage=True, output_dir=pdf_dir)
+            else:
+                ret_result = None
 
-            if pdf_path:
-                print(f"✓ {pdf_path.name} ({pdf_path.stat().st_size:,} bytes)")
+            if ret_result and ret_result.status == RetrievalStatus.RETRIEVED:
+                pdf_path = Path(ret_result.cache_path) if ret_result.cache_path else None
+                # Also copy to hop_pdfs dir with standard name
+                if pdf_path and pdf_path.exists():
+                    hop_copy = pdf_dir / f"pmid_{pmid}.pdf"
+                    if not hop_copy.exists():
+                        import shutil
+                        pdf_dir.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(pdf_path, hop_copy)
+                    pdf_path = hop_copy
+
+                source_used = ret_result.source_used or "unknown"
+                size = ret_result.file_size_bytes or 0
+                print(f"✓ via {source_used} ({size:,} bytes)")
                 cand.retrieval_status = "retrieved"
+                cand.retrieval_tool = source_used
                 cand.status = "retrieved"
-                detail["pdf_path"] = str(pdf_path)
+                detail["pdf_path"] = str(pdf_path) if pdf_path else ""
+                detail["source"] = source_used
                 detail["status"] = "retrieved"
                 report["retrieved"] += 1
 
                 # Step 3: Run extraction pipeline
-                print(f"  Running extraction pipeline...")
-                success = _run_extraction(pdf_path, pmid, doi, title=title, verbose=verbose)
-                if success:
-                    cand.status = "extracted"
-                    detail["status"] = "extracted"
-                    report["extracted"] += 1
-                    print(f"  ✓ Extraction complete")
-                else:
-                    detail["status"] = "extraction_failed"
-                    report["failed"] += 1
-                    print(f"  ✗ Extraction failed")
+                if pdf_path and pdf_path.exists():
+                    print(f"  Running extraction pipeline...")
+                    success = _run_extraction(pdf_path, pmid, doi, title=title, verbose=verbose)
+                    if success:
+                        cand.status = "extracted"
+                        detail["status"] = "extracted"
+                        report["extracted"] += 1
+                        print(f"  ✓ Extraction complete")
+                    else:
+                        detail["status"] = "extraction_failed"
+                        report["failed"] += 1
+                        print(f"  ✗ Extraction failed")
             else:
-                print(f"✗ Not available (OA)")
+                error = ""
+                if ret_result:
+                    error = ret_result.error_message or f"status={ret_result.status.value}"
+                print(f"✗ Not available ({error or 'all sources exhausted'})")
                 cand.retrieval_status = "no_fulltext"
                 cand.paywall_flagged = True
                 detail["status"] = "no_pdf"
+                detail["error"] = error
                 report["failed"] += 1
 
             cand.updated_at = datetime.now(timezone.utc)

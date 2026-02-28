@@ -1,6 +1,6 @@
 # Node IDs — Complete Reference
 
-> All 63 nodes in `registries/NODE_REGISTRY.csv`, grouped by layer.
+> All 70 nodes in `registries/NODE_REGISTRY.csv`, grouped by layer.
 
 ---
 
@@ -31,7 +31,7 @@
 | `NODE_BEH_COG_ACTIVITY` | Cognitive Activity Level |
 | `NODE_BEH_SELF_EFFICACY` | Self-Efficacy / Adherence Motivation |
 
-## Layer 2 — Biomarkers (13 nodes)
+## Layer 2 — Biomarkers (18 nodes)
 
 | Node ID | Label |
 |---------|-------|
@@ -39,6 +39,12 @@
 | `NODE_BIO_CRP` | C-Reactive Protein |
 | `NODE_BIO_TNF` | Tumor Necrosis Factor Alpha |
 | `NODE_BIO_BDNF` | Brain-Derived Neurotrophic Factor |
+| `NODE_BIO_IL8` | Interleukin-8 (CXCL8) |
+| `NODE_BIO_IL10` | Interleukin-10 |
+| `NODE_BIO_IL4` | Interleukin-4 |
+| `NODE_BIO_IFNG` | Interferon-Gamma |
+| `NODE_BIO_MCP1` | Monocyte Chemoattractant Protein-1 (CCL2) |
+| `NODE_BIO_STNFR2` | Soluble TNF Receptor II (sTNF-RII) |
 | `NODE_BIO_CORTISOL` | Cortisol Diurnal Slope |
 | `NODE_BIO_P16` | p16^INK4a Expression |
 | `NODE_BIO_GH2AX` | Gamma-H2AX Foci |
@@ -47,7 +53,6 @@
 | `NODE_BIO_GLUCOSE` | Fasting Glucose |
 | `NODE_BIO_NFL` | Neurofilament Light Chain |
 | `NODE_BIO_SHANNON` | Gut Microbiome Shannon Diversity |
-| *(12 listed; node_layer=2 has 12 in registry)* | |
 
 ## Layer 3 — Biological Pathways (14 nodes)
 
@@ -82,7 +87,7 @@
 | `NODE_SYM_DECONDITIONING` | Physical Deconditioning |
 | `NODE_SYM_APPETITE` | Appetite / Nausea Disruption |
 
-## Layer 5 — Cognitive Domains (10 nodes)
+## Layer 5 — Cognitive Domains (11 nodes)
 
 | Node ID | Label |
 |---------|-------|
@@ -94,6 +99,7 @@
 | `NODE_COG_VERBAL_FLUENCY` | Verbal Fluency |
 | `NODE_COG_EXEC_PLANNING` | Executive Function — Planning |
 | `NODE_COG_EXEC_INHIBITION` | Executive Function — Inhibition |
+| `NODE_COG_MULTITASKING` | Multitasking / Cognitive Flexibility |
 | `NODE_COG_VISUOSPATIAL` | Visuospatial Function |
 | `NODE_COG_LANGUAGE` | Language Comprehension |
 
@@ -109,6 +115,7 @@
 
 **Physical activity edges:** source = `NODE_BEH_PHYSICAL_ACTIVITY`  
 **Cognitive rehabilitation edges:** source = `NODE_BEH_COG_ACTIVITY`  
-**Inflammation pathways:** `NODE_BIO_IL6`, `NODE_BIO_CRP`, `NODE_BIO_TNF` → `NODE_PATH_OIC`  
+**Inflammation pathways:** `NODE_BIO_IL6`, `NODE_BIO_CRP`, `NODE_BIO_TNF`, `NODE_BIO_IL8`, `NODE_BIO_IL10`, `NODE_BIO_IL4`, `NODE_BIO_IFNG`, `NODE_BIO_MCP1`, `NODE_BIO_STNFR2` → `NODE_PATH_OIC`  
 **Subjective cognition:** `NODE_SYM_COG_COMPLAINTS` (PROs like FACT-Cog)  
 **Objective cognition:** `NODE_COG_*` (neuropsych tests)  
+**Multitasking/flexibility:** `NODE_COG_MULTITASKING` (CANTAB MTT, WCST, TMT-B switching)  

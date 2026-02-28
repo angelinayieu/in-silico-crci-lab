@@ -1,0 +1,22 @@
+{
+  "doi": "10.3389/fphar.2017.00138",
+  "title": "Biomarkers Associated with Cognitive Impairment in Treated Cancer Patients: Potential Predisposition and Risk Factors",
+  "authors": [
+    "Castel H",
+    "L\u00e9ger F",
+    "Bhatt M"
+  ],
+  "year": 2017,
+  "journal": "Front Pharmacol",
+  "pmid": "28377717",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Narrative review of biomarkers of CRCI: cytokines, BDNF, hormones, genetic. No pooled estimates."
+}

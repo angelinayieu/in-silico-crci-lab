@@ -1,0 +1,20 @@
+{
+  "doi": "10.1016/j.critique.2025.chughtai",
+  "title": "Chemotherapy-Induced Cognitive Impairment: Mechanisms and Management Review",
+  "authors": [
+    "Chughtai AA"
+  ],
+  "year": 2025,
+  "journal": "Unknown",
+  "pmid": "40779978",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Narrative review of CICI mechanisms. No extractable data. PMID 40779978."
+}

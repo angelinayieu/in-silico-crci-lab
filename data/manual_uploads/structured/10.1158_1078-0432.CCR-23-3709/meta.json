@@ -1,0 +1,22 @@
+{
+  "study_id": "STUDY_WILLIAMS_2024",
+  "doi": "10.1158/1078-0432.CCR-23-3709",
+  "first_author": "Williams",
+  "year": 2024,
+  "title": "Systemic Biological Mechanisms of Neurocognitive Dysfunction in Long-term Survivors of Childhood Hodgkin Lymphoma",
+  "journal": "Clinical Cancer Research",
+  "study_design": "cohort",
+  "cancer_type": "hodgkin_lymphoma",
+  "treatment_phase": "long_term_survivorship",
+  "sample_size": 197,
+  "control_size": 199,
+  "notes": "Cross-sectional analysis of childhood HL survivors (mean 20.5yr post-diagnosis, mean age 35.4) vs age/sex-matched community controls. Comprehensive neuropsych battery (12 domains) + inflammatory biomarkers (IL-6, TNF-α, hs-CRP, OxLDL, GPx, MDA, homocysteine, etc). Biomarker tertile analysis + elastic net multi-biomarker models. IL-6 specifically associated with visuomotor processing speed; CRP broadly associated with 7 cognitive domains; MDA and homocysteine each associated with 2-3 domains. Mediation: CRP mediated vascular→sustained attention (39.6%), visual processing speed (70.9%); IL-6 mediated pulmonary→visuomotor processing speed (36.8%). 45% survivors had CRP≥3 vs 28% controls. Higher chest radiation (>30Gy) → higher CRP (β=0.65) and homocysteine (β=0.23). No CNS-directed therapy in sample.",
+  "extraction_mode": "STANDARD",
+  "null_findings": [
+    "IL-6 tertile effects NOT significant in community controls",
+    "CRP associations NOT identified in controls",
+    "TNF-α: only 2nd tertile associated with long-term recall (not 3rd), may be spurious",
+    "OxLDL: not significantly associated with any cognitive outcome",
+    "IL-10, IL-8: not measured in this study"
+  ]
+}

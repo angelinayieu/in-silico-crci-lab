@@ -41,6 +41,7 @@ if _env_path.exists():
                 os.environ.setdefault(key.strip(), val.strip())
 
 from crci.shared.db import get_session, init_db
+from crci.retrieval.config import load_retrieval_config
 
 
 _WORKSTREAM_MAP = {
@@ -131,6 +132,31 @@ def main() -> int:
     args = parser.parse_args()
 
     _setup_logging(args.verbose)
+
+    # ── Validate retrieval API keys at startup ──
+    rc = load_retrieval_config()
+    _logger = logging.getLogger(__name__)
+    key_issues = []
+    if not rc.unpaywall_email:
+        key_issues.append("UNPAYWALL_EMAIL not set → adapter BROKEN")
+    if not rc.core_api_key:
+        key_issues.append("CORE_API_KEY not set → source non-functional")
+    if not rc.ncbi_api_key:
+        key_issues.append("NCBI_API_KEY not set → PubMed limited to 3 req/s")
+    if not rc.openalex_email:
+        key_issues.append("OPENALEX_EMAIL not set → throttled")
+    if not rc.s2_api_key:
+        key_issues.append("S2_API_KEY not set → 1 req/s")
+    if not rc.crossref_mailto:
+        key_issues.append("CROSSREF_MAILTO not set → throttled")
+    if key_issues:
+        _logger.warning("=" * 60)
+        _logger.warning("RETRIEVAL API KEY WARNINGS (%d):", len(key_issues))
+        for issue in key_issues:
+            _logger.warning("  ⚠ %s", issue)
+        _logger.warning("Set keys in .env — see comments for registration links")
+        _logger.warning("=" * 60)
+
     init_db()
 
     # Determine workstreams

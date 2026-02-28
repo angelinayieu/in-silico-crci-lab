@@ -1,0 +1,4 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.3390/cancers13112576,NODE_COG_VERBAL_FLUENCY,INST_COWAT,44.43,8.22,30,breast,mixed,
+10.3390/cancers13112576,NODE_COG_WORK_MEM,INST_DIGIT_SPAN,12.01,2.92,30,breast,mixed,
+10.3390/cancers13112576,NODE_COG_EPISODIC_MEM,INST_HVLTR,10.93,2.94,30,breast,mixed,

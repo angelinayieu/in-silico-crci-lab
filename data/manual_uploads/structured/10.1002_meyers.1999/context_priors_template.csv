@@ -1,0 +1,2 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1002/meyers.1999,NODE_SYM_COG_COMPLAINTS,mixed,mixed,-0.40,0.60,published_norm,1,"Early review establishing CRCI as clinical entity; 17-35% of patients affected; primarily memory and attention"

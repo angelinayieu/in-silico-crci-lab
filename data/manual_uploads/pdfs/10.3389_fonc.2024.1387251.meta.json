@@ -1,0 +1,20 @@
+{
+  "doi": "10.3389/fonc.2024.1387251",
+  "title": "Cancer-Related Cognitive Impairment: The Downside of Cancer Treatment",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2024,
+  "journal": "Front Oncol",
+  "pmid": "38715789",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Frontiers Oncol CRCI downside review."
+}

@@ -1,0 +1,24 @@
+{
+  "study_id": "STUDY_VARDY_2018",
+  "doi": "10.1136/esmoopen-2017-000302",
+  "first_author": "Vardy",
+  "year": 2018,
+  "title": "Prognostic indices of inflammatory markers, cognitive function and fatigue for survival in patients with localised colorectal cancer",
+  "journal": "ESMO Open",
+  "study_design": "cohort",
+  "cancer_type": "colorectal",
+  "treatment_phase": "survivorship",
+  "sample_size": 289,
+  "control_size": 72,
+  "notes": "Longitudinal cohort with healthy controls; median follow-up 91.2 months. Survival analysis (Cox regression) testing whether inflammatory markers (IL-6, TNF-α, IL-1β), cognitive function, and fatigue predict OS and DFS. ALL cytokine associations with survival were NULL: IL-6 log HR 0.99 (0.82-1.19, p=0.88), TNF-α log HR 0.96 (0.81-1.15, p=0.68). Cognitive impairment did NOT predict OS or DFS. Fatigue did NOT predict OS or DFS. Only baseline clinical variables (stage, CEA, diabetes, lymphovascular invasion) predicted survival. Population-level data: 44% of CRC patients had cognitive impairment vs 15% healthy controls; 52% had fatigue vs 26% controls. Cytokine levels elevated in CRC patients at baseline normalized post-chemotherapy.",
+  "extraction_mode": "META_ONLY",
+  "extraction_status": "META_ONLY — survival/prognostic study with ALL NULL results for cytokine/cognition/fatigue → survival; no inflammation→cognition edge evidence; useful only for population prevalence data",
+  "null_findings": [
+    "IL-6 → OS: HR 0.99 (0.82-1.19) p=0.88",
+    "TNF-α → OS: HR 0.96 (0.81-1.15) p=0.68",
+    "IL-1β → OS: not significant",
+    "Cognitive impairment → OS: HR 0.60 (0.25-1.41) p=0.24 (NS)",
+    "Fatigue → OS: HR 1.59 (0.80-3.14) p=0.18 (NS)",
+    "ALL cytokine, cognition, fatigue predictors NULL for both OS and DFS"
+  ]
+}

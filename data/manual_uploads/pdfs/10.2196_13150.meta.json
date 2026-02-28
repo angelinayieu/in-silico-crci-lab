@@ -1,0 +1,25 @@
+{
+  "doi": "10.2196/13150",
+  "title": "Mediators of a Physical Activity Intervention on Cognition in Breast Cancer Survivors: Evidence From a Randomized Controlled Trial",
+  "authors": [
+    "Hartman SJ",
+    "Nelson SH",
+    "Cadmus-Bertram LA"
+  ],
+  "year": 2019,
+  "journal": "JMIR Cancer",
+  "pmid": "31605514",
+  "study_design": "RCT",
+  "cancer_type": "breast",
+  "treatment_phase": "long_term_survivorship",
+  "n_total": 87,
+  "extraction_mode": "DEEP",
+  "targeted_edges": [
+    "ER_ACTIVITY_PROC_SPEED",
+    "ER_ACTIVITY_COG_COMPLAINTS"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  },
+  "notes": "RCT PA intervention (n=43 exercise, n=44 control). 12wk. Anxiety mediated PA\u2192self-reported cognition. CRP NS mediator. BDNF NS."
+}

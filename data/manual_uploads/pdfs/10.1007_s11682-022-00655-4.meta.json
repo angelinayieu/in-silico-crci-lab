@@ -1,0 +1,21 @@
+{
+  "doi": "10.1007/s11682-022-00655-4",
+  "title": "A Meta-Analysis of fMRI Studies Examining Chemotherapy-Related Cognitive Impairment",
+  "authors": [
+    "Saward J",
+    "Bayer T"
+  ],
+  "year": 2022,
+  "journal": "Brain Imaging Behav",
+  "pmid": "35366180",
+  "study_design": "meta_analysis",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "ALE meta-analysis of fMRI studies in CRCI. k=22. Convergent hypoactivation in frontal/parietal regions."
+}

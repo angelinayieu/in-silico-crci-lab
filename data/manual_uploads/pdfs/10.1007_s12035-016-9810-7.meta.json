@@ -1,0 +1,22 @@
+{
+  "doi": "10.1007/s12035-016-9810-7",
+  "title": "Potential Mechanisms of Cognitive Dysfunction Associated with Cancer and Its Corresponding Cytokines",
+  "authors": [
+    "Ren X",
+    "St Clair DK",
+    "Bhuseinova I"
+  ],
+  "year": 2017,
+  "journal": "Mol Neurobiol",
+  "pmid": "28063894",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Narrative review of cytokine mechanisms (TNF\u03b1, IL-1\u03b2, IL-6) in CICI. No extractable data."
+}

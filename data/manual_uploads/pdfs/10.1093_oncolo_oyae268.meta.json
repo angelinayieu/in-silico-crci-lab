@@ -1,0 +1,25 @@
+{
+  "doi": "10.1093/oncolo/oyae268",
+  "title": "Chemotherapy-induced cognitive impairment and its long-term development in patients with breast cancer: results from the observational CICARO study",
+  "authors": [
+    "Kerkmann A",
+    "et al."
+  ],
+  "year": 2024,
+  "journal": "The Oncologist",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "extraction_mode": "STANDARD",
+  "n_total": 53,
+  "n_treatment": 24,
+  "n_control": 29,
+  "targeted_edges": [
+    "ER_CHEMO_NFL",
+    "ER_DEPRESSION_COGCOMPLAINTS",
+    "ER_OIC_EPISODIC"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  }
+}

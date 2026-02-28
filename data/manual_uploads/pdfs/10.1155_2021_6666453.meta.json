@@ -1,0 +1,26 @@
+{
+  "doi": "10.1155/2021/6666453",
+  "title": "A Prediction Model for Cognitive Impairment Risk in Colorectal Cancer after Chemotherapy Treatment",
+  "authors": [
+    "Zhou SP",
+    "Wu L",
+    "Jin C"
+  ],
+  "year": 2021,
+  "journal": "Biomed Res Int",
+  "pmid": "33688501",
+  "study_design": "cohort",
+  "cancer_type": "colorectal",
+  "treatment_phase": "active_treatment",
+  "n_total": 386,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EPISODIC",
+    "ER_OIC_ATTNSUST"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=386 CRC patients after chemo. 161 (41.7%) had CI. Prediction model (logistic regression + random forest). Predictors: age, education, TNF-\u03b1, IL-6, CRP, anxiety, depression."
+}

@@ -1,0 +1,22 @@
+{
+  "doi": "10.1038/s41598-022-05682-1",
+  "title": "Prevalence of cognitive impairment following chemotherapy treatment for breast cancer: a systematic review and meta-analysis",
+  "authors": [
+    "Whittaker AL",
+    "et al."
+  ],
+  "year": 2022,
+  "journal": "Scientific Reports",
+  "study_design": "meta_analysis",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "extraction_mode": "STANDARD",
+  "n_total": 10615,
+  "targeted_edges": [
+    "ER_ATTNSUST_CRCI",
+    "ER_PROCSPD_CRCI"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  }
+}

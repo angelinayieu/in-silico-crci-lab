@@ -1,0 +1,20 @@
+{
+  "doi": "10.brief.review.2018",
+  "title": "Brief Review of Cancer-Related Cognitive Impairment",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2018,
+  "journal": "Unknown",
+  "pmid": "29497579",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Brief CRCI review 2018. No full text accessible."
+}

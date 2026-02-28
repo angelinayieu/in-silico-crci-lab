@@ -1227,6 +1227,58 @@ WORKSTREAM_PRIORITY: list[str] = [
     "correlations",
 ]
 
+# ═══════════════════════════════════════════════════════════════
+#  TRIAGE SWEEP (AUTOMATED_RETRIEVAL_PLAN.md Part 7b, 4-Stage)
+# ═══════════════════════════════════════════════════════════════
+
+# Stage 1.5 extractability scan
+EXTRACTABILITY_MARKER_THRESHOLD_PASS: int = 3
+EXTRACTABILITY_TABLE_HINT_REQUIRED: bool = True
+EXTRACTABILITY_MARKERS: list[str] = [
+    "95% confidence interval", "confidence interval",
+    "standard error", "SE =", "SE=",
+    "β =", "beta =", "B =", "regression coefficient",
+    "odds ratio", "OR =", "OR=",
+    "hazard ratio", "HR =", "HR=",
+    "Pearson r", "r =", "r=", "correlation coefficient",
+    "η²", "eta squared", "partial eta",
+    "Cohen", "effect size", "d =", "g =",
+    "Table 2", "Table 3", "Table 4", "Table 5",
+    "mixed-effects", "ANCOVA", "ANOVA",
+    "adjusted for", "controlling for",
+    "mediated by", "mediation analysis", "path coefficient",
+    "multilevel model", "hierarchical linear",
+    "p < 0.0", "p = 0.0", "p<.0", "p=.0",
+    "Supplementary Table", "Supplemental Table",
+]
+
+# Extraction batch optimizer weights (additive, not multiplicative)
+EXTRACTION_PRIORITY_WEIGHTS: dict[str, float] = {
+    "aps": 0.20,
+    "new_edge_coverage": 0.35,
+    "extractability": 0.20,
+    "design_rank": 0.15,
+    "access_cost_penalty": 0.10,
+}
+EXPLORATION_BUDGET_FRACTION: float = 0.10
+EXPLORATION_BUDGET_MIN: int = 3
+
+# Design rank mapping (for extraction prioritization)
+DESIGN_RANK: dict[str, float] = {
+    "meta_analysis": 1.0,
+    "RCT": 0.9,
+    "cohort": 0.7,
+    "cross_sectional": 0.5,
+    "unknown": 0.3,
+}
+
+# Vertical slice targeting
+DEFAULT_SLICE_PATHWAYS: list[str] = [
+    "PW_M08_HPA_AXIS",
+    "PW_M04_NEUROPLASTICITY",
+    "PW_M01_NEUROINFLAMMATION",
+]
+
 
 # ═══════════════════════════════════════════════════════════════
 #  PHASE 8: TRAJECTORY BUILDER (S2 — report assembly)

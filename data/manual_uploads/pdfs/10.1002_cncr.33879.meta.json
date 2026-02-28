@@ -1,0 +1,26 @@
+{
+  "doi": "10.1002/cncr.33879",
+  "title": "Seizures' impact on cognition and quality of life in childhood cancer survivors",
+  "authors": [
+    "Phillips NS",
+    "Ness KK",
+    "Krull KR"
+  ],
+  "year": 2022,
+  "journal": "Cancer",
+  "pmid": "34468985",
+  "study_design": "cross_sectional",
+  "cancer_type": "mixed",
+  "treatment_phase": "long_term_survivorship",
+  "n_total": 2022,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EPISODIC",
+    "ER_OIC_ATTNSUST"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  },
+  "notes": "N=2022 childhood cancer survivors (St. Jude). Seizures associated with worse cognition in multiple domains. Very large sample. Paywalled."
+}

@@ -1,0 +1,20 @@
+{
+  "doi": "10.2147/bctt.2014.prevalence",
+  "title": "Cancer-Related Cognitive Impairment: Prevalence, Mechanisms, Management",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2014,
+  "journal": "Breast Cancer Targets Ther",
+  "pmid": "24716504",
+  "study_design": "narrative_review",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Breast cancer CRCI prevalence/mechanisms/management review. No full text accessible."
+}

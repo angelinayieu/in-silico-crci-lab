@@ -1,0 +1,14 @@
+{
+  "title": "Effects of yoga exercise and conventional exercise on cortisol slope and quality of life in breast cancer survivors",
+  "authors": "Agasi-Idenburg SC et al.",
+  "year": 2024,
+  "journal": "Cancers",
+  "pmcid": "PMC11475836",
+  "cancer_type": "breast",
+  "sample_size": 50,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "B"
+  ],
+  "topology_fill": "Slice-1"
+}

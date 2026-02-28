@@ -16,8 +16,10 @@ from dataclasses import dataclass, field
 from crci.shared.models.output_contracts import (
     DecisionTrace,
     DecisionTraceEntry,
+    EdgeInfluence,
     RecommendationReport,
     SchedulePlan,
+    StudyContribution,
 )
 
 logger = logging.getLogger(__name__)
@@ -194,24 +196,93 @@ def render_provenance_chain(
     if trace.decision_critical_edges:
         for edge_id in trace.decision_critical_edges:
             edge_node_id = f"edge_{edge_id}"
+            # R3: Annotate with variance contribution if available
+            influence = trace.edge_influences.get(edge_id)
+            if influence:
+                edge_value = (
+                    f"var={influence.variance_contribution_pct:.1f}%, "
+                    f"ε={influence.elasticity:.3f}"
+                )
+            else:
+                edge_value = "decision-critical"
+
             nodes.append(ProvenanceNode(
                 node_id=edge_node_id,
                 label=f"Edge: {edge_id}",
                 node_type="edge",
                 depth=4,
-                value="decision-critical",
+                value=edge_value,
                 color=_TYPE_COLORS["edge"],
             ))
             n_edges_traced += 1
-            # Link from score
+            # Link from score — R3: weight by variance contribution
             score_nodes = [n for n in nodes if n.node_type == "score"]
             if score_nodes:
+                link_weight = (
+                    influence.variance_contribution_pct / 100.0
+                    if influence else 0.5
+                )
+                link_label = (
+                    f"{influence.variance_contribution_pct:.1f}% var"
+                    if influence else "depends on"
+                )
                 links.append(ProvenanceLink(
                     source_id=score_nodes[0].node_id,
                     target_id=edge_node_id,
-                    weight=0.5,
-                    label="depends on",
+                    weight=link_weight,
+                    label=link_label,
                 ))
+
+    # R2: Study and paper nodes from edge_study_map
+    n_studies_traced = 0
+    paper_node_ids_seen: set[str] = set()
+    if trace.edge_study_map:
+        for edge_id, contributions in trace.edge_study_map.items():
+            edge_node_id = f"edge_{edge_id}"
+            # Only attach studies to edges that are in the node list
+            edge_exists = any(n.node_id == edge_node_id for n in nodes)
+            if not edge_exists:
+                continue
+
+            for sc in contributions:
+                study_node_id = f"study_{sc.ler_id}"
+                nodes.append(ProvenanceNode(
+                    node_id=study_node_id,
+                    label=f"Study: {sc.study_id}",
+                    node_type="study",
+                    depth=5,
+                    value=f"weight={sc.weight_pct:.1f}%, β={sc.beta:.3f}",
+                    color=_TYPE_COLORS["study"],
+                ))
+                n_studies_traced += 1
+                links.append(ProvenanceLink(
+                    source_id=edge_node_id,
+                    target_id=study_node_id,
+                    weight=sc.weight_pct / 100.0,
+                    label=f"{sc.weight_pct:.1f}%",
+                ))
+
+                # Paper node (deduplicated)
+                if sc.paper_ref and sc.paper_ref not in paper_node_ids_seen:
+                    paper_node_id = f"paper_{sc.paper_ref}"
+                    paper_node_ids_seen.add(sc.paper_ref)
+                    nodes.append(ProvenanceNode(
+                        node_id=paper_node_id,
+                        label=sc.paper_ref,
+                        node_type="paper",
+                        depth=6,
+                        value="source paper",
+                        color=_TYPE_COLORS["paper"],
+                    ))
+
+                # Link study → paper
+                if sc.paper_ref:
+                    links.append(ProvenanceLink(
+                        source_id=study_node_id,
+                        target_id=f"paper_{sc.paper_ref}",
+                        weight=1.0,
+                        label="from",
+                    ))
 
     depth_labels = [
         "Session",
@@ -219,6 +290,8 @@ def render_provenance_chain(
         "Recommendation",
         "SAFE Score",
         "Critical Edges",
+        "Studies",
+        "Papers",
     ]
 
     return ProvenanceChainView(

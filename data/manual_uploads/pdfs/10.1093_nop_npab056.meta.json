@@ -1,0 +1,25 @@
+{
+  "doi": "10.1093/nop/npab056",
+  "title": "Factors associated with cognitive impairment and cognitive concerns in patients with metastatic non-small cell lung cancer",
+  "authors": [
+    "Eggen AC",
+    "Reyners AKL",
+    "Hospers GAP"
+  ],
+  "year": 2022,
+  "journal": "Neurooncol Pract",
+  "pmid": "35087675",
+  "study_design": "cross_sectional",
+  "cancer_type": "lung",
+  "treatment_phase": "active_treatment",
+  "n_total": 81,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_FATIGUE_ATTN",
+    "ER_DEPRESSION_WORKMEM"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=81 metastatic NSCLC. Cross-sectional. 35% had cognitive impairment on MoCA. Anxiety and depression associated with cognitive concerns."
+}

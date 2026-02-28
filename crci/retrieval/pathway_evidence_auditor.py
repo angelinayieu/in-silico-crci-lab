@@ -20,6 +20,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+import json
+
 from sqlalchemy import select, func, and_, case
 from sqlalchemy.orm import Session
 
@@ -115,6 +117,9 @@ def audit_evidence_landscape(
         logger.warning("No edge relations found for audit")
         return report
 
+    # Build edge→pathway reverse lookup
+    edge_to_pathway = _build_edge_to_pathway(session)
+
     # Load evidence counts per edge
     evidence_counts = _load_evidence_counts(session)
 
@@ -143,9 +148,9 @@ def audit_evidence_landscape(
 
         gap_report = EdgeGapReport(
             edge_relation_id=edge_id,
-            node_x_id=edge.node_x_id,
-            node_y_id=edge.node_y_id,
-            pathway_id=edge.pathway_id,
+            node_x_id=edge.node_x,
+            node_y_id=edge.node_y,
+            pathway_id=edge_to_pathway.get(edge_id),
             k_total=k_total,
             k_primary=counts["k_primary"],
             k_meta=counts["k_meta"],
@@ -256,21 +261,53 @@ def _compute_gap_priority(k_total: int, has_research_gap: bool) -> float:
 # ═══════════════════════════════════════════════════════════════
 
 
+def _build_edge_to_pathway(session: Session) -> dict[str, str | None]:
+    """Build reverse lookup: edge_relation_id → pathway_id.
+
+    pathways_v1.edge_relation_ids_json is a JSON array of edge IDs.
+    We invert this to a dict for O(1) lookups.
+    """
+    mapping: dict[str, str | None] = {}
+    stmt = select(Pathway.pathway_id, Pathway.edge_relation_ids_json)
+    for row in session.execute(stmt).all():
+        edge_ids_raw = row.edge_relation_ids_json
+        if not edge_ids_raw:
+            continue
+        try:
+            if isinstance(edge_ids_raw, str):
+                edge_ids = json.loads(edge_ids_raw)
+            else:
+                edge_ids = edge_ids_raw
+            for eid in edge_ids:
+                mapping[eid] = row.pathway_id
+        except (json.JSONDecodeError, TypeError):
+            logger.debug("Could not parse edge_relation_ids_json for %s", row.pathway_id)
+    return mapping
+
+
 def _load_edge_relations(
     session: Session,
     pathway_ids: list[str] | None = None,
 ) -> list:
-    """Load edge relation definitions, optionally filtered by pathway."""
+    """Load edge relation definitions, optionally filtered by pathway.
+
+    Note: EdgeRelationsDefinition has node_x/node_y (not node_x_id/node_y_id)
+    and does not have a pathway_id column — we derive it from pathways_v1.
+    """
     stmt = select(
         EdgeRelationsDefinition.edge_relation_id,
-        EdgeRelationsDefinition.node_x_id,
-        EdgeRelationsDefinition.node_y_id,
-        EdgeRelationsDefinition.pathway_id,
+        EdgeRelationsDefinition.node_x,
+        EdgeRelationsDefinition.node_y,
     )
-    if pathway_ids:
-        stmt = stmt.where(EdgeRelationsDefinition.pathway_id.in_(pathway_ids))
+    rows = session.execute(stmt).all()
 
-    return session.execute(stmt).all()
+    if pathway_ids:
+        # Filter to edges belonging to the requested pathways
+        edge_to_pw = _build_edge_to_pathway(session)
+        pw_set = set(pathway_ids)
+        rows = [r for r in rows if edge_to_pw.get(r.edge_relation_id) in pw_set]
+
+    return rows
 
 
 def _load_evidence_counts(session: Session) -> dict[str, dict[str, int]]:

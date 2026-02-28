@@ -1,0 +1,41 @@
+{
+  "doi": "10.1016/j.chiabu.2017.07.005",
+  "title": "Effects of childhood trauma exposure and cortisol levels on cognitive functioning among breast cancer survivors",
+  "authors": ["Kamen C", "Scheiber C", "Janelsins M", "Jo B", "Shen H", "Palesh O"],
+  "year": 2017,
+  "journal": "Child Abuse & Neglect",
+  "pmid": "",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "intervention_type": "observational",
+  "n_total": 56,
+  "n_treatment": 56,
+  "n_control": 0,
+  "extraction_mode": "SHALLOW",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "randomization": "not_applicable",
+    "allocation_concealment": "not_applicable",
+    "blinding_participants": "not_applicable",
+    "blinding_outcome": "moderate",
+    "attrition": "low",
+    "selective_reporting": "low",
+    "other": "high",
+    "overall": "high"
+  },
+  "notes": "Cross-sectional study of 56 breast cancer survivors. 57% experienced at least one childhood traumatic event. Uses self-reported cognition (FACT-Cog subset) NOT objective neuropsych. Selected on insomnia symptoms — not generalizable. NO EDGE EVIDENCE EXTRACTED because: (1) outcome is self-reported cognition (maps to NODE_SYM_COG_COMPLAINTS) not objective domains; (2) no HPA→COG_COMPLAINTS edge exists in registry; (3) childhood trauma is not a direct cancer-treatment pathway node. Key findings preserved in meta.json for future use if edges are added.",
+  "key_findings": {
+    "trauma_cognition_r": -0.29,
+    "cortisol_slope_trauma_vs_no_trauma_d": 0.68,
+    "cortisol_slope_trauma_vs_no_trauma_p": 0.019,
+    "waking_cortisol_trauma_vs_no_trauma_d": 0.75,
+    "waking_cortisol_trauma_vs_no_trauma_p": 0.010,
+    "cortisol_slope_cognition_partial_r": 0.35,
+    "cortisol_slope_cognition_p": 0.02,
+    "model_R2": 0.47,
+    "trauma_cognition_adjusted_beta": -0.22,
+    "trauma_cognition_adjusted_p": 0.04
+  },
+  "extraction_decision": "SKIPPED_EDGE_EVIDENCE: Self-reported cognition (FACT-Cog) maps to COG_COMPLAINTS not objective COG domains. No HPA→COG_COMPLAINTS edge in registry. Childhood trauma not a model node. Cortisol findings are valuable but pathway (trauma→cortisol→subjective_cognition) doesn't map to existing edge architecture."
+}

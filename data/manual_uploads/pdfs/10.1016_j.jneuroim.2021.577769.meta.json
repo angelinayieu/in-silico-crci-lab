@@ -1,0 +1,26 @@
+{
+  "doi": "10.1016/j.jneuroim.2021.577769",
+  "title": "Relationships between cytokines and cognitive function from pre- to post-chemotherapy in patients with breast cancer",
+  "authors": [
+    "Janelsins MC",
+    "Lei L",
+    "Engles C"
+  ],
+  "year": 2022,
+  "journal": "J Neuroimmunol",
+  "pmid": "34871864",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "n_total": 155,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EPISODIC",
+    "ER_OIC_COGCOMPLAINTS"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Pilot longitudinal study. N=155 BC + controls. Pre\u2192post-chemo cytokine and cognition changes. TNF-\u03b1 and IL-6 fluctuations associated with cognitive trajectories."
+}

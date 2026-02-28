@@ -1,0 +1,20 @@
+{
+  "doi": "10.1093/oncolo/oyae090",
+  "title": "Cognitive impairment following breast cancer treatments: an umbrella review",
+  "authors": [
+    "Oliva G",
+    "et al."
+  ],
+  "year": 2024,
+  "journal": "The Oncologist",
+  "study_design": "meta_analysis",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "extraction_mode": "SHALLOW",
+  "n_total": 0,
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "low"
+  },
+  "notes": "Umbrella review (review of reviews). No primary effect sizes. Provides context priors from pooled qualitative synthesis."
+}

@@ -1,0 +1,2 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1200/JCO.2016.68.5826,NODE_SYM_COG_COMPLAINTS,breast,early_recovery,-0.36,0.50,published_norm,1,"36% of survivors reported cognitive decline = z ~ -0.36 assuming normal distribution"

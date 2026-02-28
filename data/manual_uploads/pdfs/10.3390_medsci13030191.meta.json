@@ -1,0 +1,20 @@
+{
+  "doi": "10.3390/medsci13030191",
+  "title": "Bibliometric Analysis of Cancer-Related Cognitive Impairment Research",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2025,
+  "journal": "Med Sci",
+  "pmid": "40981189",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Bibliometric mapping of CRCI research landscape. No extractable edge data."
+}

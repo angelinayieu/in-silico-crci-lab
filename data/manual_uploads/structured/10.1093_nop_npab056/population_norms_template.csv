@@ -1,0 +1,2 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1093/nop/npab056,NODE_COG_GLOBAL,INST_MOCA,-0.38,0.86,77,lung,active_treatment,

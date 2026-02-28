@@ -1,0 +1,15 @@
+{
+  "title": "Diurnal cortisol rhythm as a predictor of lung cancer survival and IL-6 in ovarian cancer",
+  "authors": "Sephton SE, Lush E, Dedert EA, Floyd AR, Rebholz WN, Dhabhar FS, Spiegel D, Salmon P",
+  "year": 2013,
+  "journal": "Psychoneuroendocrinology",
+  "pmcid": "PMC4440672",
+  "pmid": "25704910",
+  "cancer_type": "ovarian",
+  "sample_size": 113,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "D"
+  ],
+  "topology_fill": "Slice-1"
+}

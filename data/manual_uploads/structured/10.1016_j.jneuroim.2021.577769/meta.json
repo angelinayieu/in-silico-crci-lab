@@ -1,0 +1,20 @@
+{
+  "study_id": "STUDY_JANELSINS_2022",
+  "doi": "10.1016/j.jneuroim.2021.577769",
+  "first_author": "Janelsins",
+  "year": 2022,
+  "title": "Relationships between cytokines and cognitive function from pre- to post-chemotherapy in patients with breast cancer",
+  "journal": "Journal of Neuroimmunology",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "during_treatment",
+  "sample_size": 78,
+  "control_size": 78,
+  "notes": "Longitudinal pilot study from pre- to post-chemotherapy. IL-6, MCP-1, sTNFRI, sTNFRII increased during chemo. IL-6 change associated with worse executive function (OTS) and verbal fluency (Category Fluency). MCP-1 change associated with worse exec function. Best edge: ER_OIC_WORKMEM from OTS-executive-planning proxy. Category Fluency → verbal fluency not extracted (ER_OIC_VERBAL_FLUENCY not in registry). Verbal memory (VRM) results not significant (p=0.105). Baseline IL-6 associated with BETTER post-chemo cognition (paradoxical, possibly adaptive priming). Covariates: age, race, education, baseline reading score, baseline anxiety.",
+  "extraction_mode": "STANDARD",
+  "unmapped_findings": [
+    "ΔIL-6 → ΔCategory Fluency: β=−0.548, SE=0.255, p=0.036 — no ER_OIC_VERBAL_FLUENCY edge in registry",
+    "ΔMCP-1 → ΔOTS: β=0.017, SE=0.006, p=0.006 — MCP-1 not a separate node; absorbed into OIC composite",
+    "Baseline IL-6 → better post-chemo exec function (paradoxical direction, not extracted)"
+  ]
+}

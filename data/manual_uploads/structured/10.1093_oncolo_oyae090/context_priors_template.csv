@@ -1,0 +1,5 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1093/oncolo/oyae090,NODE_COMP_CRCI,breast,early_recovery,-0.6,0.5,published_norm,41,Oliva 2024 umbrella review: consistent small-moderate cognitive deficits across 41 included reviews. Estimated z≈−0.60 from pooled findings.
+10.1093/oncolo/oyae090,NODE_COG_PROC_SPEED,breast,early_recovery,-0.4,0.5,published_norm,20,"Oliva 2024: Processing speed consistently impaired in breast cancer post-CT, small-moderate effect."
+10.1093/oncolo/oyae090,NODE_COG_EPISODIC_MEM,breast,early_recovery,-0.5,0.5,published_norm,25,"Oliva 2024: Memory (verbal/visual) consistently impaired, moderate effect across reviews."
+10.1093/oncolo/oyae090,NODE_COG_EXEC_PLANNING,breast,early_recovery,-0.35,0.5,published_norm,15,Oliva 2024: Executive function impaired but less consistently than memory/processing speed.

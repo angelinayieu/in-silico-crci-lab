@@ -35,7 +35,7 @@ Read this FIRST. It routes you to the exact instructions you need based on what 
 |-----------|-----------------|-----------------|-------------------|-------------|
 | **RCT + cancer + cognitive primary outcome** | Randomized trial, cancer population, cognitive test as primary/secondary endpoint | `DEEP` | ALL 12 templates (edge_evidence, population_norms, node_priors, instrument_evidence, temporal_evidence, biomarker_correlations, + 6 profile templates) | Check for multi-arm resolution, compute SE from CIs |
 | **Cohort/observational + cognitive outcomes** | Longitudinal cohort, cross-sectional, case-control | `STANDARD` | edge_evidence + population_norms + node_priors | May need to borrow SDs from other studies |
-| **Meta-analysis / systematic review** | Aggregates multiple studies | `DEEP` | edge_evidence (pooled estimates) + constituent study extraction | Extract both pooled AND per-study effects if Table available |
+| **Meta-analysis / systematic review** | Aggregates multiple studies | `DEEP` | edge_evidence (pooled estimates) + constituent study extraction | Extract both pooled AND per-study effects if Table available. **After loading: run Step 7b (hop discovery → retrieval → report).** |
 | **Biomarker / mechanistic only** | No behavioral intervention, just biomarker associations | `SHALLOW` | edge_evidence only | Often reports correlations (r) — convert to β |
 | **Dose-response study** | Reports effects at multiple dose levels | `DEEP` | edge_evidence + **dose_bridges info** | Extract EC₅₀, Emax if reported — feeds Category A tables |
 | **Longitudinal (≥3 timepoints)** | Reports cognitive change over time | `DEEP` | ALL 12 templates, especially temporal_evidence | Extract per-timepoint effects for trajectory modeling |
@@ -65,6 +65,37 @@ Read this FIRST. It routes you to the exact instructions you need based on what 
 ```bash
 python scripts/load_evidence_into_db.py --verbose
 ```
+
+**After import for meta-analyses/systematic reviews → Run the feedback loop (Step 7b):**
+```bash
+# 1. Queue constituent studies
+python -c "
+from crci.shared.db import get_session, init_db
+from crci.retrieval.hop_discoverer import run_hop_discovery
+init_db()
+with get_session() as session:
+    n = run_hop_discovery(session)
+    session.commit()
+    print(f'Queued {n} constituent studies')
+"
+
+# 2. Resolve IDs + attempt PDF retrieval
+python scripts/process_hop_queue.py --max-papers 20 --verbose
+
+# 3. See what's paywalled / needs manual download
+python scripts/show_paywalled.py --all
+
+# 4. Present the Constituent Study Report to the user (see 01_PROCEDURE.md Step 7b-3)
+```
+
+The AI must present a **Constituent Study Report** showing:
+- Which papers were retrieved (with PDF paths)
+- Which are paywalled (with DOI links for manual download)
+- Which couldn't be identified (no PMID/DOI)
+
+For paywalled papers, the user provides the PDF manually, then the AI extracts it.
+This loop repeats until all constituent studies are processed.
+Full details: **[01_PROCEDURE.md](../01_PROCEDURE.md) Step 7b**.
 
 ---
 
@@ -101,14 +132,25 @@ but are NOT populated from individual papers.
 | 2 | **[registries/EDGE_REGISTRY.csv](registries/EDGE_REGISTRY.csv)** | Check the edge doesn't already exist |
 | 3 | **[registries/INSTRUMENT_REGISTRY.csv](registries/INSTRUMENT_REGISTRY.csv)** | Check the instrument doesn't already exist |
 | 4 | **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** Step 1 | Column reference for EDGE_REGISTRY |
+| 5 | **`data/templates/node_proposals_template.csv`** | Template for proposing new nodes (see below) |
 
-**Rules:**
-- Node IDs: `NODE_[DOMAIN]_[CONSTRUCT]` (e.g., `NODE_COG_WORK_MEM`)
+**Rules — Edges & Instruments (can add directly):**
 - Edge IDs: `ER_[SOURCE]_[TARGET]` (e.g., `ER_ACTIVITY_WORKMEM`)
 - Instrument IDs: `INST_[ABBREVIATION]` (e.g., `INST_HVLTR`)
-- Every new node must have: `node_id`, `node_label`, `node_role`, `orientation`, `node_domain`, `default_state_space`, `state_update_scale`
 - Every new edge must have: `source_node_id`, `target_node_id`, `relation_type`, `expected_sign`, `primary_pathway`
 - After adding to registries, run `python scripts/load_evidence_into_db.py --reset --verbose` to sync to DB
+
+**Rules — Nodes (CANNOT add directly — proposal required):**
+- Nodes are the most protected entity. Do **NOT** add directly to NODE_REGISTRY.csv during extraction.
+- Instead, fill a row in `node_proposals_template.csv` inside the paper's extraction folder:
+  - `proposed_node_id`: follows `NODE_[DOMAIN]_[CONSTRUCT]` convention (e.g., `NODE_COG_WORK_MEM`)
+  - `proposed_node_label`, `proposed_node_layer`, `proposed_clinical_domain`, `proposed_orientation`
+  - `justification`: why this construct isn't covered by existing nodes
+  - `related_existing_nodes`: comma-separated list of similar nodes already in the registry
+  - `source_quote`: verbatim text from the paper defining the construct
+- Use `NODE_PENDING:<proposed_id>` as placeholder in edge CSVs referencing the unmapped construct
+- Proposal enters `review_tasks` queue → human approves/rejects/merges with existing node
+- Every new node must have (when promoted): `node_id`, `node_label`, `node_role`, `orientation`, `node_domain`, `default_state_space`, `state_update_scale`
 
 ---
 

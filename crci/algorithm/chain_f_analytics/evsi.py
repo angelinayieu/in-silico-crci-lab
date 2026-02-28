@@ -68,6 +68,10 @@ class VarianceState:
     # Per-edge variance contribution
     per_edge_variance_contrib: dict[str, float]
 
+    # R4: Per-study variance contribution within each edge
+    # {edge_id: {ler_id: variance_share}}
+    per_study_variance_contrib: dict[str, dict[str, float]] = field(default_factory=dict)
+
     gate_f_g3_passed: bool = False
 
 
@@ -79,20 +83,29 @@ class VarianceState:
 def _compute_literature_variance(
     edge_tau_squared: dict[str, float],
     edge_sensitivities: dict[str, float] | None = None,
-) -> tuple[float, dict[str, float]]:
+    edge_study_weights: dict[str, list[dict]] | None = None,
+) -> tuple[float, dict[str, float], dict[str, dict[str, float]]]:
     """F3a: Compute variance from inter-study heterogeneity.
 
     V_lit = Σ_e (∂θ/∂β_e)² × τ²_e
+
+    R4 extension: decomposes each edge's literature variance into per-study
+    shares using weight-proportional allocation:
+        V_lit_study_i = w_i_normalized × V_lit_edge
 
     Args:
         edge_tau_squared: edge_id → τ² (from meta-analysis).
         edge_sensitivities: edge_id → ∂θ/∂β_e (path sensitivity).
             If None, uses uniform sensitivity = 1.0.
+        edge_study_weights: edge_id → list of dicts with keys
+            {ler_id, weight_normalized}. From R1 StudyWeight data.
 
     Returns:
-        (literature_variance, per_edge_contribution)
+        (literature_variance, per_edge_contribution, per_study_contribution)
+        where per_study_contribution = {edge_id: {ler_id: variance_share}}.
     """
     per_edge: dict[str, float] = {}
+    per_study: dict[str, dict[str, float]] = {}
     total = 0.0
 
     for edge_id, tau_sq in edge_tau_squared.items():
@@ -104,7 +117,17 @@ def _compute_literature_variance(
         per_edge[edge_id] = contrib
         total += contrib
 
-    return total, per_edge
+        # R4: Weight-proportional per-study decomposition
+        if edge_study_weights and edge_id in edge_study_weights:
+            study_list = edge_study_weights[edge_id]
+            study_shares: dict[str, float] = {}
+            for sw in study_list:
+                ler_id = sw.get("ler_id", "unknown")
+                w_norm = sw.get("weight_normalized", 0.0)
+                study_shares[ler_id] = w_norm * contrib
+            per_study[edge_id] = study_shares
+
+    return total, per_edge, per_study
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -384,6 +407,7 @@ def compute_variance_decomposition(
     posterior_covariance: np.ndarray | None = None,
     observed_mask: np.ndarray | None = None,
     target_indices: list[int] | None = None,
+    edge_study_weights: dict[str, list[dict]] | None = None,
 ) -> VarianceState:
     """F3: Five-source variance decomposition.
 
@@ -399,6 +423,8 @@ def compute_variance_decomposition(
         posterior_covariance: Σ_post matrix.
         observed_mask: Which nodes observed.
         target_indices: Target (cognitive) node indices.
+        edge_study_weights: R4 — per-edge study weights for per-study
+            variance decomposition. {edge_id: [{ler_id, weight_normalized}]}.
 
     Returns:
         VarianceState.
@@ -409,8 +435,8 @@ def compute_variance_decomposition(
     logger.info("── F3: Five-Source Variance Decomposition ──")
 
     # F3a: Literature
-    v_lit, per_edge = _compute_literature_variance(
-        edge_tau_squared or {}, edge_sensitivities,
+    v_lit, per_edge, per_study = _compute_literature_variance(
+        edge_tau_squared or {}, edge_sensitivities, edge_study_weights,
     )
 
     # F3b: Measurement
@@ -452,6 +478,7 @@ def compute_variance_decomposition(
         missing_variance=v_missing,
         top_reducible=top_reducible,
         per_edge_variance_contrib=per_edge,
+        per_study_variance_contrib=per_study,
     )
 
     # Gate F-G3

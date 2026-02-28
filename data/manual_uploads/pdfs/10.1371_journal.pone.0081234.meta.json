@@ -1,0 +1,22 @@
+{
+  "doi": "10.1371/journal.pone.0081234",
+  "title": "The Effect of Cancer Chemotherapy on Cognition: A Systematic Review of Evidence from Human Studies",
+  "authors": [
+    "Cheung YT",
+    "Ng T",
+    "Shwe M"
+  ],
+  "year": 2013,
+  "journal": "PLoS One",
+  "pmid": "24339912",
+  "study_design": "systematic_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "SR of 23 studies on cytokines/chemotherapy/cognition. Qualitative synthesis, no meta-analysis. Has XML."
+}

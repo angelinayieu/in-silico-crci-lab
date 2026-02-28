@@ -1,0 +1,26 @@
+{
+  "doi": "10.1038/s41598-018-32257-w",
+  "title": "Diminished gray matter density mediates chemotherapy dosage-related cognitive impairment in breast cancer patients",
+  "authors": [
+    "Li M",
+    "Chen H",
+    "Lv Q"
+  ],
+  "year": 2018,
+  "journal": "Sci Rep",
+  "pmid": "30206305",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "n_total": 70,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_WORKMEM",
+    "ER_OIC_EPISODIC"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=35 BC post-chemo + 35 HC. MRI VBM. Chemo patients had decreased GM density in frontal/temporal regions. GM density mediated chemo dose \u2192 cognition. MoCA scores lower in chemo group."
+}

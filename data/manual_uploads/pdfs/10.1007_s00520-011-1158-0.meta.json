@@ -1,0 +1,25 @@
+{
+  "doi": "10.1007/s00520-011-1158-0",
+  "title": "Differential expression of cytokines in breast cancer patients receiving different chemotherapies: implications for cognitive impairment research",
+  "authors": [
+    "Janelsins MC",
+    "Mustian KM",
+    "Palesh OG"
+  ],
+  "year": 2012,
+  "journal": "Support Care Cancer",
+  "pmid": "21533812",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "n_total": 54,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_CHEMO_IL6",
+    "ER_CHEMO_TNF"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=54 BC patients: 28 doxorubicin+cyclophosphamide, 26 docetaxel+cyclophosphamide. Differential cytokine changes by regimen. IL-6, IL-8, MCP-1 increased post-chemo in AC group."
+}

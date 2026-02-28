@@ -1,0 +1,20 @@
+{
+  "doi": "10.1016/j.pmedr.2015.lo",
+  "title": "CRC Screening Behavior Study",
+  "authors": [
+    "Lo SH"
+  ],
+  "year": 2015,
+  "journal": "Prev Med Rep",
+  "pmid": "26504782",
+  "study_design": "cross_sectional",
+  "cancer_type": "colorectal",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: CRC screening behavior + SES/cognition. No cognitive impairment outcomes."
+}

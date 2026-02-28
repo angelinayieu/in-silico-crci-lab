@@ -1,0 +1,20 @@
+{
+  "doi": "10.21037/atm-20-6443",
+  "title": "Cancer-Related Cognitive Impairment: A Narrative Review",
+  "authors": [
+    "Bai L"
+  ],
+  "year": 2021,
+  "journal": "Ann Transl Med",
+  "pmid": "",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Ann Transl Med narrative review of CRCI."
+}

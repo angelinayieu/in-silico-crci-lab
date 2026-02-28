@@ -1,0 +1,20 @@
+{
+  "doi": "10.1016/j.mito.2026.chen",
+  "title": "Mitochondrial Quality Control in Cancer-Related Cognitive Impairment",
+  "authors": [
+    "Chen L"
+  ],
+  "year": 2026,
+  "journal": "Unknown",
+  "pmid": "41723889",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Review of mitochondrial mechanisms in CRCI. No extractable edge data."
+}

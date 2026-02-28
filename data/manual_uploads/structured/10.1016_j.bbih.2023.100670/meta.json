@@ -1,0 +1,25 @@
+{
+  "study_id": "STUDY_PATEL_2023",
+  "doi": "10.1016/j.bbih.2023.100670",
+  "first_author": "Patel",
+  "year": 2023,
+  "title": "Inflammation-related proteins as biomarkers of treatment-related behavioral symptoms: A longitudinal study of breast cancer patients and age-matched controls",
+  "journal": "Brain Behavior and Immunity - Health",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "survivorship",
+  "sample_size": 173,
+  "control_size": 77,
+  "notes": "Longitudinal cohort with matched controls; 4 timepoints: baseline (pre-any treatment), 1-month post-treatment, 1-year, 2-year. Joint longitudinal models with fold-change estimates. Treatment (all types including surgery-only) caused transient increases in sTNF-RII and IL-6 at 1-month post-treatment, returning to baseline by 1 year. sTNF-RII increase → worse Physical Functioning (fold-change 0.79, 95%CI 0.73-0.85 per unit ln(sTNF-RII) in patients) and worse Pain. IL-6 → worse Physical Functioning (fold-change 0.96, 95%CI 0.94-0.98, both patients and controls). IL-1RA → worse Physical Functioning (fold-change 0.93, 95%CI 0.90-0.97 in patients). CRITICALLY: NO significant associations between inflammatory markers and cognitive outcomes (Attention/Concentration unchanged, Perceived Cognitive Problems unchanged from baseline in patients). Controls showed modest improvement in cognitive measures (practice effect). Fold-change format not convertible to Cohen's d without additional distributional information. SF-36 Physical Functioning as outcome.",
+  "extraction_mode": "META_ONLY",
+  "extraction_status": "META_ONLY — no inflammation→cognition edge evidence; sTNF-RII/IL-6/IL-1RA → Physical Functioning/Pain only; cognitive outcomes (Attention/Concentration, Perceived Cognitive Problems) NULL; fold-change format not directly convertible to cohens_d",
+  "null_findings": [
+    "sTNF-RII → Attention/Concentration: not significant",
+    "sTNF-RII → Perceived Cognitive Problems: not significant",
+    "IL-6 → Attention/Concentration: not significant",
+    "IL-6 → Perceived Cognitive Problems: not significant",
+    "IL-1RA → cognitive outcomes: not significant",
+    "CRP → any behavioral symptom: not significant",
+    "All inflammatory markers returned to baseline by 1-year post-treatment"
+  ]
+}

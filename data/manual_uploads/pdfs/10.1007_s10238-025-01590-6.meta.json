@@ -1,0 +1,20 @@
+{
+  "doi": "10.1007/s10238-025-01590-6",
+  "title": "Risk Prediction Models for Cancer-Related Cognitive Impairment: A Review",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2025,
+  "journal": "Clin Exp Med",
+  "pmid": "40047952",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Review of CRCI risk prediction models. Meta-review, no original data."
+}

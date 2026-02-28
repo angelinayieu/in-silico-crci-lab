@@ -1,0 +1,25 @@
+{
+  "doi": "10.1007/s12035-018-1224-4",
+  "title": "Chemotherapy-Induced Cognitive Impairment Is Associated with Cytokine Dysregulation and Disruptions in Neuroplasticity",
+  "authors": [
+    "Shi DD",
+    "Huang YH",
+    "Lai CSW"
+  ],
+  "year": 2019,
+  "journal": "Mol Neurobiol",
+  "pmid": "30008071",
+  "study_design": "pre_post",
+  "cancer_type": "mixed",
+  "treatment_phase": "active_treatment",
+  "n_total": 0,
+  "extraction_mode": "SHALLOW",
+  "targeted_edges": [
+    "ER_CHEMO_IL6",
+    "ER_OIC_EPISODIC"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "ANIMAL STUDY (mice). DAC chemo\u2192increased IL-1\u03b2,IL-6,TNF\u03b1 in hippocampus\u2192spatial memory impairment (water maze). Reduced BDNF, synaptophysin, PSD-95. Paywalled."
+}

@@ -1,0 +1,28 @@
+{
+  "doi": "10.1016/j.jneuroim.2018.04.012",
+  "title": "Relationship between body mass index, cytokines, and cognitive function in breast cancer survivors on aromatase inhibitors",
+  "authors": [
+    "Henneghan AM",
+    "Palesh O",
+    "Harrison M",
+    "Kesler SR"
+  ],
+  "year": 2018,
+  "journal": "Journal of Neuroimmunology",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "survivorship",
+  "extraction_mode": "MODERATE",
+  "n_total": 66,
+  "targeted_edges": [
+    "ER_OIC_VERBAL",
+    "ER_OIC_EPISODIC",
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_COGCOMPLAINTS"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate",
+    "notes": "Cross-sectional, N=66, non-parametric RFR models (no standard β). Convenience sample, predominantly white (93.4%), single-site."
+  },
+  "notes": "Machine learning (Random Forest Regression) to identify cytokine predictors of cognition in BCS 6mo-10yr post-chemo. R² values reported for full models; no individual standardized coefficients available. Key: IL-10/IL-7/IL-4→verbal fluency; IL-1β/IL-2→verbal memory; IL-4/IL-1β/TNF-α→delayed memory; GM-CSF/IL-8/IL-2→processing speed; IL-1β/IL-2→executive; no cytokine predictors for FACT-Cog."
+}

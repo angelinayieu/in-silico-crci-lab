@@ -1,0 +1,23 @@
+{
+  "study_id": "STUDY_HOOGLAND_2023",
+  "doi": "10.3390/cancers15133407",
+  "first_author": "Hoogland",
+  "year": 2023,
+  "title": "Relationships among Inflammatory Biomarkers and Self-Reported Treatment-Related Symptoms in Patients Treated with Chemotherapy for Gynecologic Cancer: A Controlled Comparison",
+  "journal": "Cancers",
+  "study_design": "cohort",
+  "cancer_type": "gynecologic",
+  "treatment_phase": "during_and_post_treatment",
+  "sample_size": 121,
+  "control_size": 105,
+  "extraction_mode": "META_ONLY",
+  "notes": "NO COGNITIVE OUTCOMES MEASURED — paper assesses fatigue, depression, sleep, physical activity only. Uses random-effects fluctuation mixed models. Actual parameter estimates in Supplementary Table S3 (not in PDF). Key qualitative findings: between-person CRP→depression (p=0.01); within-person CRP→physical_activity (p=0.03). No significant effects for IL-6, TNF-alpha on fatigue or sleep. Cancer type: gynecologic (ovarian/endometrial/cervical). 5 timepoints: pre-chemo1, pre-chemo3, pre-chemo6, 6mo post, 12mo post. Biomarkers: TNF-alpha, TNFR1, TNFR2, IL-6, IL-10, IL-1b, IL-1ra, CRP.",
+  "extraction_status": "NO_EDGE_EVIDENCE — no cognitive outcomes, effect sizes in supplementary materials",
+  "qualitative_findings": {
+    "CRP_depression": "Between-person CRP associated with greater depression (p=0.01), main effect across patients and controls",
+    "CRP_physical_activity": "Within-person CRP fluctuations associated with less physical activity (p=0.03), main effect",
+    "null_fatigue": "No inflammatory biomarker associated with fatigue",
+    "null_sleep": "No inflammatory biomarker associated with sleep disturbance",
+    "null_group_interaction": "CRP-symptom associations not stronger for cancer patients than controls"
+  }
+}

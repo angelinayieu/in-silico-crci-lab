@@ -1,0 +1,4 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1093/jnci_djv131,NODE_COG_EPISODIC_MEM,INST_HVLTR,51.88,6.85,88,breast,pre_treatment,55-75
+10.1093/jnci_djv131,NODE_COG_PROC_SPEED,INST_TMT_B,109.79,12.89,88,breast,pre_treatment,55-75
+10.1093/jnci_djv131,NODE_COG_EXEC_INHIBITION,INST_STROOP,11.23,1.73,88,breast,pre_treatment,55-75

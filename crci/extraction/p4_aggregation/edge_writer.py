@@ -335,7 +335,23 @@ def _write_edge_param_build(
 
     Spec SYS_EX lines 1287-1288: Also write edge_param_builds_v1
       (audit trail + overlap_decision_json + annotation_source_ids_json)
+
+    R1 provenance: also persists per-study IVW weights as study_weights_json
+    for full source traceability.
     """
+    # R1 provenance: serialize per-study weights from PooledEstimate
+    study_weights_payload = [
+        {
+            "ler_id": sw.ler_id,
+            "study_id": sw.study_id,
+            "weight": sw.weight,
+            "weight_normalized": sw.weight_normalized,
+            "beta": sw.beta,
+            "se": sw.se,
+        }
+        for sw in inp.pooled_estimate.study_weights
+    ]
+
     build_record = EdgeParamBuild(
         build_id=f"bld_{compiled.edge_param_id}",
         build_label=f"P4-WR compile for {compiled.edge_relation_id}",
@@ -356,6 +372,7 @@ def _write_edge_param_build(
             "overlap_decision": inp.overlap_decision,
             "pub_bias_risk": compiled.pub_bias_risk.value if compiled.pub_bias_risk else None,
         },
+        study_weights_json=study_weights_payload if study_weights_payload else None,
         warnings_json=[],
         status="ok",
         notes=json.dumps({

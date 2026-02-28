@@ -173,6 +173,150 @@ What the paper actually reports (before conversion):
 | `[BIAS_ADJ]` | Quality or bias adjustment |
 | `[CONSTRUCT]` | Construct validity or node mapping |
 | `[DUPLICATE]` | Avoiding double-counting |
+| `[DOSE_MAP]` | Dose/protocol detail mapping or approximation |
+| `[ACTION_MAP]` | Intervention → action_id / sub_action_type mapping |
+
+---
+
+## action_class (Intervention Classification)
+
+| Value | Includes |
+|-------|----------|
+| `physical_activity` | Aerobic exercise, resistance training, yoga, Tai Chi, Pilates, dance, aquatic |
+| `cognitive_training` | Computerized training, paper-based exercises, group cognitive rehabilitation, neurofeedback |
+| `stress_regulation` | MBSR, MBCT, guided meditation, progressive muscle relaxation, biofeedback |
+| `sleep` | CBT-I, sleep restriction, stimulus control, sleep hygiene education |
+| `light_exposure` | Morning bright light, light box therapy |
+| `social` | Social engagement, support groups, group activities |
+| `nutrition` | Anti-inflammatory diet, Mediterranean diet, supplementation |
+| `pharmacological` | Stimulants, anti-inflammatory drugs, cholinesterase inhibitors |
+| `combined` | Multi-component (e.g., exercise + cognitive training) — list sub-components in notes |
+
+---
+
+## sub_action_type (Intervention Sub-Variants)
+
+### Physical Activity
+
+| Value | Description |
+|-------|-------------|
+| `walking` | Walking at prescribed pace/duration |
+| `jogging` | Jogging/running at prescribed intensity |
+| `cycling` | Stationary or outdoor cycling |
+| `swimming` | Swimming or aquatic exercise |
+| `high_intensity_interval_training` | HIIT — alternating high/low intensity bouts |
+| `moderate_continuous_training` | Steady-state aerobic at 50-70% capacity |
+| `resistance_machines` | Gym machine-based resistance training |
+| `resistance_free_weights` | Dumbbells, barbells |
+| `resistance_body_weight` | Push-ups, squats, lunges, etc. |
+| `resistance_bands` | Elastic band resistance |
+| `yoga_hatha` | Hatha yoga (poses + breathing) |
+| `yoga_vinyasa` | Flow-based yoga |
+| `yoga_restorative` | Gentle/restorative yoga |
+| `tai_chi` | Tai Chi / Qigong |
+| `pilates` | Pilates (mat or reformer) |
+| `dance` | Dance-based exercise |
+| `aquatic_exercise` | Water-based exercise (not lap swimming) |
+| `combined_aerobic_resistance` | Both aerobic and resistance in program |
+| `multimodal_exercise` | ≥3 modalities combined |
+
+### Cognitive Training
+
+| Value | Description |
+|-------|-------------|
+| `computerized_cognitive_training` | Software/app-based cognitive exercises |
+| `paper_based_cognitive_exercises` | Worksheet/puzzle-based training |
+| `group_cognitive_rehabilitation` | Group-format rehab with therapist |
+| `strategy_training_memory` | Memory strategy instruction (mnemonics, etc.) |
+| `strategy_training_attention` | Attention/concentration strategy instruction |
+| `neurofeedback` | EEG-based neurofeedback training |
+| `brain_games` | Commercial brain-training games (Lumosity, etc.) |
+| `speed_of_processing_training` | UFOV or similar processing-speed focused |
+| `dual_task_training` | Simultaneous cognitive-motor tasks |
+
+### Stress Regulation
+
+| Value | Description |
+|-------|-------------|
+| `mbsr` | Mindfulness-Based Stress Reduction (8-wk protocol) |
+| `mbct` | Mindfulness-Based Cognitive Therapy |
+| `guided_meditation` | Guided audio/in-person meditation |
+| `progressive_muscle_relaxation` | PMR protocol |
+| `deep_breathing` | Diaphragmatic/paced breathing exercises |
+| `biofeedback` | HRV or other biofeedback |
+| `acceptance_commitment_therapy` | ACT-based intervention |
+
+### Nutrition
+
+| Value | Description |
+|-------|-------------|
+| `mediterranean_diet` | Mediterranean dietary pattern |
+| `anti_inflammatory_diet` | Anti-inflammatory diet protocol |
+| `omega3_supplementation` | Fish oil / EPA+DHA supplementation |
+| `vitamin_d_supplementation` | Vitamin D supplementation |
+| `whole_diet_intervention` | Comprehensive dietary change program |
+
+### Pharmacological
+
+| Value | Description |
+|-------|-------------|
+| `methylphenidate` | Methylphenidate/Ritalin |
+| `modafinil` | Modafinil/Provigil |
+| `donepezil` | Donepezil (cholinesterase inhibitor) |
+| `memantine` | Memantine (NMDA antagonist) |
+| `nsaid` | Non-steroidal anti-inflammatory drug |
+| `cytokine_inhibitor` | TNF/IL-6 inhibitor |
+
+---
+
+## supervision (Intervention Delivery)
+
+| Value | Meaning |
+|-------|---------|
+| `supervised` | All sessions led/monitored by a professional |
+| `partially_supervised` | Some sessions supervised, some independent |
+| `unsupervised` | Fully self-directed (may have initial instruction) |
+| `home_based` | Performed at home (may be remotely monitored) |
+
+---
+
+## control_type (Comparator Arm)
+
+| Value | Meaning |
+|-------|---------|
+| `usual_care` | Standard of care / no additional intervention |
+| `waitlist` | Waitlist control (receives intervention later) |
+| `active_control` | Receives a different active intervention |
+| `attention_control` | Matched contact time, non-therapeutic activity |
+| `lower_dose` | Same intervention at lower dose/intensity |
+| `placebo` | Placebo (pharmacological studies) |
+| `sham` | Sham intervention (e.g., sham neurofeedback) |
+
+---
+
+## dose_unit
+
+| Value | Use When |
+|-------|----------|
+| `min_per_session` | Duration of individual session |
+| `min_per_week` | Total weekly dose in minutes |
+| `sessions_per_week` | Frequency |
+| `met_hours_per_week` | Metabolic equivalent hours |
+| `mg_per_day` | Pharmacological daily dose |
+| `iu_per_day` | International units per day (vitamins) |
+
+---
+
+## intensity_metric
+
+| Value | Instrument / Description |
+|-------|-------------------------|
+| `percent_hrmax` | % of age-predicted maximum heart rate |
+| `percent_hrr` | % of heart rate reserve (Karvonen method) |
+| `percent_vo2max` | % of measured VO2max |
+| `rpe_borg` | Rating of Perceived Exertion (6-20 Borg scale) |
+| `met` | Metabolic equivalent of task |
+| `qualitative` | Described as "light" / "moderate" / "vigorous" only |
 
 ## Risk Levels
 

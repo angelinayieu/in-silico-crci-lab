@@ -1,0 +1,22 @@
+{
+  "doi": "10.1016/j.soncn.2013.merriman",
+  "title": "Chemotherapy-Related Cognitive Impairment: Mechanisms Review",
+  "authors": [
+    "Merriman JD",
+    "Von Ah D",
+    "Miaskowski C"
+  ],
+  "year": 2013,
+  "journal": "Semin Oncol Nurs",
+  "pmid": "24183157",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Mechanisms review of CRCI. No extractable data."
+}

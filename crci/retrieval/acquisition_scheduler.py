@@ -54,6 +54,10 @@ from crci.retrieval.saturation_detector import (
     update_cycle_count,
 )
 from crci.retrieval.search_coordinator import SearchCoordinator
+from crci.retrieval.pathway_evidence_auditor import (
+    audit_evidence_landscape,
+    get_priority_edge_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +118,24 @@ def run_acquisition_cycle(
     if not queries:
         logger.warning("No queries generated. Check Class A tables.")
         return report
+
+    # Step 1b: Prioritize queries using evidence gap analysis
+    try:
+        priority_edges = get_priority_edge_ids(session, max_edges=50)
+        if priority_edges:
+            priority_set = set(priority_edges)
+            # Sort queries: those targeting priority edges come first
+            def _query_priority(q: object) -> int:
+                edge_ids = getattr(q, "edge_ids", None) or []
+                return -sum(1 for eid in edge_ids if eid in priority_set)
+            queries.sort(key=_query_priority)
+            logger.info(
+                "Step 1b: Re-ordered queries by gap priority (%d priority edges)",
+                len(priority_edges),
+            )
+    except Exception as exc:
+        logger.warning("Gap-based query prioritization failed (non-fatal): %s", exc)
+        report.errors.append(f"Gap prioritization warning: {exc}")
 
     # Respect daily query budget
     budget = config.RETRIEVAL_MAX_QUERIES_PER_DAY
@@ -260,6 +282,29 @@ def run_acquisition_cycle(
     except Exception as exc:
         logger.warning("Saturation check failed (non-fatal): %s", exc)
         report.errors.append(f"Saturation check warning: {exc}")
+
+    # Step 7: Post-cycle evidence landscape audit
+    logger.info("Step 7: Running post-cycle evidence landscape audit")
+    try:
+        landscape = audit_evidence_landscape(session, top_n_gaps=20)
+        if landscape.gaps:
+            grade_dist = landscape.grade_distribution
+            logger.info(
+                "Evidence landscape: %d edges total, grades: %s, "
+                "mean k=%.1f, top gap: %s (grade %s, priority %.3f)",
+                landscape.total_edges,
+                ", ".join(f"{g}={n}" for g, n in sorted(grade_dist.items())),
+                landscape.mean_k,
+                landscape.top_priority_gaps[0].edge_relation_id
+                if landscape.top_priority_gaps else "N/A",
+                landscape.top_priority_gaps[0].sufficiency_grade
+                if landscape.top_priority_gaps else "N/A",
+                landscape.top_priority_gaps[0].gap_priority_score
+                if landscape.top_priority_gaps else 0.0,
+            )
+    except Exception as exc:
+        logger.warning("Post-cycle audit failed (non-fatal): %s", exc)
+        report.errors.append(f"Landscape audit warning: {exc}")
 
     return report
 

@@ -1,0 +1,20 @@
+{
+  "doi": "10.1016/j.apjon.2023.100334",
+  "title": "Cancer-Related Cognitive Impairment: A Review for Clinical Practice",
+  "authors": [
+    "Unknown Authors"
+  ],
+  "year": 2024,
+  "journal": "Asia Pac J Oncol Nurs",
+  "pmid": "38098856",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Asia-Pacific CRCI review for clinicians. No extractable data."
+}

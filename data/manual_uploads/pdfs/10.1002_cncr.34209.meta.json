@@ -1,0 +1,18 @@
+{
+  "doi": "10.1002/cncr.34209",
+  "pmid": "35385137",
+  "pmcid": null,
+  "title": "Mindfulness-based stress reduction and cognitive function among breast cancer",
+  "journal": "Cancer",
+  "year": 2022,
+  "oa_status": "closed",
+  "publisher": "Wiley",
+  "source": "user_pubmed_link_plus_automated_resolution",
+  "staged_at": "2026-02-28T03:32:36.410040+00:00",
+  "retrieval_status": "abstract_only",
+  "retrieval_blocker": "No PMCID and no OA full text found via EuropePMC/OpenAlex/Wiley endpoint",
+  "next_action": "Manual PDF upload required to continue extraction",
+  "study_design": "randomized_controlled_trial",
+  "cancer_type": "breast",
+  "n_total": 60
+}

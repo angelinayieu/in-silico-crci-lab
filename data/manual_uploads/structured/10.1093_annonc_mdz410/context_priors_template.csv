@@ -1,0 +1,3 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1093/annonc/mdz410,NODE_COMP_CRCI,breast,mixed,-0.5,0.5,published_norm,50,Lange 2019: Authoritative review of CRCI state of the art. 15-25% of patients show persistent impairment. z≈−0.50 for typical CRCI population.
+10.1093/annonc/mdz410,NODE_SYM_COG_COMPLAINTS,breast,early_recovery,-0.8,0.5,published_norm,30,"Lange 2019: Self-reported complaints more prevalent than objective impairment, especially peri-treatment."

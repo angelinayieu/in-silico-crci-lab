@@ -36,6 +36,7 @@ from crci.shared.models.output_contracts import (
     DifferentialEffectSummary,
     DomainRiskBreakdown,
     DomainScore,
+    EdgeInfluence,
     EvidenceGapItem,
     EvidenceGapReport,
     ExtractionQualitySummary,
@@ -48,6 +49,7 @@ from crci.shared.models.output_contracts import (
     SchedulePlan,
     SensitivityIndexItem,
     SensitivityReport,
+    StudyContribution,
     SubpopulationComparisonSummary,
     SynergyMetrics,
     TemporalTrajectory,
@@ -131,16 +133,37 @@ class SessionSummary:
 
 def _build_provenance(
     schedules: list[Schedule],
+    edge_study_provenance: dict[str, list[dict]] | None = None,
 ) -> list[ProvenanceEntry]:
     """RT-I1: Build provenance chain for each recommended intervention.
 
     Args:
         schedules: Ranked schedules from RT-G.
+        edge_study_provenance: edge_id → list of study weight dicts
+            (from R1 study_weights_json). When provided, populates
+            supporting_edges with per-study attribution.
 
     Returns:
         ProvenanceEntry per schedule.
     """
     entries: list[ProvenanceEntry] = []
+
+    # Build supporting_edges from edge_study_provenance if available
+    supporting: list[dict] = []
+    if edge_study_provenance:
+        for edge_id, study_weights in edge_study_provenance.items():
+            supporting.append({
+                "edge_id": edge_id,
+                "study_weights": [
+                    {
+                        "study_id": sw.get("study_id", ""),
+                        "ler_id": sw.get("ler_id", ""),
+                        "weight_pct": sw.get("weight_normalized", 0.0) * 100,
+                        "paper_ref": sw.get("paper_ref"),
+                    }
+                    for sw in study_weights
+                ],
+            })
 
     for sched in schedules:
         for item in sched.items:
@@ -148,9 +171,11 @@ def _build_provenance(
                 intervention_id=item.action_id,
                 intervention_label=item.action_label,
                 claim_level=sched.claim_level,
+                supporting_edges=supporting,
             ))
 
-    logger.info("RT-I1 Provenance: %d entries", len(entries))
+    logger.info("RT-I1 Provenance: %d entries, %d edges with study attribution",
+                len(entries), len(supporting))
     return entries
 
 
@@ -472,6 +497,7 @@ def _build_variance_decomposition(
         total_variance=variance.total_variance,
         dominant_source=dominant,
         per_edge_contributions=variance.per_edge_variance_contrib or {},
+        per_study_contributions=variance.per_study_variance_contrib or {},
     )
 
 
@@ -879,8 +905,18 @@ def _build_decision_trace(
     disclosure: UncertaintyDisclosure,
     session: SessionSummary,
     run_id: str,
+    edge_study_provenance: dict[str, list[dict]] | None = None,
+    sensitivity_indices: list[SensitivityIndex] | None = None,
 ) -> DecisionTrace:
-    """Build decision trace for audit trail."""
+    """Build decision trace for audit trail.
+
+    When edge_study_provenance is provided, builds edge_study_map
+    that maps each critical edge to its contributing StudyContributions.
+
+    When sensitivity_indices is provided (R3), builds edge_influences
+    mapping each edge to its variance contribution percentage
+    (elasticity²/Σelasticity²).
+    """
     entries: list[DecisionTraceEntry] = []
 
     # Session info
@@ -907,10 +943,59 @@ def _build_decision_trace(
             outcome=f"intervention_id={prov.intervention_id}",
         ))
 
+    # Build edge_study_map from provenance data
+    edge_study_map: dict[str, list[StudyContribution]] = {}
+    if edge_study_provenance:
+        for edge_id, study_weights in edge_study_provenance.items():
+            contributions: list[StudyContribution] = []
+            for sw in study_weights:
+                contributions.append(StudyContribution(
+                    ler_id=sw.get("ler_id", ""),
+                    study_id=sw.get("study_id", ""),
+                    paper_ref=sw.get("paper_ref"),
+                    weight_pct=sw.get("weight_normalized", 0.0) * 100,
+                    beta=sw.get("beta", 0.0),
+                    se=sw.get("se", 0.0),
+                ))
+            if contributions:
+                edge_study_map[edge_id] = contributions
+        logger.info(
+            "Decision trace: edge_study_map populated for %d edges",
+            len(edge_study_map),
+        )
+
+    # R3: Build edge_influences from D4c sensitivity indices
+    edge_influences: dict[str, EdgeInfluence] = {}
+    if sensitivity_indices:
+        # Variance contribution: elasticity² / Σ(elasticity²) × 100
+        sum_elasticity_sq = sum(si.elasticity ** 2 for si in sensitivity_indices)
+        for si in sensitivity_indices:
+            if sum_elasticity_sq > 0:
+                var_pct = (si.elasticity ** 2 / sum_elasticity_sq) * 100.0
+            else:
+                var_pct = 0.0
+            edge_influences[si.edge_id] = EdgeInfluence(
+                edge_id=si.edge_id,
+                elasticity=si.elasticity,
+                discovery_score=si.discovery_score,
+                variance_contribution_pct=var_pct,
+            )
+        logger.info(
+            "Decision trace: edge_influences populated for %d edges "
+            "(top contributor: %s at %.1f%%)",
+            len(edge_influences),
+            max(edge_influences, key=lambda k: edge_influences[k].variance_contribution_pct)
+            if edge_influences else "N/A",
+            max(ei.variance_contribution_pct for ei in edge_influences.values())
+            if edge_influences else 0.0,
+        )
+
     return DecisionTrace(
         run_id=run_id,
         entries=entries,
         decision_critical_edges=disclosure.critical_edges,
+        edge_study_map=edge_study_map,
+        edge_influences=edge_influences,
     )
 
 
@@ -944,6 +1029,8 @@ def assemble_report(
     bundle_result: BundleResult | None = None,
     # D4-D6: Full ranking result (for sensitivity + safety detail)
     ranking_result: RankingResult | None = None,
+    # R2: Per-edge study-level provenance (from extraction pipeline)
+    edge_study_provenance: dict[str, list[dict]] | None = None,
 ) -> RecommendationReport:
     """RT-I4: Assemble complete RecommendationReport.
 
@@ -970,6 +1057,9 @@ def assemble_report(
         pathway_evidence_scores: From B6.5 (FrozenModelState.pathway_evidence_scores).
         bundle_result: From ALG-D3 (BundleResult, for synergy diagnostics).
         ranking_result: From ALG-D (D4-D6) — full ranking for sensitivity + safety.
+        edge_study_provenance: R2 — edge_id → list of study weight dicts
+            (from R1 study_weights_json). When provided, enables study-level
+            drill-down in provenance viewer and decision trace.
 
     Returns:
         RecommendationReport.
@@ -981,8 +1071,8 @@ def assemble_report(
         len(ranked_schedules.schedules),
     )
 
-    # RT-I1: Provenance
-    provenance = _build_provenance(ranked_schedules.schedules)
+    # RT-I1: Provenance (R2: with study-level attribution)
+    provenance = _build_provenance(ranked_schedules.schedules, edge_study_provenance)
 
     # RT-I2: Uncertainty Disclosure (MANDATORY)
     top_sched = ranked_schedules.schedules[0] if ranked_schedules.schedules else None
@@ -1014,8 +1104,13 @@ def assemble_report(
     # Variance decomposition
     var_decomp = _build_variance_decomposition(variance, run_id)
 
-    # Decision trace
-    trace = _build_decision_trace(provenance, disclosure, session, run_id)
+    # Decision trace (R2: with edge→study map, R3: with edge influences)
+    trace = _build_decision_trace(
+        provenance, disclosure, session, run_id, edge_study_provenance,
+        sensitivity_indices=(
+            ranking_result.sensitivity_indices if ranking_result else None
+        ),
+    )
 
     # Trajectories (Phase 8 S2)
     traj_list = (

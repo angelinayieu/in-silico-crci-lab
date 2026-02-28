@@ -1,0 +1,26 @@
+{
+  "doi": "10.4103/ajtr.ajtr_2020",
+  "title": "Changes in plasma IL-1\u03b2, TNF-\u03b1 and IL-4 levels are involved in chemotherapy-related cognitive impairment in early-stage breast cancer patients",
+  "authors": [
+    "Zhao J",
+    "Tian Z",
+    "Chen L"
+  ],
+  "year": 2020,
+  "journal": "Am J Transl Res",
+  "pmid": "32655829",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "n_total": 190,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EPISODIC",
+    "ER_OIC_ATTNSUST"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=190 BC. Pre/post-chemo. CICI in 38.4%. Higher IL-1\u03b2, TNF-\u03b1 post-chemo \u2192 worse cognition. IL-4 decreased post-chemo. Paywalled - abstract-only extraction."
+}

@@ -1,0 +1,4 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1038/s41598-022-05682-1,NODE_COMP_CRCI,breast,active_treatment,-0.67,0.5,published_norm,20,"25% prevalence of objective impairment before CT (Whittaker 2022, pooled across 24 studies)"
+10.1038/s41598-022-05682-1,NODE_COMP_CRCI,breast,early_recovery,-0.84,0.5,published_norm,15,30% prevalence of objective impairment on CT (Whittaker 2022)
+10.1038/s41598-022-05682-1,NODE_SYM_COG_COMPLAINTS,breast,early_recovery,-1.15,0.5,published_norm,10,~44% self-reported cognitive complaints post-CT (Whittaker 2022)

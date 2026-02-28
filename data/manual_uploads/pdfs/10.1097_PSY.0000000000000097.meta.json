@@ -1,0 +1,15 @@
+{
+  "title": "Association between sleep quality and cortisol diurnal rhythm in breast cancer survivors",
+  "authors": "Tell D, Mathews HL, Witek-Janusek L",
+  "year": 2014,
+  "journal": "Psychosomatic Medicine",
+  "pmcid": "PMC4163097",
+  "pmid": "25186656",
+  "cancer_type": "breast",
+  "sample_size": 130,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "A"
+  ],
+  "topology_fill": "Slice-1"
+}

@@ -1,0 +1,27 @@
+{
+  "doi": "10.3332/ecancer.2025.1856",
+  "title": "Acute and long-term effects of chemotherapy on cognitive function among Indian breast cancer patients",
+  "authors": [
+    "Singh P",
+    "et al."
+  ],
+  "year": 2025,
+  "journal": "ecancermedicalscience",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "extraction_mode": "STANDARD",
+  "n_total": 120,
+  "n_treatment": 90,
+  "n_control": 30,
+  "targeted_edges": [
+    "ER_DEPRESSION_COGCOMPLAINTS",
+    "ER_OIC_EPISODIC",
+    "ER_FATIGUE_ATTN",
+    "ER_OIC_ATTNSUST",
+    "ER_OIC_EXECPLAN"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  }
+}

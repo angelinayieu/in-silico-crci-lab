@@ -1,0 +1,26 @@
+{
+  "doi": "10.1007/s00520-016-3480-z",
+  "title": "Cognitive function and its relationship to other psychosocial factors in lymphoma survivors",
+  "authors": [
+    "Krolak D",
+    "Collins B",
+    "Bhargava R"
+  ],
+  "year": 2017,
+  "journal": "Support Care Cancer",
+  "pmid": "27837322",
+  "study_design": "cross_sectional",
+  "cancer_type": "hematologic",
+  "treatment_phase": "long_term_survivorship",
+  "n_total": 622,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_FATIGUE_ATTN",
+    "ER_DEPRESSION_WORKMEM",
+    "ER_FATIGUE_PROCSPEED"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=622 lymphoma survivors (survey). Self-reported cognitive complaints associated with fatigue, depression, anxiety, QoL. Paywalled - abstract-only extraction."
+}

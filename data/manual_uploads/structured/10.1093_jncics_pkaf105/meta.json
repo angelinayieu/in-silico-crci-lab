@@ -1,0 +1,24 @@
+{
+  "doi": "10.1093/jncics/pkaf105",
+  "title": "Longitudinal assessment of cognitive function in patients with breast cancer and lymphoma receiving chemotherapy",
+  "authors": [
+    "Sun H",
+    "et al."
+  ],
+  "year": 2025,
+  "journal": "JNCI Cancer Spectrum",
+  "study_design": "cohort",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "extraction_mode": "STANDARD",
+  "n_total": 225,
+  "n_treatment": 114,
+  "n_control": 111,
+  "targeted_edges": [
+    "ER_DEPRESSION_COGCOMPLAINTS",
+    "ER_OIC_COGCOMPLAINTS"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  }
+}

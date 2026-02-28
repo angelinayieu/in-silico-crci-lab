@@ -1,0 +1,14 @@
+{
+  "title": "Plasma BDNF, BDNF Val66Met polymorphism and self-perceived cognitive impairment in breast cancer",
+  "authors": "Ng T, Teo SM, Yeo HL, Shwe M, Gan YX, Cheung YT, Foo KM, Cham MT, Lee JA, Tan YP, Fan G, Yong WS, Preetha M, Loh WJ, Koo SL, Jain A, Lee GE, Wong M, Dent R, Yap YS, Ng R, Chan A",
+  "year": 2017,
+  "journal": "BMC Cancer",
+  "pmcid": "PMC5735945",
+  "cancer_type": "breast",
+  "sample_size": 51,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "F"
+  ],
+  "topology_fill": "Slice-1"
+}

@@ -1,0 +1,15 @@
+{
+  "title": "Sleep quality and cortisol diurnal slope in prostate cancer survivors: mediation of depressive symptoms",
+  "authors": "Hoyt MA, Bower JE, Irwin MR, Weierich MR, Stanton AL",
+  "year": 2016,
+  "journal": "Behavioral Neuroscience",
+  "pmcid": "PMC4877249",
+  "pmid": "26866336",
+  "cancer_type": "prostate",
+  "sample_size": 66,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "A"
+  ],
+  "topology_fill": "Slice-1"
+}

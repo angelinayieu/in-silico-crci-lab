@@ -1,0 +1,4 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.3332/ecancer.2025.1856,NODE_SYM_COG_COMPLAINTS,INST_FACTCOG_PCI,67.0,2.96,30,breast,active_treatment,
+10.3332/ecancer.2025.1856,NODE_COG_EPISODIC_MEM,INST_MOCA,25.0,1.67,30,breast,active_treatment,
+10.3332/ecancer.2025.1856,NODE_COG_ATTN_SUSTAINED,INST_MOCA,17.0,1.67,30,breast,active_treatment,

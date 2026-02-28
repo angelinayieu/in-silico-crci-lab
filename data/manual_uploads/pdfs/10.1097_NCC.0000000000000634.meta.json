@@ -1,0 +1,25 @@
+{
+  "doi": "10.1097/NCC.0000000000000634",
+  "title": "Physical Activity, the Childhood Cancer Symptom Cluster-Leukemia, and Cognitive Function: A Longitudinal Mediation Analysis",
+  "authors": [
+    "Hooke MC",
+    "Gilchrist L",
+    "Tanner L"
+  ],
+  "year": 2018,
+  "journal": "Cancer Nurs",
+  "pmid": "30124481",
+  "study_design": "cohort",
+  "cancer_type": "hematologic",
+  "treatment_phase": "active_treatment",
+  "n_total": 99,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_ACTIVITY_PROC_SPEED",
+    "ER_FATIGUE_ATTN"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=99 childhood leukemia. Longitudinal. PA\u2192symptom cluster\u2192cognitive function mediation. Paywalled."
+}

@@ -1,0 +1,3 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.3390/jcm11092363,NODE_SYM_COG_COMPLAINTS,INST_FACTCOG_PCI,55.01,12.1,90,breast,early_recovery,
+10.3390/jcm11092363,NODE_COG_VERBAL_FLUENCY,INST_COWAT,47.03,9.31,90,breast,early_recovery,

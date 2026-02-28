@@ -1,0 +1,20 @@
+{
+  "study_id": "STUDY_NG_2023",
+  "doi": "10.1038/s41598-023-43581-1",
+  "first_author": "Ng",
+  "year": 2023,
+  "title": "Brain-derived neurotrophic factor as a biomarker in cancer-related cognitive impairment among adolescent and young adult cancer patients",
+  "journal": "Scientific Reports",
+  "study_design": "cohort",
+  "cancer_type": "mixed",
+  "treatment_phase": "during_treatment",
+  "sample_size": 74,
+  "control_size": 118,
+  "notes": "AYA cancer (15-39yo): breast 24%, head/neck 22%, others. Chemo: platinum 61%, anthracyclines 26%, taxanes 24%. 49% concurrent radiotherapy+chemo. CANTAB battery + FACT-Cog. Linear mixed models adjusted for sociodemographic, baseline cognition, fatigue, psychological distress, time. BDNF measured via ELISA. Baseline BDNF → memory (β=0.05 p=0.018), attention (β=0.04 p=0.029). Post-baseline BDNF → exec function (β=0.04 p=0.030). Also: BDNF Val66Met Met/Met → better exec function vs Val/Val (β=0.82, p=0.012). Anthracycline subgroup: 1 ng/mL BDNF decrease → 0.84-point FACT-Cog total decrease (p=0.014). Cancer patients had much lower BDNF than controls (10.7 vs 21.6 ng/mL, p<0.001).",
+  "extraction_mode": "STANDARD",
+  "unmapped_findings": [
+    "Baseline BDNF → Attention (CANTAB RVP): β=0.04, p=0.029 — no ER_NEUROPLAST_ATTN edge in registry",
+    "BDNF Val66Met Met/Met → exec function: β=0.82, p=0.012 — genetic moderator, not an edge",
+    "Self-perceived cognitive abilities (PCA): β=0.19, p=0.020 — maps to COGCOMPLAINTS but via BDNF not OIC"
+  ]
+}

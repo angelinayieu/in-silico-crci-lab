@@ -1,0 +1,22 @@
+{
+  "doi": "10.1016/j.tranon.2021.101297",
+  "title": "Blood and Neuroimaging Biomarkers of Cognitive Sequelae in Breast Cancer Patients Throughout Chemotherapy: A Systematic Review",
+  "authors": [
+    "Schroyen G",
+    "Blommaert J",
+    "van Weehaeghe D"
+  ],
+  "year": 2022,
+  "journal": "Transl Oncol",
+  "pmid": "34896851",
+  "study_design": "systematic_review",
+  "cancer_type": "breast",
+  "treatment_phase": "active_treatment",
+  "n_total": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "SR of blood and neuroimaging biomarkers during chemo in BC. k=44 studies. Qualitative synthesis."
+}

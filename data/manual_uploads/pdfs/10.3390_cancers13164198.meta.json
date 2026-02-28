@@ -1,0 +1,25 @@
+{
+  "doi": "10.3390/cancers13164198",
+  "title": "Neuroinflammation and Its Association with Cognition, Neuronal Markers and Peripheral Inflammation after Chemotherapy for Breast Cancer",
+  "authors": [
+    "Schroyen G",
+    "Vissers J",
+    "Smeets A"
+  ],
+  "year": 2021,
+  "journal": "Cancers (Basel)",
+  "pmid": "34439351",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "n_total": 74,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EPISODIC"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "C+ n=19, C- n=18, HC n=37. TSPO-PET neuroimaging. NfL dramatically elevated in C+ (20-fold). Higher relative glial expression \u2192 worse cognition."
+}

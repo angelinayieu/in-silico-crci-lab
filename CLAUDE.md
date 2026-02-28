@@ -22,7 +22,15 @@ Every gate must be enforced. Every module must connect to the next.
 5. Read **[registries/INSTRUMENT_REGISTRY.csv](registries/INSTRUMENT_REGISTRY.csv)** — valid instrument IDs
 6. List `data/manual_uploads/structured/` — see which papers already have folders
 7. Check `data/manual_uploads/pdfs/` — see which PDFs + meta.json exist
-8. If the paper is a **systematic review or meta-analysis**: also read `crci/retrieval/hop_discoverer.py` docstring (it auto-queues constituent studies)
+8. If the paper is a **systematic review or meta-analysis**:
+   - Read `01_PROCEDURE.md` **Step 7b** — the full MA feedback loop (hop discovery → retrieval → report → extract constituents)
+   - After loading the MA's pooled data, you MUST run the constituent study loop:
+     1. `run_hop_discovery(session)` → queues constituent studies
+     2. `python scripts/process_hop_queue.py` → resolves IDs + retrieves PDFs
+     3. `python scripts/show_paywalled.py --all` → shows queue status
+     4. Present the **Constituent Study Report** to the user (format in Step 7b-3)
+     5. Extract retrieved PDFs → load into DB → repeat for paywalled papers the user provides
+   - The LLM_TASK_ROUTER.md § "Meta-Analysis Workflow" has the exact commands
 
 **Minimum context for ANY paper extraction:** steps 1-5 above. Without them, you risk wrong IDs, duplicate edges, or inconsistent column names.
 

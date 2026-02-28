@@ -1,0 +1,2 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1200/JCO.2015.63.0905,NODE_COMP_CRCI,colorectal,active_treatment,-0.44,0.5,published_norm,1,"z=(45.6-50)/10=-0.44; CRC localized patients Global T-score mean=45.6 (SD=7.4 N=289) vs normative T mean=50 SD=10; 43% cognitively impaired (GDS>0.5) vs 15% HCs (P<.001); impairment in processing speed verbal memory and attention/working memory domains; this is a composite across all cognitive domains"

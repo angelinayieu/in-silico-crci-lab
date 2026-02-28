@@ -1071,6 +1071,8 @@ class EdgeParamBuild(Base):
     timing_prior_ids_json = Column(JSONB)
     outputs_edge_param_ids_json = Column(JSONB)
     outputs_summary_json = Column(JSONB)
+    # R1 provenance: per-study IVW weights [{ler_id, study_id, weight, weight_normalized, beta, se}]
+    study_weights_json = Column(JSONB)
     warnings_json = Column(JSONB)
     status = Column(Text, default="ok")
     notes = Column(Text)

@@ -1,0 +1,20 @@
+{
+  "doi": "10.1038/s41598-017-12703-x",
+  "title": "Biomarkers of inflammation and breast cancer risk",
+  "authors": [
+    "Agnoli C"
+  ],
+  "year": 2017,
+  "journal": "Sci Rep",
+  "pmid": "",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Inflammation biomarkers predicting breast cancer INCIDENCE not cognitive impairment."
+}

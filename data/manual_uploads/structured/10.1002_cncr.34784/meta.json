@@ -1,0 +1,21 @@
+{
+  "study_id": "STUDY_MANDELBLATT_2023",
+  "doi": "10.1002/cncr.34784",
+  "first_author": "Mandelblatt",
+  "year": 2023,
+  "title": "Plasma Levels of Interleukin-6 Mediate Neurocognitive Performance in Older Breast Cancer Survivors: The Thinking and Living with Cancer Study",
+  "journal": "Cancer",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "survivorship",
+  "sample_size": 400,
+  "control_size": 329,
+  "notes": "TLC study prospective cohort; women >=60 years; breast cancer stage 0-III; pre-systemic therapy baseline to 60 months follow-up. Mediation analysis: Survivor status → cytokines → cognition. Table 2 reports mediation model path coefficients (βa=cancer→cytokine, βb=cytokine→cognition, βab=indirect). APE composite = attention + processing speed + executive function (TMT-A, TMT-B, SDMT, COWAT). LM domain = learning/memory. IL-6 and TNF-alpha significantly mediate survivor→APE relationship. IL-6 mediation βab=-0.023 SE=0.009 p=0.01 survives Bonferroni correction. LM domain: no survivor/control differences, no mediation. Also measured IL-8, IL-10, IFN-gamma. Controlled for age, race, education, site, anxiety, depression, BMI, comorbidities, time.",
+  "extraction_mode": "STANDARD",
+  "null_findings": [
+    "LM (Learning/Memory) domain: no survivor vs control differences in mediation model",
+    "IL-8 → APE: not associated (βb not reported as significant)",
+    "IFN-gamma → APE: not associated (βb not reported as significant)",
+    "IL-6 → LM: not mediated (no survivor/control LM differences)"
+  ]
+}

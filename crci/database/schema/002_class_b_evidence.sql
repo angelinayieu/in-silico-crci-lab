@@ -310,6 +310,8 @@ CREATE TABLE IF NOT EXISTS edge_param_builds_v1 (
     timing_prior_ids_json           JSONB,
     outputs_edge_param_ids_json     JSONB,
     outputs_summary_json            JSONB,
+    -- R1 provenance: per-study IVW weights [{ler_id, study_id, weight, weight_normalized, beta, se}]
+    study_weights_json              JSONB,
     warnings_json                   JSONB,
     status                          TEXT        DEFAULT 'ok',
     notes                           TEXT,

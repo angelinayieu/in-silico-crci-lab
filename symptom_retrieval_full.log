@@ -1,0 +1,427 @@
+nohup: ignoring input
+======================================================================
+SYMPTOM-COGNITION PAPER BATCH RETRIEVAL
+======================================================================
+Total papers to retrieve: 56
+  - PMC articles: 38
+  - DOI papers: 11
+  - PMID papers: 7
+
+
+======================================================================
+SESSION 1: PMC ARTICLES
+======================================================================
+
+======================================================================
+Retrieving: PMC6640530
+Description: Liou 2019 insomnia→perceived CI breast
+======================================================================
+  ✓ Resolved: DOI=10.1093/jncics/pkz041, PMID=31355357
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC6122719
+Description: Giffard PROSOM-K 2018 sleep→memory BCA
+======================================================================
+  ✓ Resolved: DOI=10.1186/s12885-018-4762-2, PMID=30176833
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC6792503
+Description: Vardy 2022 inflammation→attention BCA
+======================================================================
+  ✓ Resolved: DOI=10.1002/cam4.2490, PMID=31407525
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC12665909
+Description: Onyedibe 2025 depression/fatigue→FACT-Cog
+======================================================================
+  ✓ Resolved: DOI=10.3332/ecancer.2025.1958, PMID=41333365
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC12119337
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1038/s41390-024-03512-w, PMID=39210050
+  ❌ Error: Command '['python3', 'scripts/retrieve_papers.py', '--doi', '10.1038/s41390-024-03512-w']' timed out after 120 seconds
+
+======================================================================
+Retrieving: PMC11642909
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1371/journal.pone.0314551, PMID=39671361
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC10900040
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1007/s41105-022-00439-9, PMID=38469285
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC4165557
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1007/s10549-014-3092-6, PMID=25138546
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC4455839
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1212/01.CON.0000466656.59413.29, PMID=26039844
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC2861143
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1002/pon.1581, PMID=19472296
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC7602817
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.3390/cancers12103000, PMID=33081111
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC8170590
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1097/NRL.0b013e318188040d, PMID=19276784
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC8713760
+Description: Ehrstedt 2021 fatigue→processing speed pediatric
+======================================================================
+  ✓ Resolved: DOI=10.3389/fmolb.2021.770413, PMID=34970595
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC9073450
+Description: CRCI search result
+======================================================================
+  ✓ Resolved: DOI=10.1007/s40263-022-00913-5, PMID=35522374
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC10914843
+Description: Lung cancer CRCI prevalence meta-analysis
+======================================================================
+  ✓ Resolved: DOI=10.1007/s00520-024-08402-9, PMID=38441715
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC12077423
+Description: Lung cancer neuropsych protocol
+======================================================================
+  ✓ Resolved: DOI=10.3389/fpsyg.2025.1502793, PMID=40370379
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC5657249
+Description: Simó lung cancer cognitive + brain
+======================================================================
+  ✓ Resolved: DOI=10.1097/JTO.0000000000000345, PMID=25325778
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC7384931
+Description: CLL cognition disease risk→memory/EF
+======================================================================
+  ✓ Resolved: DOI=10.1080/10428194.2020.1728748, PMID=32148161
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC10305842
+Description: CML/TKI cognition symptoms→subjective CI
+======================================================================
+  ✓ Resolved: DOI=10.1080/10428194.2022.2148208, PMID=36476293
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC9046282
+Description: Hodgkin lymphoma long-term cognition Hungary
+======================================================================
+  ✓ Resolved: DOI=10.1007/s00520-022-06918-6, PMID=35274189
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC8755481
+Description: Lymphoma CRCI longitudinal commentary
+======================================================================
+  ✓ Resolved: DOI=10.1093/jnci/djab134, PMID=34255081
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC9385796
+Description: Aggressive lymphoma CRCI feasibility
+======================================================================
+  ✓ Resolved: DOI=10.1007/s00520-022-07153-9, PMID=35699780
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC4239806
+Description: Vardy 2014 CRC cognition+fatigue baseline
+======================================================================
+  ✓ Resolved: DOI=10.1093/annonc/mdu448, PMID=25214544
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC5683012
+Description: Vardy 2015 CRC cognition longitudinal 24mo
+======================================================================
+  ✓ Resolved: DOI=10.1200/JCO.2015.63.0905, PMID=26527785
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC4380836
+Description: Ho 2015 fatigue→depression cross-lagged BCA
+======================================================================
+  ✓ Resolved: DOI=10.1016/j.jpainsymman.2014.09.009, PMID=25461671
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC4058321
+Description: Brown 2013 cross-lagged fatigue↔depression NULL
+======================================================================
+  ✓ Resolved: DOI=10.1037/a0029773, PMID=22924447
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC3250363
+Description: Liu fatigue↔sleep longitudinal BCA actigraphy
+======================================================================
+  ✓ Resolved: DOI=10.5665/sleep.1630, PMID=22294814
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC12211318
+Description: Hendy 2025 sleep/fatigue/depression→QoL BCA
+======================================================================
+  ✓ Resolved: DOI=10.1186/s12885-025-14538-6, PMID=40597987
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC9368026
+Description: Total pain→illness acceptance pelvic SEM
+======================================================================
+  ✓ Resolved: DOI=10.3390/ijerph19159631, PMID=35954987
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC12211190
+Description: Cancer pain→QoL SEM biopsychosocial
+======================================================================
+  ✓ Resolved: DOI=10.1186/s12885-025-14473-6, PMID=40597821
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC8691137
+Description: EF→depressive symptoms via coping BCA mediation
+======================================================================
+  ✓ Resolved: DOI=10.1097/PSY.0000000000000926, PMID=33657085
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC4995149
+Description: Noll 2017 NCF/mood/QoL temporal lobe glioma
+======================================================================
+  ✓ Resolved: DOI=10.1002/pon.4046, PMID=26677053
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC5980921
+Description: Symptoms/anxiety/depression→QoL path analysis
+======================================================================
+  ✓ Resolved: DOI=10.22034/APJCP.2018.19.2.365, PMID=29479979
+  ❌ Failed to retrieve
+
+======================================================================
+Retrieving: PMC12287671
+Description: JMIR 2025 systematic review network analysis
+======================================================================
+  ✓ Resolved: DOI=10.2196/66087, PMID=40633921
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC9529994
+Description: Xiao 2022 HNC network 4 timepoints
+======================================================================
+  ✓ Resolved: DOI=10.1002/cncr.34424, PMID=35969226
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC6377208
+Description: GYN cancer CRCI review
+======================================================================
+  ✓ Resolved: DOI=10.1080/23809000.2018.1443811, PMID=30775449
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC5425316
+Description: Ovarian cancer brain structure+cognition
+======================================================================
+  ✓ Resolved: DOI=10.1007/s11682-016-9608-4, PMID=27766586
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+Retrieving: PMC9883396
+Description: Mental health disorders ovarian cancer survivors
+======================================================================
+  ✓ Resolved: DOI=10.1002/cam4.4976, PMID=35773781
+  ✅ Successfully retrieved via DOI
+
+======================================================================
+SESSION 2: DOI-BASED PAPERS
+======================================================================
+
+======================================================================
+Retrieving: 10.1101/2025.01.10.25322159
+Description: Cognitive function LPA chemo 2025 preprint
+======================================================================
+
+======================================================================
+Retrieving: 10.1007/s00520-026-10317-6
+Description: Aggressive lymphoma cognition 2026 Springer
+======================================================================
+
+======================================================================
+Retrieving: 10.3389/fonc.2025.1509424
+Description: Hodgkin lymphoma cognition Frontiers
+======================================================================
+
+======================================================================
+Retrieving: 10.1186/s12885-025-14732-6
+Description: CRC neuropsych 2025 BMC
+======================================================================
+  ❌ Error: Command '['python3', 'scripts/retrieve_papers.py', '--doi', '10.1186/s12885-025-14732-6']' timed out after 120 seconds
+
+======================================================================
+Retrieving: 10.3389/fonc.2024.1380916
+Description: GYN cancer distress trajectory Frontiers
+======================================================================
+
+======================================================================
+Retrieving: 10.3389/fmolb.2021.770413
+Description: Long-term CRCI review Frontiers
+======================================================================
+
+======================================================================
+Retrieving: 10.3389/fpubh.2023.1079873
+Description: Somatic symptom network Frontiers
+======================================================================
+
+======================================================================
+Retrieving: 10.2196/66087
+Description: JMIR network analysis direct link
+======================================================================
+
+======================================================================
+Retrieving: 10.1007/s11764-024-01543-0
+Description: Doppenberg-Smit 2024 symptom networks Springer
+======================================================================
+
+======================================================================
+Retrieving: 10.1007/s11764-022-01246-4
+Description: EMA temporal network Springer
+======================================================================
+
+======================================================================
+Retrieving: 10.1038/s41598-025-09550-6
+Description: Network QoL/mindfulness Nature Sci Rep
+======================================================================
+  ❌ Error: Command '['python3', 'scripts/retrieve_papers.py', '--doi', '10.1038/s41598-025-09550-6']' timed out after 120 seconds
+
+======================================================================
+SESSION 3: PMID-BASED PAPERS
+======================================================================
+
+======================================================================
+Retrieving: PMID 36890861
+Description: Luo 2023 lung cancer symptom cluster→CI
+======================================================================
+  ✓ Resolved to DOI: 10.1016/j.apjon.2023.100200
+
+======================================================================
+Retrieving: PMID 29080061
+Description: Dhillon 2018 CRC perceived CI longitudinal
+======================================================================
+  ⚠️  No DOI found for PMID 29080061
+
+======================================================================
+Retrieving: PMID 15897927
+Description: Beck 2005 pain→sleep→fatigue mediation
+======================================================================
+  ⚠️  No DOI found for PMID 15897927
+
+======================================================================
+Retrieving: PMID 30679301
+Description: Charalambous 2019 pain→anxiety/fatigue mediation
+======================================================================
+  ✓ Resolved to DOI: 10.1136/bmjopen-2018-026809
+
+======================================================================
+Retrieving: PMID 39387227
+Description: CRF network analysis BCA 2024
+======================================================================
+  ✓ Resolved to DOI: 10.1002/cam4.70268
+
+======================================================================
+Retrieving: PMID 31435892
+Description: Schellekens 2020 fatigue/depression network
+======================================================================
+  ✓ Resolved to DOI: 10.1007/s10865-019-00084-7
+
+======================================================================
+Retrieving: PMID 33404703
+Description: Corallo 2021 GYN cancer CRCI+depression
+======================================================================
+  ⚠️  No DOI found for PMID 33404703
+
+======================================================================
+BATCH RETRIEVAL SUMMARY
+======================================================================
+  ✅ Successfully retrieved: 40/56
+  ❌ Failed: 16/56
+
+  Failed papers:
+    - PMC12119337: CRCI search result...
+      Reason: PMC retrieval failed
+    - PMC10900040: CRCI search result...
+      Reason: PMC retrieval failed
+    - PMC4165557: CRCI search result...
+      Reason: PMC retrieval failed
+    - PMC4455839: CRCI search result...
+      Reason: PMC retrieval failed
+    - PMC8170590: CRCI search result...
+      Reason: PMC retrieval failed
+    - PMC5657249: Simó lung cancer cognitive + brain...
+      Reason: PMC retrieval failed
+    - PMC8755481: Lymphoma CRCI longitudinal commentary...
+      Reason: PMC retrieval failed
+    - PMC5683012: Vardy 2015 CRC cognition longitudinal 24mo...
+      Reason: PMC retrieval failed
+    - PMC8691137: EF→depressive symptoms via coping BCA mediation...
+      Reason: PMC retrieval failed
+    - PMC5980921: Symptoms/anxiety/depression→QoL path analysis...
+      Reason: PMC retrieval failed
+    - 10.1101/2025.01.10.25322159: Cognitive function LPA chemo 2025 preprint...
+      Reason: DOI retrieval failed
+    - 10.1186/s12885-025-14732-6: CRC neuropsych 2025 BMC...
+      Reason: DOI retrieval failed
+    - 10.1038/s41598-025-09550-6: Network QoL/mindfulness Nature Sci Rep...
+      Reason: DOI retrieval failed
+    - 29080061: Dhillon 2018 CRC perceived CI longitudinal...
+      Reason: PMID resolution/retrieval failed
+    - 15897927: Beck 2005 pain→sleep→fatigue mediation...
+      Reason: PMID resolution/retrieval failed
+    - 33404703: Corallo 2021 GYN cancer CRCI+depression...
+      Reason: PMID resolution/retrieval failed
+======================================================================

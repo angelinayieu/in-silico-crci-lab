@@ -1,0 +1,5 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1002/cncr.34784,NODE_COG_PROC_SPEED,INST_TMT_B,-0.07,0.61,400,breast,survivorship,60-90
+10.1002/cncr.34784,NODE_COG_PROC_SPEED,INST_TMT_B,0.06,0.62,329,,survivorship,60-90
+10.1002/cncr.34784,NODE_SYM_COG_COMPLAINTS,INST_FACTCOG_PCI,60.7,10.8,400,breast,survivorship,60-90
+10.1002/cncr.34784,NODE_SYM_COG_COMPLAINTS,INST_FACTCOG_PCI,61.5,9.5,329,,survivorship,60-90

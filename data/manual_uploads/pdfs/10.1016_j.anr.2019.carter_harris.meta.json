@@ -1,0 +1,20 @@
+{
+  "doi": "10.1016/j.anr.2019.carter_harris",
+  "title": "Lung Cancer Screening Decision Making",
+  "authors": [
+    "Carter-Harris L"
+  ],
+  "year": 2020,
+  "journal": "Asian Nurs Res",
+  "pmid": "31550991",
+  "study_design": "cross_sectional",
+  "cancer_type": "lung",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Lung cancer screening decision-making behavior. Not cognitive impairment."
+}

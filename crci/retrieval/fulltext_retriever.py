@@ -258,6 +258,128 @@ class FulltextRetriever:
         self._update_queue_from_doi(norm_doi, resolved, result)
         return result
 
+    # ═══════════════════════════════════════════════════════════
+    #  ENTRY POINT 2: PMID-BASED RETRIEVAL
+    # ═══════════════════════════════════════════════════════════
+
+    def retrieve_by_pmid(
+        self,
+        pmid: str,
+        title: str | None = None,
+        stage: bool = True,
+        output_dir: Path | None = None,
+    ) -> RetrievalResult:
+        """Retrieve full text for a single PMID.
+
+        Resolves PMID → DOI via NCBI ID converter, then delegates to
+        the full 8-source chain via retrieve_by_doi().
+
+        If no DOI can be resolved, attempts Europe PMC and PMC XML
+        directly using the PMID/PMCID.
+
+        Args:
+            pmid: PubMed ID string.
+            title: Expected title for fuzzy-match validation.
+            stage: If True, stage the retrieved file for P0 extraction.
+            output_dir: If provided, copy the final PDF here as pmid_{pmid}.pdf.
+
+        Returns:
+            RetrievalResult describing what was retrieved (or why not).
+        """
+        from crci.retrieval.id_resolver import _normalize_pmid
+
+        norm_pmid = _normalize_pmid(str(pmid))
+        if not norm_pmid:
+            return RetrievalResult(
+                doi="",
+                pmid=pmid,
+                status=RetrievalStatus.FAILED,
+                error_message="Invalid PMID",
+            )
+
+        # Step 1: Resolve PMID → DOI + PMCID via NCBI
+        logger.info("Resolving PMID %s → DOI/PMCID...", norm_pmid)
+        resolved_doi = ""
+        resolved_pmcid = ""
+        try:
+            from crci.retrieval.id_resolver import _fetch_ncbi_id_mapping
+            mapping = _fetch_ncbi_id_mapping([norm_pmid], "pmid")
+            if norm_pmid in mapping:
+                resolved_doi = mapping[norm_pmid].get("doi", "")
+                resolved_pmcid = mapping[norm_pmid].get("pmcid", "")
+                logger.info(
+                    "PMID %s resolved: DOI=%s PMCID=%s",
+                    norm_pmid, resolved_doi or "(none)", resolved_pmcid or "(none)",
+                )
+        except Exception as exc:
+            logger.warning("NCBI ID resolution failed for PMID %s: %s", norm_pmid, exc)
+
+        # Step 2: If we got a DOI, use the full 8-source chain
+        result: RetrievalResult | None = None
+        if resolved_doi:
+            result = self.retrieve_by_doi(resolved_doi, title=title, stage=stage)
+            # Enrich with PMID
+            if result.pmid != norm_pmid:
+                result = result.model_copy(update={"pmid": norm_pmid})
+        else:
+            logger.info(
+                "No DOI resolved for PMID %s — attempting direct PMC retrieval",
+                norm_pmid,
+            )
+            # Try direct PMC retrieval with PMCID or PMID
+            identifier = resolved_pmcid or f"PMID:{norm_pmid}"
+            for source_name in ("europe_pmc", "pmc_xml"):
+                adapter = self._ft_adapters.get(source_name)
+                if adapter is None:
+                    continue
+                if source_name in ("europe_pmc", "pmc_xml") and not resolved_pmcid:
+                    continue  # These need PMCID
+                try:
+                    content = adapter.retrieve_fulltext(resolved_pmcid)
+                    if content:
+                        ext = "xml" if source_name in ("europe_pmc", "pmc_xml") else "pdf"
+                        cache_path = self._save_to_cache(content, f"pmid_{norm_pmid}", ext)
+                        result = RetrievalResult(
+                            doi="",
+                            pmid=norm_pmid,
+                            status=RetrievalStatus.RETRIEVED,
+                            cache_path=str(cache_path),
+                            source_used=source_name,
+                            file_size_bytes=len(content),
+                            retrieval_format=ext,
+                        )
+                        if stage:
+                            staged = self.stage_for_extraction(
+                                cache_path, f"pmid_{norm_pmid}",
+                                ResolvedIdentifiers(pmid=norm_pmid, pmcid=resolved_pmcid),
+                            )
+                            if staged:
+                                result = result.model_copy(update={"cache_path": str(staged)})
+                        break
+                except Exception as exc:
+                    logger.debug("Direct %s retrieval failed for PMID %s: %s", source_name, norm_pmid, exc)
+
+            if result is None:
+                result = RetrievalResult(
+                    doi="",
+                    pmid=norm_pmid,
+                    status=RetrievalStatus.ABSTRACT_ONLY,
+                    error_message=f"No DOI resolved; no OA fulltext for PMID {norm_pmid}",
+                )
+
+        # Step 3: If output_dir specified, copy to expected location
+        if output_dir and result.status == RetrievalStatus.RETRIEVED and result.cache_path:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            src = Path(result.cache_path)
+            dst = output_dir / f"pmid_{norm_pmid}{src.suffix}"
+            if src.exists() and not dst.exists():
+                shutil.copy2(src, dst)
+                logger.info("Copied retrieved file to %s", dst)
+                result = result.model_copy(update={"cache_path": str(dst)})
+
+        return result
+
     def _try_source(
         self,
         source_name: str,

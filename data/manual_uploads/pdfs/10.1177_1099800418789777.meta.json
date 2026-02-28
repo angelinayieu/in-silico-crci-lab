@@ -1,0 +1,14 @@
+{
+  "title": "MBSR effects on salivary cortisol and IL-6 in breast cancer survivors",
+  "authors": "Lengacher CA et al.",
+  "year": 2019,
+  "journal": "Biological Research for Nursing",
+  "pmcid": "PMC6700883",
+  "cancer_type": "breast",
+  "sample_size": 322,
+  "extraction_mode": "STANDARD",
+  "bridge_edges": [
+    "D"
+  ],
+  "topology_fill": "Slice-1"
+}

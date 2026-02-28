@@ -1,0 +1,20 @@
+{
+  "doi": "10.1002/meyers.1999",
+  "title": "Neurocognitive dysfunction in cancer patients: a risk factor analysis",
+  "authors": [
+    "Meyers CA"
+  ],
+  "year": 1999,
+  "journal": "Unknown",
+  "pmid": "10442168",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Old review/chapter from 1999 on neurocognitive dysfunction. Historical reference only."
+}

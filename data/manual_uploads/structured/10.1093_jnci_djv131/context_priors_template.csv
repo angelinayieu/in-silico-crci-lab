@@ -1,0 +1,4 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1093/jnci_djv131,NODE_COG_EPISODIC_MEM,breast,pre_treatment,-0.40,0.5,published_norm,1,"z=(46.00-50)/10; patient mean T-score=46.00 vs normative mean=50 SD=10; 28% of patients scored <1SD below norm"
+10.1093/jnci_djv131,NODE_COG_PROC_SPEED,breast,pre_treatment,0.29,0.5,published_norm,1,"z=(104.35-100)/15; patient mean standard score=104.35 vs normative mean=100 SD=15; 7.8% <1SD"
+10.1093/jnci_djv131,NODE_COG_EXEC_INHIBITION,breast,pre_treatment,0.15,0.5,published_norm,1,"z=(10.44-10)/3; patient mean scaled score=10.44 vs normative mean=10 SD=3; 8.4% <1SD"

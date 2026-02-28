@@ -1,0 +1,4 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.3109/09540261.2013.864260,NODE_SYM_COG_COMPLAINTS,breast,mixed,-0.45,0.50,published_norm,1,"Review estimates 17-75% of cancer patients experience CRCI depending on assessment method; mean z≈-0.45 from neuropsych testing"
+10.3109/09540261.2013.864260,NODE_COG_PROC_SPEED,breast,active_treatment,-0.50,0.60,published_norm,1,"Processing speed most affected domain during active treatment; approximately 0.5 SD below norms"
+10.3109/09540261.2013.864260,NODE_COG_EPISODIC_MEM,breast,active_treatment,-0.35,0.55,published_norm,1,"Episodic memory moderately affected; approximately 0.35 SD below norms"

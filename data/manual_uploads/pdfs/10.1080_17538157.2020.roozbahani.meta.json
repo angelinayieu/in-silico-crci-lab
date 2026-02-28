@@ -1,0 +1,20 @@
+{
+  "doi": "10.1080/17538157.2020.roozbahani",
+  "title": "Skin Cancer Prevention Behavior",
+  "authors": [
+    "Roozbahani N"
+  ],
+  "year": 2020,
+  "journal": "Inform Health Soc Care",
+  "pmid": "32527329",
+  "study_design": "cross_sectional",
+  "cancer_type": "skin",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Skin cancer prevention behavior. Not cognitive impairment."
+}

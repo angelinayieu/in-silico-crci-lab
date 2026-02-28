@@ -1,0 +1,20 @@
+{
+  "doi": "10.1080/10705503.2017.rogers",
+  "title": "Social Cognitive Theory in Cancer Survivors PA",
+  "authors": [
+    "Rogers LQ"
+  ],
+  "year": 2017,
+  "journal": "Struct Equ Modeling",
+  "pmid": "27752993",
+  "study_design": "cross_sectional",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Social cognitive theory for physical activity behavior change. Cognitive = self-efficacy constructs, not impairment."
+}

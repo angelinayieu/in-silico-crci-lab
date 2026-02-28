@@ -1,0 +1,21 @@
+{
+  "study_id": "STUDY_WANG_2010",
+  "doi": "10.1016/j.bbi.2010.03.009",
+  "first_author": "Wang",
+  "year": 2010,
+  "title": "Inflammatory Cytokines are Associated with the Development of Symptom Burden in Patients with NSCLC Undergoing Concurrent Chemoradiation Therapy",
+  "journal": "Brain Behavior and Immunity",
+  "study_design": "cohort",
+  "cancer_type": "nsclc",
+  "treatment_phase": "active_treatment",
+  "sample_size": 62,
+  "control_size": 0,
+  "notes": "Prospective longitudinal study of 62 NSCLC patients undergoing concurrent chemoradiation (CXRT). Weekly MDASI symptom assessments for 15 weeks + weekly serum cytokines for 8 weeks. Mixed-effect models. IL-6, IL-10, and sTNF-R1 increased significantly during CXRT. sTNF-R1 increase → all 15 MDASI symptoms (est=1.74 SE=0.69 p<.05). IL-6 increase → 5 most severe symptoms: pain fatigue sleep appetite sore throat (est=0.32 SE=0.16 p<.05). V20 (lung volume irradiated) → sTNF-R1 (est=1.77 SE=0.71 p<.01) and total symptom burden. Symptoms peaked at week 8 of CXRT. TNF-α undetectable in all samples. NO cognitive outcomes measured — MDASI measures symptom severity only. ECOG PS 0-1. Platinum-taxane chemo + 64Gy radiation.",
+  "extraction_mode": "SHALLOW",
+  "null_findings": [
+    "TNF-α: undetectable in all serum samples",
+    "IL-1RA, IL-8, IL-12p40p70: no significant change during CXRT",
+    "IL-6 NOT associated with all 15 symptoms (only the top 5 most severe)",
+    "Affective symptoms (distress, sadness): no significant change over time"
+  ]
+}

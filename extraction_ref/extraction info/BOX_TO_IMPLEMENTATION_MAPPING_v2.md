@@ -140,7 +140,7 @@ handles different paper types, evidence families, and extraction modes.
 |-------|-------------------|--------|
 | Edge exists in EDGE_REGISTRY? | Add new row with all 14 required columns | `registries/EDGE_REGISTRY.csv` |
 | Instrument exists in INSTRUMENT_REGISTRY? | Add new row | `registries/INSTRUMENT_REGISTRY.csv` |
-| Node exists in NODE_REGISTRY? | Flag as `REVIEW_TASK` (do NOT invent nodes) | `registries/NODE_REGISTRY.csv` |
+| Node exists in NODE_REGISTRY? | Do NOT invent nodes. Fill `node_proposals_template.csv` row (proposed_node_id, label, layer, justification, related_existing_nodes). Use `NODE_PENDING:<id>` placeholder in edge CSVs. Enters `review_tasks` queue. | `registries/NODE_REGISTRY.csv`, `data/templates/node_proposals_template.csv` |
 
 **Step 2 — Create Paper Subfolder**
 

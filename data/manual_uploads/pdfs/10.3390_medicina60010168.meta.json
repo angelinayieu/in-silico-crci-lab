@@ -1,0 +1,20 @@
+{
+  "doi": "10.3390/medicina60010168",
+  "title": "Biomarkers in Breast Cancer Diagnosis",
+  "authors": [
+    "L\u00f3pez-Gonz\u00e1lez A"
+  ],
+  "year": 2024,
+  "journal": "Medicina",
+  "pmid": "",
+  "study_design": "narrative_review",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "NOT CRCI: Biomarkers for breast cancer diagnosis. Not cognitive impairment."
+}

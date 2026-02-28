@@ -1,0 +1,24 @@
+{
+  "doi": "10.3390/cancers13112576",
+  "title": "Effects of Cancer, Chemotherapy, and Cytokines on Subjective and Objective Cognitive Functioning Among Patients with Breast Cancer",
+  "authors": [
+    "Chen VC",
+    "Lin TY",
+    "Lin CF"
+  ],
+  "year": 2021,
+  "journal": "Cancers (Basel)",
+  "pmid": "34073990",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "mixed",
+  "n_total": 136,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_VERBAL"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Pre-CT n=70, Post-CT n=36, Controls n=30. Verbal fluency (SFT) significantly impaired in cancer groups. IL-13\u2192SFT (negative), IL-5\u2192FACT-PCI (negative)."
+}

@@ -1,0 +1,27 @@
+{
+  "doi": "10.1186/s13058-024-01850-5",
+  "title": "Inflammation at diagnosis and cognitive impairment two years later in breast cancer patients from the Canto-Cog study",
+  "authors": [
+    "Duivon M",
+    "Lequesne J",
+    "Di Meglio A"
+  ],
+  "year": 2024,
+  "journal": "Breast Cancer Res",
+  "pmid": "38856297",
+  "study_design": "cohort",
+  "cancer_type": "breast",
+  "treatment_phase": "long_term_survivorship",
+  "n_total": 200,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_OIC_EPISODIC",
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_WORKMEM",
+    "ER_OIC_ATTNSUST"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  },
+  "notes": "Prospective CANTO-Cog cohort. Inflammation at diagnosis \u2192 cognition 2yr later. N=200 BC stage I-III."
+}

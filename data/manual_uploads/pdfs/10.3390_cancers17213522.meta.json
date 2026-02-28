@@ -1,0 +1,20 @@
+{
+  "doi": "10.3390/cancers17213522",
+  "title": "Biomarkers in Chemotherapy-Related Cognitive Impairment: A Systematic Review",
+  "authors": [
+    "Boschetti F"
+  ],
+  "year": 2025,
+  "journal": "Cancers (Basel)",
+  "pmid": "",
+  "study_design": "systematic_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "active_treatment",
+  "n_total": 0,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "SR of biomarkers in CRCI. Large SR with 561KB XML. Qualitative synthesis of biological markers."
+}

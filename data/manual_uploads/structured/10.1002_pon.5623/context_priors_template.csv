@@ -1,0 +1,5 @@
+doi,node_id,cancer_type,treatment_phase,mean,sd,source_type,n_contributing,notes
+10.1002/pon.5623,NODE_COMP_CRCI,breast,active_treatment,-0.67,0.5,published_norm,20,Dijkshoorn 2021 Table 2: 24% CT patients impaired at baseline (N=446). z=invnorm(0.24)≈−0.71
+10.1002/pon.5623,NODE_COMP_CRCI,breast,early_recovery,-0.52,0.5,published_norm,15,Dijkshoorn 2021 Table 2: 30% CT patients impaired after treatment (N=229). z=invnorm(0.30)≈−0.52
+10.1002/pon.5623,NODE_COMP_CRCI,breast,late_recovery,-0.74,0.5,published_norm,10,Dijkshoorn 2021 Table 2: 23% CT patients impaired at short-term FU (N=336). z≈−0.74
+10.1002/pon.5623,NODE_COMP_CRCI,breast,mixed,-1.28,0.5,published_norm,5,Dijkshoorn 2021 Table 2: Only 10% of controls impaired (N=120). z=invnorm(0.10)≈−1.28 (reference)

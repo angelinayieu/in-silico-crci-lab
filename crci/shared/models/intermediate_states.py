@@ -425,6 +425,27 @@ class ResolvedEvidence(BaseModel):
 # ═══════════════════════════════════════════════════════════════
 
 
+class StudyWeight(BaseModel):
+    """Per-study weight attribution for IVW meta-analysis provenance.
+
+    Records which study contributed what weight to the pooled estimate,
+    enabling full audit trail from edge → individual study → paper.
+
+    Weight semantics depend on aggregation method:
+      - IVW_FIXED:    w_i = 1/SE²_i (unnormalized)
+      - IVW_RANDOM:   w_i = 1/(SE²_i + τ²) (unnormalized)
+      - SINGLE_BEST:  1.0 for selected study, 0.0 for others
+      - DIRECT (k=1): 1.0 for the single study
+    """
+
+    ler_id: str
+    study_id: str
+    weight: float          # Unnormalized IVW weight
+    weight_normalized: float = 0.0  # w_i / Σ(w_j) — fraction of pooled estimate
+    beta: float = 0.0      # Individual study effect size
+    se: float = 0.0        # Individual study standard error
+
+
 class PooledEstimate(BaseModel):
     """Output of IVW meta-analysis.
 
@@ -442,6 +463,8 @@ class PooledEstimate(BaseModel):
     total_n: int = 0
     aggregation_method: str = "IVW_random"
     individual_weights: list[float] = Field(default_factory=list)
+    # R1 provenance: per-study identified weights (supersedes individual_weights)
+    study_weights: list[StudyWeight] = Field(default_factory=list)
 
 
 class PriorSpec(BaseModel):

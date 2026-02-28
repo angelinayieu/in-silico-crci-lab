@@ -1,0 +1,25 @@
+{
+  "doi": "10.1002/pon.4200",
+  "title": "Predictors of baseline cancer-related cognitive impairment in cancer patients scheduled for a curative treatment",
+  "authors": [
+    "Lycke M",
+    "Lefebvre T",
+    "Pottel L"
+  ],
+  "year": 2017,
+  "journal": "Psychooncology",
+  "pmid": "27338029",
+  "study_design": "cross_sectional",
+  "cancer_type": "mixed",
+  "treatment_phase": "active_treatment",
+  "n_total": 140,
+  "extraction_mode": "STANDARD",
+  "targeted_edges": [
+    "ER_FATIGUE_ATTN",
+    "ER_DEPRESSION_WORKMEM"
+  ],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "N=140 mixed cancer. Pre-treatment. Predictors of baseline CI: age, IQ, worry, fatigue. Identified pre-treatment cognitive deficits. Paywalled."
+}

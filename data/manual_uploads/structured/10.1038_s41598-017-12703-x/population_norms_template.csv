@@ -1,0 +1,4 @@
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
+10.1038/s41598-017-12703-x,NODE_BIO_IL6,INST_IL6_PLASMA,1.35,1.82,1557,breast,pre_treatment,35-65
+10.1038/s41598-017-12703-x,NODE_BIO_CRP,INST_CRP_HS,2.10,3.41,1557,breast,pre_treatment,35-65
+10.1038/s41598-017-12703-x,NODE_BIO_TNF,INST_TNF_PLASMA,3.89,2.05,1557,breast,pre_treatment,35-65

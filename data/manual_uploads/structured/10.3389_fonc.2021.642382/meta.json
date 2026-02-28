@@ -1,0 +1,25 @@
+{
+  "doi": "10.3389/fonc.2021.642382",
+  "title": "Cognitive Effects and Depression Associated With Taxane-Based Chemotherapy in Breast Cancer Survivors: A Meta-Analysis",
+  "authors": [
+    "Ibrahim EY",
+    "et al."
+  ],
+  "year": 2021,
+  "journal": "Frontiers in Oncology",
+  "study_design": "meta_analysis",
+  "cancer_type": "breast",
+  "treatment_phase": "early_recovery",
+  "extraction_mode": "STANDARD",
+  "n_total": 697,
+  "targeted_edges": [
+    "ER_OIC_PROCSPEED",
+    "ER_OIC_EXECPLAN",
+    "ER_OIC_EPISODIC",
+    "ER_FATIGUE_ATTN",
+    "ER_DEPRESSION_COGCOMPLAINTS"
+  ],
+  "risk_of_bias": {
+    "overall": "low"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "doi": "10.4161/cc.2017.cellcycle",
+  "title": "Mechanisms of Chemotherapy-Induced Cognitive Impairment Review",
+  "authors": [
+    "Unknown"
+  ],
+  "year": 2017,
+  "journal": "Cell Cycle",
+  "pmid": "28657421",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Cell Cycle review of chemo brain mechanisms. No full text accessible."
+}

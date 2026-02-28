@@ -1,0 +1,20 @@
+{
+  "doi": "10.1177/20552076251358297",
+  "title": "Digital Health Interventions for Cancer-Related Cognitive Impairment: Scoping Review",
+  "authors": [
+    "Chen L"
+  ],
+  "year": 2025,
+  "journal": "Digit Health",
+  "pmid": "",
+  "study_design": "narrative_review",
+  "cancer_type": "mixed",
+  "treatment_phase": "mixed",
+  "n_total": 0,
+  "extraction_mode": "META_ONLY",
+  "targeted_edges": [],
+  "risk_of_bias": {
+    "overall": "moderate"
+  },
+  "notes": "Scoping review of digital health interventions for CRCI. No extractable data."
+}
