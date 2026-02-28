@@ -1,4 +1,4 @@
-doi,instrument_id,reliability_value,reliability_type,factor_loading_mean,test_retest_icc,sample_size,cancer_type,cancer_validated,provenance_ref
-10.1016/j.lfs.2013.08.011,INST_DIGIT_SPAN,0.90,cronbachs_alpha,,0.83,,mixed,no,"WAIS-III manual (Wechsler 1997); test-retest from standardization sample; alpha from Sattler 2008"
-10.1016/j.lfs.2013.08.011,INST_FACTCOG_PCI,0.92,cronbachs_alpha,,,,mixed,yes,"Wagner et al. 2009 J Clin Oncol; alpha from cancer survivor validation sample n=584; cancer-validated instrument"
-10.1016/j.lfs.2013.08.011,INST_HVLTR,0.80,cronbachs_alpha,,0.74,,mixed,no,"Benedict et al. 1998; HVLT-R manual; note: Cherrier actually used RAVLT not HVLT-R but reliability similar; test-retest ICC from Lezak 2004"
+doi,instrument_id,instrument_name,instrument_subscale,cronbachs_alpha,se_alpha,test_retest_reliability,factor_loading_mean,sem_value,N,cancer_type,treatment_phase,cancer_validated,provenance_ref,notes
+10.1016/j.lfs.2013.08.011,INST_DIGIT_SPAN,,,0.90,,0.83,,,,mixed,,no,WAIS-III manual (Wechsler 1997); test-retest from standardization sample; alpha from Sattler 2008,
+10.1016/j.lfs.2013.08.011,INST_FACTCOG_PCI,,,0.92,,,,,,mixed,,yes,Wagner et al. 2009 J Clin Oncol; alpha from cancer survivor validation sample n=584; cancer-validated instrument,
+10.1016/j.lfs.2013.08.011,INST_HVLTR,,,0.80,,0.74,,,,mixed,,no,Benedict et al. 1998; HVLT-R manual; note: Cherrier actually used RAVLT not HVLT-R but reliability similar; test-retest ICC from Lezak 2004,

@@ -1,0 +1,7 @@
+doi,instrument_id,reliability_value,reliability_type,factor_loading_mean,test_retest_icc,sample_size,cancer_type,cancer_validated,provenance_ref
+10.1002/pon.4370,INST_TMT_B,0.79,test_retest,,0.79,,breast,no,"Lezak et al. 2004 Neuropsychological Assessment; note: TMT-A used in study mapped to INST_TMT_B; test-retest from normative studies"
+10.1002/pon.4370,INST_HVLTR,0.82,cronbachs_alpha,,0.74,,breast,no,"Benedict et al. 1998 HVLT-R Professional Manual; alpha from standardization; test-retest ICC from repeat assessments"
+10.1002/pon.4370,INST_COWAT,0.83,cronbachs_alpha,,0.70,,breast,no,"Ruff et al. 1996; alpha from Animal naming subset; test-retest from Lezak 2004"
+10.1002/pon.4370,INST_FACTCOG_PCI,0.92,cronbachs_alpha,,,,breast,yes,"Wagner et al. 2009 J Clin Oncol; alpha from cancer survivor validation n=584; validated in breast cancer specifically"
+10.1002/pon.4370,INST_CESD,0.87,cronbachs_alpha,,,,breast,no,"Radloff 1977 Applied Psychological Measurement; CES-D 20-item original; high internal consistency across populations"
+10.1002/pon.4370,INST_FACIT_FATIGUE,0.95,cronbachs_alpha,,,,breast,yes,"Yellen et al. 1997 J Pain Symptom Management; FACIT-Fatigue scale; cancer-validated; alpha from mixed cancer sample"

@@ -1,243 +1,265 @@
 # CSV → Database Column Mapping
 
-> How CSV template columns map to database table columns.  
-> The load script (`scripts/load_evidence_into_db.py`) performs these mappings.
+> **Post-alignment**: CSV template columns match DB table columns exactly.
+> The only non-DB column in most templates is `doi` — resolved to `study_id` by the importer.
+> This file documents the transforms and auto-generated columns for each of the 12 templates.
 
 ---
 
-## edge_evidence_template.csv → edge_evidence_v1
+## Governing Principle: Direct Mapping
+
+```
+CSV column name == DB column name
+```
+
+All 12 CSV templates use **DB column names directly**. There are zero renames.
+The importer's job is limited to:
+
+1. **`doi` → `study_id`**: Lookup DOI in `study_registry_v1` to get the internal study_id
+2. **Auto-generated columns**: `ler_id`, `prior_id`, `correlation_id`, `span_hash`, etc.
+3. **Computed columns**: `harmonized_beta`, `harmonized_se`, `se_eff` — set by downstream pipeline stages
+
+> **See `06_CSV_TEMPLATES.md` for the authoritative column-by-column specification.**
+> This file focuses on transform logic and auto-generation rules.
+
+---
+
+## 1. edge_evidence_template.csv → `edge_evidence_v1`
+
+| Extractor Columns | 28 |
+|---|---|
+| DB Total Columns | 107 |
+| Auto-Generated | ~79 |
+
+### Transforms
 
 | CSV Column | DB Column | Transform |
 |-----------|-----------|-----------|
-| `doi` | `study_id` | Lookup via study_registry_v1 (doi → study_id) |
-| `edge_id` | `edge_relation_id` | Direct |
-| `beta_raw` | `effect_value_reported` | Direct |
-| `se_raw` | `se_reported` | Direct |
-| `effect_type_original` | `effect_type_reported` | Direct |
-| `effect_size_type` | `effect_size_type` | Direct |
-| `sample_size` | `N_effect` | Direct |
-| `study_design` | `study_design` | Direct |
-| `cancer_type` | `cancer_type` | Direct |
-| `treatment_phase` | `treatment_phase` | Direct |
-| `instrument_id` | `upstream_instrument_id` | Direct |
-| `confidence_note` | `notes` | Direct |
-| `ci_low` | `ci_low_reported` | Direct |
-| `ci_high` | `ci_high_reported` | Direct |
-| `p_value` | `p_value` | Direct |
-| `n_treatment` | *(used for SE derivation)* | Not stored directly |
-| `n_control` | *(used for SE derivation)* | Not stored directly |
-| `sd_treatment` | `sd_x` | Direct |
-| `sd_control` | `sd_y` | Direct |
-| `cancer_validated` | `cancer_validation_status` | Direct (text) |
-| `rob_overall` | `rob_overall` | Direct |
-| `pub_year` | `pub_year` | Direct |
-| `covariates_adjusted` | `covariates_adjusted` | Direct |
-| `endpoint_vs_change` | `endpoint_vs_change` | Direct |
-| `comparison_arm_label` | `comparison_arm_label` | Direct |
-| `se_derivation_method` | `se_derivation_level` | Direct |
-| `shared_control_flag` | `shared_control_flag` | Direct |
-| `outcome_directionality` | *(used for harmonization)* | Pipeline |
-| `beta_sign_convention` | *(used for harmonization)* | Pipeline |
-| `timepoint_weeks` | *(links to temporal_evidence)* | |
-| `effect_size_context` | `extraction_snippet` | Direct |
-| `outcome_node_id` | `node_y` | Direct |
+| `doi` | `study_id` | Lookup via `study_registry_v1` |
+| *(all other 27 columns)* | *(same name)* | Direct pass-through |
 
 ### Auto-Generated Columns (not in CSV)
 
 | DB Column | How Generated |
 |-----------|---------------|
-| `ler_id` | `LER_{study_id}_{edge_id}_{span_hash}` |
-| `profile_id` | `"PROFILE_DEFAULT"` (hardcoded; future: `{cancer_type}:{treatment_phase}`) |
+| `ler_id` | `LER_{study_id}_{edge_relation_id}_{span_hash}` |
+| `edge_param_id` | `EP_{edge_relation_id}_{span_hash[:8]}` |
+| `edge_family` | Looked up from `edge_relations_definitions_v1` |
+| `node_x` | Looked up from `edge_relations_definitions_v1` |
+| `node_y` | Looked up from `edge_relations_definitions_v1` |
+| `profile_id` | `"PROFILE_DEFAULT"` |
+| `harmonized_beta` | Initially = `effect_value_reported`; later overwritten by scale harmonizer (Step 4c) |
+| `harmonized_se` | Initially = `se_reported`; later overwritten by SE calibrator (Step 4c) |
+| `harmonization_status` | `"harmonized"` |
+| `harmonized_scale` | Inferred from `effect_type_reported` |
+| `se_eff` | Computed by 7-layer SE calibration (Step 4d) |
+| `se_quality_tag` | `"manual_extraction"` |
+| `identification_status` | `"plausible"` |
+| `quality_rating` | = `rob_overall` or `"moderate"` |
+| `span_hash` | SHA-256 of (study_id, edge_relation_id, effect_value_reported, se_reported, N_effect) |
 | `entered_by` | `"manual_csv_import"` |
-| `entered_at` | Current timestamp |
+| `entered_at` | Current UTC timestamp |
 | `version` | `1` |
 | `active` | `1` |
-| `harmonized_beta` | Copied from `beta_raw` at load time (already clean effect sizes). Later overwritten by `harmonize_scales_to_cohens_d()` if scale is `mean_diff_raw`. |
-| `harmonized_se` | Copied from `se_raw` at load time. Later overwritten with SD-borrowing inflation if applicable. |
+| `outcome_type` | `"semi_objective"` (default) |
 
 ---
 
-## population_norms_template.csv → population_norms_v1
+## 2. population_norms_template.csv → `population_norms_v1`
+
+| Extractor Columns | 9 |
+|---|---|
+| DB Total Columns | 21 |
+
+### Transforms
 
 | CSV Column | DB Column | Transform |
 |-----------|-----------|-----------|
 | `doi` | `study_id` | DOI → study_id lookup |
-| `node_id` | `node_id` | Direct |
-| `instrument_id` | `instrument_id` | Direct |
-| `mean` | `mean_raw` | Direct |
-| `sd` | `sd_raw` | Direct |
-| `sample_size` | `N` | Direct |
-| `cancer_type` | `cancer_type` | Direct |
-| `treatment_phase` | `treatment_phase` | Direct |
-| `age_range` | `population_descriptor` | Direct |
+| *(all other 8 columns)* | *(same name)* | Direct |
 
----
-
-## context_priors_template.csv → node_priors_v1
-
-> **Actual DB table:** `node_priors_v1` (NOT `context_priors_v1`)
-
-| CSV Column | DB Column | Transform |
-|-----------|-----------|----------|
-| `doi` | *(used for provenance)* | Stored in `provenance` field |
-| `node_id` | `node_id` | Direct |
-| `cancer_type` | `cancer_type` | Direct |
-| `treatment_phase` | `treatment_phase` | Direct |
-| `prior_mean_z` | `mean` | Direct |
-| `prior_sd_z` | `sd` | Direct |
-| `source_type` | `provenance` | Direct |
-| `n_contributing` | *(stored in notes)* | |
-| `notes` | `notes` | Direct |
-
----
-
-## temporal_evidence_template.csv → temporal_evidence_v1
-
-| CSV Column | DB Column | Transform |
-|-----------|-----------|-----------|
-| `doi` | `study_id` | DOI → study_id lookup |
-| `edge_id` | `action_id` | Edge → action mapping |
-| `timepoint_weeks` | `timepoint_weeks` | Direct |
-| `value` | `effect` | Direct |
-| `se` | `se` | Direct |
-| `is_recovery` | `is_recovery` | Direct |
-| `sample_size` | `N` | Direct |
-| `provenance_ref` | `provenance_ref` | Direct |
-
----
-
-## instrument_evidence_template.csv → instrument_evidence_v1
-
-| CSV Column | DB Column | Transform |
-|-----------|-----------|-----------|
-| `doi` | `study_id` | DOI → study_id lookup |
-| `instrument_id` | `instrument_id` | Direct |
-| `reliability_value` | `cronbachs_alpha` | Direct |
-| `reliability_type` | *(routes to correct column)* | |
-| `factor_loading_mean` | `factor_loading_mean` | Direct |
-| `test_retest_icc` | `test_retest_reliability` | Direct |
-| `sample_size` | `N` | Direct |
-| `cancer_type` | `cancer_type` | Direct |
-| `cancer_validated` | *(metadata)* | |
-| `provenance_ref` | `provenance_ref` | Direct |
-
----
-
-## correlation_template.csv → biomarker_correlations_v1
-
-> **Note:** The DB table is `biomarker_correlations_v1` (not `correlation_evidence_v1`).
-
-| CSV Column | DB Column | Transform |
-|-----------|-----------|-----------|
-| `doi` | `source_citation` | `"doi:{value}"` (or `provenance_ref` if set) |
-| `biomarker_id_1` | `node_a_id` | Direct |
-| `biomarker_id_2` | `node_b_id` | Direct |
-| `correlation_r` | `rho` | Direct |
-| `sample_size` | *(used for `rho_se` derivation)* | SE ≈ (1 − r²) / √(n − 2) |
-| `partial_or_zero` | *(stored in `notes`)* | |
-| `population` | *(stored in `notes`)* | |
-| `provenance_ref` | `source_citation` | Direct |
-
-### Auto-Generated Columns
+### Auto-Generated
 
 | DB Column | How Generated |
 |-----------|---------------|
-| `correlation_id` | `CORR_{sha256(study_id|node_a|node_b)[:12]}` |
-| `rho_se` | `(1 - r²) / √(n - 2)` |
-| `d_block` | Derived from node prefixes (e.g. `"BC"` for BIO↔COG) |
-| `is_decision_critical` | `0` (default) |
+| `id` | UUID |
+| `study_id` | From `doi` lookup |
+| `extraction_run_id` | Current run ID |
+| `instrument_name` | Looked up from `instrument_definitions_v1` |
+| `cognitive_domain` | Inferred from `node_id` |
+| `population_descriptor` | Auto-composed |
+| `mean_z`, `sd_z` | Computed later from raw + norms |
+| `percentile` | Computed |
+| `provenance_status` | `"manual_extraction"` |
+| `provenance_ref` | From doi |
+| `created_at` | UTC timestamp |
+| `version` | `1` |
 
----dose_evidence_template.csv → dose_evidence_v1
+---
+
+## 3. context_priors_template.csv → `node_priors_v1`
+
+> ⚠️ Target table is `node_priors_v1` (NOT `context_priors_v1`)
+
+| Extractor Columns | 9 |
+|---|---|
+| DB Total Columns | 14 |
+
+### Transforms
 
 | CSV Column | DB Column | Transform |
 |-----------|-----------|-----------|
-| `id` | `id` | Auto-generated if blank |
-| `study_id` | `study_id` | DOI → study_id lookup |
-| `extraction_run_id` | `extraction_run_id` | Direct |
-| `action_id` | `action_id` | FK to action_catalog_v1 |
-| `intervention_type` | `intervention_type` | Direct |
-| `dose_level` | `dose_level` | Direct |
-| `dose_unit` | `dose_unit` | Direct |
-| `effect` | `effect` | Direct |
-| `se` | `se` | Direct |
-| `N` | `N` | Direct |
-| `dose_response_shape` | `dose_response_shape` | Direct |
-| `effective_dose_range` | `effective_dose_range` | Direct |
-| `maximum_tolerated_dose` | `maximum_tolerated_dose` | Direct |
-| `provenance_status` | `provenance_status` | Direct |
-| `provenance_ref` | `provenance_ref` | Direct |
-| `notes` | `notes` | Direct |
-| `version` | `version` | Direct |
+| `doi` | `provenance` | Stored as `"doi:{value}; source_type:{source_type}"` |
+| `source_type` | `provenance` | Appended to provenance string |
+| `n_contributing` | `notes` | Folded into notes |
+| `mean` | `mean` | Direct (z-score value) |
+| `sd` | `sd` | Direct (uncertainty value) |
+| *(node_id, cancer_type, treatment_phase)* | *(same name)* | Direct |
+
+### Auto-Generated
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `prior_id` | `NP_{node_id}_{cancer_type}_{treatment_phase}_{hash}` |
+| `prior_space` | `"z_score"` |
+| `dist_family` | `"normal"` |
+| `scope_filters_json` | JSON from cancer_type + treatment_phase |
+| `specificity_rank` | Computed from scope specificity |
+| `active` | `1` |
+| `version` | `1` |
 
 ---
 
-## subgroup_evidence_template.csv → subgroup_evidence_v1
+## 4. temporal_evidence_template.csv → `temporal_evidence_v1`
+
+| Extractor Columns | 8 |
+|---|---|
+| DB Total Columns | 19 |
+
+### Transforms
 
 | CSV Column | DB Column | Transform |
 |-----------|-----------|-----------|
-| `id` | `id` | Auto-generated if blank |
-| `study_id` | `study_id` | DOI → study_id lookup |
-| `extraction_run_id` | `extraction_run_id` | Direct |
-| `edge_id` | `edge_id` | FK to edge_relations_definitions_v1 |
-| `modifier_variable` | `modifier_variable` | Direct |
-| `modifier_value` | `modifier_value` | Direct |
-| `interaction_beta` | `interaction_beta` | Direct |
-| `interaction_se` | `interaction_se` | Direct |
-| `interaction_p` | `interaction_p` | Direct |
-| `subgroup_effect` | `subgroup_effect` | Direct |
-| `subgroup_se` | `subgroup_se` | Direct |
-| `subgroup_n` | `subgroup_n` | Direct |
-| `provenance_status` | `provenance_status` | Direct |
-| `provenance_ref` | `provenance_ref` | Direct |
-| `notes` | `notes` | Direct |
-| `version` | `version` | Direct |
+| `doi` | `study_id` | DOI → study_id lookup |
+| `edge_relation_id` | `action_id` | Edge → action mapping via edge_relations_definitions_v1 |
+| *(all other 6 columns)* | *(same name)* | Direct |
+
+### Auto-Generated
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `id` | UUID |
+| `study_id` | From `doi` lookup |
+| `extraction_run_id` | Current run ID |
+| `action_id` | Mapped from `edge_relation_id` |
+| `intervention_type` | Inferred from edge family |
+| `study_design` | From study_registry |
+| `onset_observed`, `peak_observed`, `decay_observed` | Computed from trajectory |
+| `provenance_status` | `"manual_extraction"` |
+| `created_at` | UTC timestamp |
+| `version` | `1` |
 
 ---
 
-## study_cohort_profile_template.csv → study_cohort_profiles_v1
+## 5. instrument_evidence_template.csv → `instrument_evidence_v1`
+
+| Extractor Columns | 15 |
+|---|---|
+| DB Total Columns | 25 |
+
+### Transforms
 
 | CSV Column | DB Column | Transform |
 |-----------|-----------|-----------|
-| `profile_id` | `profile_id` | Direct |
-| `study_id` | `study_id` | DOI → study_id lookup |
-| `cohort_label` | `cohort_label` | Direct |
-| `analysis_timepoint` | `analysis_timepoint` | Direct |
-| `N_analyzed` | `N_analyzed` | Direct |
-| `N_enrolled` | `N_enrolled` | Direct |
-| `sex_female_pct` | `sex_female_pct` | Direct |
-| `age_mean` | `age_mean` | Direct |
-| `age_sd` | `age_sd` | Direct |
-| `cancer_type` | `cancer_type` | Direct |
-| `treatment_phase` | `treatment_phase` | Direct |
-| *(+ 12 more demographic columns)* | *(direct mapping)* | See `05_DB_SCHEMA.md` |
+| `doi` | `study_id` | DOI → study_id lookup |
+| *(all other 14 columns)* | *(same name)* | Direct |
+
+### Auto-Generated
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `id` | UUID |
+| `study_id` | From `doi` lookup |
+| `extraction_run_id` | Current run ID |
+| `population_descriptor` | Auto-composed |
+| `factor_loading_per_subscale` | JSON (nullable) |
+| `convergent_validity` | (nullable) |
+| `discriminant_validity` | (nullable) |
+| `factor_structure` | (nullable) |
+| `measurement_invariance` | (nullable) |
+| `provenance_status` | `"manual_extraction"` |
+| `created_at` | UTC timestamp |
+| `version` | `1` |
 
 ---
 
-## profile_data_stream_template.csv → profile_data_streams_v1
+## 6. correlation_template.csv → `biomarker_correlations_v1`
 
-Direct column mapping. 25 columns total. See `05_DB_SCHEMA.md` for full schema.
+> ⚠️ Target table is `biomarker_correlations_v1` (NOT `correlation_evidence_v1`)
+
+| Extractor Columns | 6 |
+|---|---|
+| DB Total Columns | 11 |
+
+### Transforms
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `source_citation` | `"doi:{value}"` |
+| `partial_or_zero` | `d_block` | Derived from value + node prefixes |
+| *(node_a_id, node_b_id, rho, N)* | *(same name or used in computation)* | Direct |
+
+### Auto-Generated
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `correlation_id` | `CORR_{sha256(study_id\|node_a_id\|node_b_id)[:12]}` |
+| `rho_se` | `(1 - rho²) / √(N - 2)` |
+| `d_block` | From `partial_or_zero` + node prefixes |
+| `source_citation` | `"doi:{doi}"` |
+| `is_decision_critical` | `0` |
+| `version` | `1` |
+| `active` | `1` |
+
+> **Note:** `N` is consumed to compute `rho_se` but is NOT a direct DB column.
 
 ---
 
-## stream_timepoint_template.csv → stream_timepoints_v1
+## 7–12. Direct-Mapping Templates
 
-Direct column mapping. 11 columns total. See `05_DB_SCHEMA.md` for full schema.
+These templates use DB column names with minimal transformation:
+
+| # | Template | DB Table | Ext Cols | DB Cols | Only Transform |
+|---|----------|----------|----------|---------|----------------|
+| 7 | `dose_evidence_template.csv` | `dose_evidence_v1` | 17 | 18 | `created_at` auto-set |
+| 8 | `subgroup_evidence_template.csv` | `subgroup_evidence_v1` | 16 | 17 | `created_at` auto-set |
+| 9 | `study_cohort_profile_template.csv` | `study_cohort_profiles_v1` | 25 | 33 | 8 JSONB cols set programmatically |
+| 10 | `profile_data_stream_template.csv` | `profile_data_streams_v1` | 21 | 25 | 4 cols auto-set |
+| 11 | `stream_timepoint_template.csv` | `stream_timepoints_v1` | 11 | 11 | **PERFECT MATCH** — zero transforms |
+| 12 | `ontology_link_template.csv` | `ontology_links_v1` | 11 | 11 | **PERFECT MATCH** — zero transforms |
 
 ---
-
-## ontology_link_template.csv → ontology_links_v1
-
-Direct column mapping. 11 columns total. See `05_DB_SCHEMA.md` for full schema.
-
----
-
-## 
 
 ## Load Command
 
 ```bash
 cd /workspaces/in-silico-crci-lab
-python scripts/load_evidence_into_db.py
+python scripts/load_evidence_into_db.py --verbose
 ```
 
 The script auto-discovers all CSVs in `data/manual_uploads/structured/*/` subfolders.
+
+### Pipeline Step Reference
+
+| Step | Transform | Tables |
+|------|-----------|--------|
+| 3 | Register studies from meta.json | `study_registry_v1` |
+| 4 | Load edge_evidence CSVs (doi → study_id, auto-gen IDs) | `edge_evidence_v1` |
+| 4b | Load 11 auxiliary CSVs via family importers | All other 11 tables |
+| 4c | Harmonize scales to Cohen's d (SD borrowing) | `edge_evidence_v1` in-place |
+| 4d | 7-layer SE_eff calibration | `edge_evidence_v1` in-place |
+| 6 | IVW aggregation → compiled edges | `edges_v1` |
+
+---
+
+_Last updated: 2026-02-28. Consistent with `06_CSV_TEMPLATES.md`._

@@ -674,6 +674,8 @@ class BiomarkerCorrelation(Base):
     version = Column(Integer, nullable=False)
     active = Column(Integer, nullable=False)
     notes = Column(Text)
+    N = Column(Integer)
+    partial_or_zero = Column(Text)
 
 
 class FeedbackLoop(Base):
@@ -1029,6 +1031,25 @@ class EdgeEvidence(Base):
     # v2.1: Idempotent evidence writes (PERSISTENCE_FIX_CHANGELOG.md S3)
     span_hash = Column(Text)  # Deterministic hash for dedup key
 
+    # v2.2: Study-level metadata (migration 013 — template alignment)
+    # These columns are also added via 013_template_alignment.sql ALTER TABLE.
+    study_design = Column(Text)                  # RCT, cohort, cross_sectional, meta_analysis, etc.
+    cancer_type = Column(Text)                   # breast, prostate, mixed, etc.
+    treatment_phase = Column(Text)               # active_treatment, survivorship, etc.
+    pub_year = Column(Integer)                   # Publication year
+    cancer_validation_status = Column(Text)      # cancer_validated, cancer_adjacent, general_population
+    n_treatment = Column(Integer)                # Treatment/exposed arm N
+    n_control = Column(Integer)                  # Control/unexposed arm N
+
+    # v2.3: P2–P7 pipeline columns (migration 014 — wiring audit)
+    # Source: EXTRACTION_TO_COMPUTATION_WIRING_AUDIT.md §3.1
+    outcome_type = Column(Text, default="semi_objective")       # subjective, semi_objective, biomarker → Chain B τ²
+    scope_weights_json = Column(Text, default="{}")             # JSON scope match → P3 L2, Chain B L7
+
+    # P3 SE calibration outputs — written by P3, read by P4 and Chain B
+    se_eff = Column(Float)                                      # Final 7-layer calibrated SE
+    se_layer_details_json = Column(Text)                        # JSON breakdown of each layer's contribution
+
     notes = Column(Text)
 
 
@@ -1282,6 +1303,8 @@ class NodePrior(Base):
     active = Column(Integer, default=1)
     version = Column(Integer, default=1)
     notes = Column(Text)
+    source_type = Column(Text)
+    n_contributing = Column(Integer)
 
 
 class OutcomeAnchor(Base):
@@ -1817,6 +1840,7 @@ class InstrumentEvidence(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     notes = Column(Text)
     version = Column(Integer, default=1)
+    cancer_validated = Column(Text)
 
 
 class PopulationNorms(Base):
@@ -1847,6 +1871,7 @@ class PopulationNorms(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     notes = Column(Text)
     version = Column(Integer, default=1)
+    age_range = Column(Text)
 
 
 class TemporalEvidence(Base):
@@ -1860,6 +1885,7 @@ class TemporalEvidence(Base):
     study_id = Column(Text, nullable=False)
     extraction_run_id = Column(Text)
     action_id = Column(Text)
+    edge_relation_id = Column(Text)
     intervention_type = Column(Text)
     timepoint_weeks = Column(Float, nullable=False)
     effect = Column(Float)
@@ -2032,6 +2058,13 @@ class AcquisitionQueue(Base):
 
     # v2.0: Paywall tracking
     paywall_flagged = Column(Boolean, default=False)
+
+    # v3.0: Enhanced retrieval (015_retrieval_enhanced.sql)
+    pmcid = Column(Text)
+    openalex_id = Column(Text)
+    best_oa_url = Column(Text)
+    retrieval_attempts_json = Column(Text)  # JSON array of attempt records
+    file_path = Column(Text)  # relative path to saved PDF/XML
 
 
 class EvidenceValidationQuarantine(Base):

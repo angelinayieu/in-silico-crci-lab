@@ -1,15 +1,15 @@
 # CRCI Extraction Playbook
 
-**Purpose:** Single-file reference for adding a new paper to the system.  
-**Audience:** Human researchers + AI agents performing per-paper extraction.  
-**Authoritative spec:** `docs/01_v2_master/CRCI_Master_Spec_v2.0.md`  
-**Master routing doc:** [`LLM_TASK_ROUTER.md`](LLM_TASK_ROUTER.md) — start here if unsure which instructions to follow.
+> **⚠️ This file is a QUICK REFERENCE SUPPLEMENT.**
+> The authoritative extraction procedure is **[extraction_ref/01_PROCEDURE.md](../01_PROCEDURE.md)**.
+> That file contains the complete Steps 0–10, AI session setup, system prompt,
+> and the extraction → analytics pipeline connection.
+> Use this file only for the quick-reference tables below (edges, instruments, vocab).
 
-> **Batch import note (50+ papers):** This playbook works for one paper at a time.
-> For batch imports, repeat Steps 0-8 for each paper (in any order), then run
-> Step 9 once. The loader processes all papers in `data/manual_uploads/structured/`
-> automatically — no code changes needed per paper. Study IDs are auto-derived
-> from folder names (DOI slugs).
+**Purpose:** Quick-reference cheat sheet for extraction.  
+**Audience:** Human researchers + AI agents performing per-paper extraction.  
+**Authoritative procedure:** [`extraction_ref/01_PROCEDURE.md`](../01_PROCEDURE.md)  
+**Master routing doc:** [`LLM_TASK_ROUTER.md`](LLM_TASK_ROUTER.md)
 
 ---
 
@@ -33,7 +33,7 @@ DEEP_RESEARCH_STRATEGY.md §9    THIS PLAYBOOK           Database
  Phase C: Get PDFs    ──→  Step 2: Create folder         
                            Step 3: Fill edge_evidence ──→ edge_evidence_v1
                            Step 4: Fill pop norms     ──→ population_norms_v1
-                           Step 5: Fill context priors──→ context_priors_v1
+                           Step 5: Fill context priors──→ node_priors_v1
                            Step 6: Optional templates ──→ auxiliary tables
                            Step 7: Create meta.json   ──→ study_registry_v1
                            Step 8: Copy PDF              
@@ -57,7 +57,7 @@ Before extracting ANY paper, verify you have read:
 
 | Condition | Mode | Notes |
 |-----------|------|-------|
-| RCT + cancer population + cognitive **primary** outcome | **DEEP** | All 9 agents; all templates |
+| RCT + cancer population + cognitive **primary** outcome | **DEEP** | All 12 templates |
 | Cohort/observational + cognitive outcomes | **STANDARD** | Core templates only |
 | Case report / animal / biomarker-only | **SHALLOW** | edge_evidence only |
 | Unknown | **STANDARD** | Default |
@@ -108,22 +108,38 @@ mkdir -p data/manual_uploads/pdfs/
 
 `data/manual_uploads/structured/[doi-slug]/edge_evidence_template.csv`
 
-**Column reference:**
+**Column reference (28 extractor columns → 107 DB columns):**
 
 | Column | Required | Notes |
 |--------|----------|-------|
-| `doi` | YES | e.g. `10.1016/j.lfs.2013.08.011` |
-| `edge_id` | YES | Must exist in `registries/EDGE_REGISTRY.csv` |
-| `beta_raw` | YES | Effect size value as reported (Cohen's d, mean diff, OR, etc.). Raw mean differences are auto-converted to Cohen's d at import time via SD borrowing from `population_norms_v1` (Step 4c of `load_evidence_into_db.py`). |
-| `se_raw` | YES | SE of the effect size |
-| `effect_type_original` | YES | What the paper reports: `cohen_d`, `mean_diff`, `odds_ratio`, etc. |
+| `doi` | YES | e.g. `10.1016/j.lfs.2013.08.011` — resolved to `study_id` at import |
+| `edge_relation_id` | YES | Must exist in `registries/EDGE_REGISTRY.csv` |
+| `effect_value_reported` | YES | Effect size value as reported (Cohen's d, mean diff, OR, etc.). Raw mean differences are auto-converted to Cohen's d at import time via SD borrowing from `population_norms_v1` (Step 4c of `load_evidence_into_db.py`). |
+| `se_reported` | YES | SE of the effect size |
+| `effect_type_reported` | YES | What the paper reports: `cohens_d`, `mean_diff`, `odds_ratio`, etc. |
 | `effect_size_type` | YES | `BETWEEN_GROUP` / `WITHIN_GROUP` / `PRE_POST_CHANGE` |
-| `sample_size` | YES | Total N in analysis |
+| `N_effect` | YES | Total N in analysis |
 | `study_design` | YES | `RCT`, `cohort`, `case_control`, `cross_sectional` |
 | `cancer_type` | YES | `breast`, `colorectal`, `lung`, etc. |
 | `treatment_phase` | YES | `active_treatment`, `early_recovery`, etc. |
-| `instrument_id` | YES | Must exist in `registries/INSTRUMENT_REGISTRY.csv` |
-| `confidence_note` | NO | Notes on any concerns |
+| `upstream_instrument_id` | YES | Must exist in `registries/INSTRUMENT_REGISTRY.csv` |
+| `notes` | NO | Notes on any concerns |
+| `ci_low_reported` | NO | Lower bound of 95% CI |
+| `ci_high_reported` | NO | Upper bound of 95% CI |
+| `p_value` | NO | p-value if reported |
+| `n_treatment` | NO | Treatment arm N |
+| `n_control` | NO | Control arm N |
+| `sd_x` | NO | SD of treatment group (for Cohen's d computation) |
+| `sd_y` | NO | SD of control group |
+| `cancer_validation_status` | NO | `cancer_validated`, `cancer_adjacent`, `general_population` |
+| `rob_overall` | NO | Risk of bias: `low`, `moderate`, `high`, `critical` |
+| `pub_year` | NO | Publication year |
+| `covariates_adjusted` | NO | Comma-separated list of covariates |
+| `endpoint_vs_change` | NO | `endpoint` or `change_score` |
+| `comparison_arm_label` | NO | e.g. `waitlist_control`, `usual_care` |
+| `se_derivation_level` | NO | `direct`, `from_ci`, `from_p`, `imputed` |
+| `shared_control_flag` | NO | `1` if control shared with another arm |
+| `extraction_snippet` | NO | Verbatim text from paper supporting this value |
 
 ### Computing Cohen's d When Not Reported
 
@@ -144,16 +160,16 @@ d = (Δmean_tx - Δmean_ctrl) / SD_pooled_baseline
 
 `data/manual_uploads/structured/[doi-slug]/population_norms_template.csv`
 
-**Column reference (per `docs/01_v2_master/CRCI_Checklists_Templates_v2.0.md` §T1.3):**
+**Column reference (9 extractor columns → 22 DB columns):**
 
 | Column | Required | Notes |
 |--------|----------|-------|
-| `doi` | YES | Paper DOI |
+| `doi` | YES | Paper DOI — resolved to `study_id` at import |
 | `node_id` | YES | Must exist in `registries/NODE_REGISTRY.csv` |
 | `instrument_id` | YES | Instrument used to assess the node |
-| `mean` | YES | Baseline/pre-treatment mean |
-| `sd` | YES | SD of the mean (SD > 0) |
-| `sample_size` | YES | N contributing to this estimate |
+| `mean_raw` | YES | Baseline/pre-treatment mean |
+| `sd_raw` | YES | SD of the mean (SD > 0) |
+| `N` | YES | N contributing to this estimate |
 | `cancer_type` | YES | Match NODE_REGISTRY values |
 | `treatment_phase` | YES | Context for prior matching |
 | `age_range` | NO | e.g. `45-65` |
@@ -162,7 +178,22 @@ d = (Δmean_tx - Δmean_ctrl) / SD_pooled_baseline
 
 ## Step 5 — Fill context_priors_template.csv  ← RECOMMENDED
 
-`data/manual_uploads/structured/[doi-slug]/context_priors_template.csv`
+`data/manual_uploads/structured/[doi-slug]/context_priors_template.csv`  
+**Target DB table:** `node_priors_v1`
+
+**Column reference (9 extractor columns → 16 DB columns):**
+
+| Column | Required | Notes |
+|--------|----------|-------|
+| `doi` | YES | Paper DOI — resolved to provenance at import |
+| `node_id` | YES | Must exist in `registries/NODE_REGISTRY.csv` |
+| `cancer_type` | YES | Cancer context |
+| `treatment_phase` | YES | Treatment context |
+| `mean` | YES | Prior mean in z-space |
+| `sd` | YES | Prior SD in z-space (> 0) |
+| `source_type` | YES | `published_norm_comparison`, `local_control_group`, `meta_analysis` |
+| `n_contributing` | NO | Number of studies contributing to estimate |
+| `notes` | NO | Free text |
 
 Convert raw scores to z-scores:
 ```
@@ -178,11 +209,17 @@ are available, then flag `source_type = local_control_group`.
 
 Fill ONLY if the paper provides that data:
 
-| Template | Fill when... |
-|----------|-------------|
-| `temporal_evidence_template.csv` | Paper has ≥2 longitudinal timepoints |
-| `instrument_evidence_template.csv` | Paper reports Cronbach's α, test-retest ICC, or split-half |
-| `correlation_template.csv` | Paper reports inter-domain correlations (e.g. IL-6 × fatigue r) |
+| Template | Fill when... | Key columns |
+|----------|-------------|-------------|
+| `temporal_evidence_template.csv` | Paper has ≥2 longitudinal timepoints | `doi`, `edge_relation_id`, `timepoint_weeks`, `effect`, `se`, `is_recovery`, `N`, `provenance_ref` |
+| `instrument_evidence_template.csv` | Paper reports Cronbach's α, test-retest reliability, or factor loading | `doi`, `instrument_id`, `cronbachs_alpha`, `test_retest_reliability`, `sem_value`, `N`, `cancer_validated`, `provenance_ref` |
+| `correlation_template.csv` | Paper reports inter-domain correlations (e.g. IL-6 × fatigue r) | `doi`, `node_a_id`, `node_b_id`, `rho`, `N`, `partial_or_zero` |
+| `dose_evidence_template.csv` | Paper reports effects at multiple dose levels | `doi`, `action_id`, `dose_level`, `dose_unit`, `effect`, `se`, `N` |
+| `subgroup_evidence_template.csv` | Paper reports subgroup-stratified effects | `doi`, `edge_id`, `subgroup_variable`, `subgroup_level`, `effect`, `se`, `N` |
+| `study_cohort_profile_template.csv` | Rich study-level demographics/design | `doi`, `cohort_label`, `N_analyzed`, `cancer_type`, `treatment_phase` |
+| `profile_data_stream_template.csv` | Detailed instrument/measure protocols | `doi`, `stream_label`, `modality_type`, `instrument_id` |
+| `stream_timepoint_template.csv` | Specific data collection timepoints | `doi`, `timepoint_label`, `timepoint_type`, `anchor_event` |
+| `ontology_link_template.csv` | Link paper constructs to CRCI ontology | `study_id`, `source_term`, `mapped_node_id`, `support_type` |
 
 ---
 
@@ -249,7 +286,7 @@ The import pipeline performs these steps automatically:
 4. **Scale harmonization (Step 4c):** Converts `mean_diff_raw` → `cohens_d` by borrowing SD from `population_norms_v1` (Tier 1: same study SD, no inflation; Tier 2: cross-study SD, 1.15× SE inflation)
 5. Seed actions, compile IVW edges
 
-> **Important:** Population norms must be loaded (Step 4b) BEFORE scale harmonization (Step 4c) can borrow SD values. Always fill `population_norms_template.csv` when extracting papers that report raw mean differences.
+> **Important:** Population norms must be loaded (Step 4b) BEFORE scale harmonization (Step 4c) can borrow SD values. Always fill `population_norms_template.csv` (with `mean_raw` and `sd_raw`) when extracting papers that report raw mean differences.
 
 ---
 
@@ -344,12 +381,13 @@ The import pipeline performs these steps automatically:
 
 ## Chatbox Extraction Session Setup
 
-When using a chatbox (Claude or other LLM) for extraction, load this context
-at the start of the session:
+> **See [extraction_ref/01_PROCEDURE.md](../01_PROCEDURE.md) §AI Session Setup** for the
+> complete context loading instructions, system prompt, and Steps 0–10.
+> The section below is kept for backward compatibility only.
 
 **Always load (pin these):**
 1. This playbook (EXTRACTION_PLAYBOOK.md)
-2. `extraction_ref/02_CHATBOX_CONTEXT.md` — full extraction context
+2. `extraction_ref/01_PROCEDURE.md` — THE extraction procedure (Steps 0-10, AI context, system prompt)
 3. `registries/EDGE_REGISTRY.csv` — all valid edge IDs
 4. `registries/INSTRUMENT_REGISTRY.csv` — all valid instrument IDs
 5. `registries/NODE_REGISTRY.csv` — all valid node IDs
@@ -402,6 +440,12 @@ data/
     temporal_evidence_template.csv
     instrument_evidence_template.csv
     correlation_template.csv
+    dose_evidence_template.csv
+    subgroup_evidence_template.csv
+    study_cohort_profile_template.csv
+    profile_data_stream_template.csv
+    stream_timepoint_template.csv
+    ontology_link_template.csv
   manual_uploads/
     structured/
       README.md                 ← subfolder convention docs

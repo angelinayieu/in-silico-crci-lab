@@ -22,7 +22,7 @@ Read this FIRST. It routes you to the exact instructions you need based on what 
 
 | Step | Read This | Why |
 |------|-----------|-----|
-| 1 | **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** | Complete step-by-step procedure (Steps 0-9) |
+| 1 | **[01_PROCEDURE.md](../01_PROCEDURE.md)** | THE single extraction procedure (Steps 0-10, AI context, system prompt, analytics link) |
 | 2 | **[EXTRACTION_LOG.md](EXTRACTION_LOG.md)** | See what's already extracted, avoid duplication |
 | 3 | **[registries/NODE_REGISTRY.csv](registries/NODE_REGISTRY.csv)** | Valid node IDs (63 nodes) |
 | 4 | **[registries/EDGE_REGISTRY.csv](registries/EDGE_REGISTRY.csv)** | Valid edge IDs (139 edges) |
@@ -33,32 +33,32 @@ Read this FIRST. It routes you to the exact instructions you need based on what 
 
 | Paper Type | How to Identify | Extraction Mode | Templates to Fill | Extra Steps |
 |-----------|-----------------|-----------------|-------------------|-------------|
-| **RCT + cancer + cognitive primary outcome** | Randomized trial, cancer population, cognitive test as primary/secondary endpoint | `DEEP` | ALL 5 templates (edge_evidence, population_norms, context_priors, instrument_evidence, temporal_evidence) | Check for multi-arm resolution, compute SE from CIs |
-| **Cohort/observational + cognitive outcomes** | Longitudinal cohort, cross-sectional, case-control | `STANDARD` | edge_evidence + population_norms + context_priors | May need to borrow SDs from other studies |
+| **RCT + cancer + cognitive primary outcome** | Randomized trial, cancer population, cognitive test as primary/secondary endpoint | `DEEP` | ALL 12 templates (edge_evidence, population_norms, node_priors, instrument_evidence, temporal_evidence, biomarker_correlations, + 6 profile templates) | Check for multi-arm resolution, compute SE from CIs |
+| **Cohort/observational + cognitive outcomes** | Longitudinal cohort, cross-sectional, case-control | `STANDARD` | edge_evidence + population_norms + node_priors | May need to borrow SDs from other studies |
 | **Meta-analysis / systematic review** | Aggregates multiple studies | `DEEP` | edge_evidence (pooled estimates) + constituent study extraction | Extract both pooled AND per-study effects if Table available |
 | **Biomarker / mechanistic only** | No behavioral intervention, just biomarker associations | `SHALLOW` | edge_evidence only | Often reports correlations (r) — convert to β |
 | **Dose-response study** | Reports effects at multiple dose levels | `DEEP` | edge_evidence + **dose_bridges info** | Extract EC₅₀, Emax if reported — feeds Category A tables |
-| **Longitudinal (≥3 timepoints)** | Reports cognitive change over time | `DEEP` | ALL templates, especially temporal_evidence | Extract per-timepoint effects for trajectory modeling |
+| **Longitudinal (≥3 timepoints)** | Reports cognitive change over time | `DEEP` | ALL 12 templates, especially temporal_evidence | Extract per-timepoint effects for trajectory modeling |
 | **Psychometric validation study** | Reports instrument reliability/validity, no intervention | `SHALLOW` | instrument_evidence only | Extract Cronbach's α, test-retest ICC, cancer validation status |
 
 **For each paper, capture these in every relevant CSV:**
 
 | Always Record | Column | Where |
 |--------------|--------|-------|
-| DOI | `doi` | Every CSV row |
-| Edge relationship | `edge_id` | edge_evidence (must exist in EDGE_REGISTRY) |
-| Effect size + SE | `beta_raw`, `se_raw` | edge_evidence |
-| Effect type | `effect_type_original` | edge_evidence (`cohen_d`, `mean_diff`, `odds_ratio`, `correlation_r`) |
-| Sample size | `sample_size` | Every CSV |
+| DOI | `doi` | Every CSV row (pipeline-resolved to `study_id` on import) |
+| Edge relationship | `edge_relation_id` | edge_evidence (must exist in EDGE_REGISTRY) |
+| Effect size + SE | `effect_value_reported`, `se_reported` | edge_evidence |
+| Effect type | `effect_type_reported` | edge_evidence (`cohens_d`, `mean_diff`, `odds_ratio`, `correlation_r`) |
+| Sample size | `N_effect` / `N` | edge_evidence uses `N_effect`; family CSVs use `N` |
 | Cancer type | `cancer_type` | Every CSV |
 | Treatment phase | `treatment_phase` | Every CSV |
-| Instrument used | `instrument_id` | edge_evidence (must exist in INSTRUMENT_REGISTRY) |
+| Instrument used | `upstream_instrument_id` | edge_evidence (must exist in INSTRUMENT_REGISTRY) |
 
 **Common gotchas at scale:**
 - **Always check EDGE_REGISTRY first.** If the paper tests an edge that already exists, add evidence to that edge. Only create new edges for genuinely new relationships.
 - **Effect sign convention:** symptom burden nodes are higher-is-worse. If the paper reports improvement as positive, you may need to flip the sign. Check `expected_sign` in EDGE_REGISTRY.
 - **SE from CI:** If only confidence intervals are given: `SE = (upper - lower) / (2 × 1.96)`
-- **Mean diff → Cohen's d:** The loader auto-converts if you fill population_norms. Set `effect_type_original = mean_diff_[unit]` and always provide the population_norms CSV.
+- **Mean diff → Cohen's d:** The loader auto-converts if you fill population_norms. Set `effect_type_reported = mean_diff_[unit]` and always provide the population_norms CSV (with `mean_raw`, `sd_raw`, `N`).
 - **Multi-arm trials:** Only compare each arm to control. Don't enter arm-vs-arm comparisons (double-counts the control).
 
 **After filling CSVs → Run import:**
@@ -151,8 +151,9 @@ but are NOT populated from individual papers.
     ┌─────────────────────────────────────────────────────┐
     │            PAPER EXTRACTION (Task A)                 │
     │  PDF → fill CSVs → data/manual_uploads/structured/  │
-    │  Templates: edge_evidence, population_norms,         │
-    │  context_priors, instrument_evidence, temporal_evid  │
+    │  12 Templates: edge_evidence, population_norms,      │
+    │  node_priors, instrument_evidence, temporal_evidence, │
+    │  biomarker_correlations, + 6 profile data streams     │
     └──────────────────────┬──────────────────────────────┘
                            │
                            ▼

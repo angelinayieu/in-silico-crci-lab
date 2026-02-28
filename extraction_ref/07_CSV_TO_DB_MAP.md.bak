@@ -1,0 +1,140 @@
+# CSV → Database Column Mapping
+
+> **Post-alignment**: CSV template columns now match DB table columns exactly.  
+> The only non-DB column in most templates is `doi` — resolved to `study_id` by the importer.  
+> This file documents the few remaining transforms and auto-generated columns.
+
+---
+
+## Principle: Direct Mapping
+
+All 12 CSV templates use **DB column names directly**. There are no renames.
+The importer's job is limited to:
+
+1. **`doi` → `study_id`**: Looks up DOI in `study_registry_v1` to get the internal study_id
+2. **Auto-generated columns**: `ler_id`, `span_hash`, `correlation_id`, etc.
+3. **Harmonized columns**: `harmonized_beta`, `harmonized_se`, `harmonized_scale` — computed from raw values
+
+---
+
+## edge_evidence_template.csv → edge_evidence_v1
+
+### Transforms
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `study_id` | Lookup via study_registry_v1 |
+| *(all other columns)* | *(same name)* | Direct pass-through |
+
+### Auto-Generated Columns (not in CSV)
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `ler_id` | `LER_{study_id}_{edge_relation_id}_{span_hash}` |
+| `edge_param_id` | `EP_{edge_relation_id}_{span_hash[:8]}` |
+| `edge_family` | Looked up from `edge_relations_definitions_v1` |
+| `node_x` | Looked up from `edge_relations_definitions_v1` |
+| `node_y` | Looked up from `edge_relations_definitions_v1` |
+| `profile_id` | `"PROFILE_DEFAULT"` |
+| `harmonized_beta` | Initially = `effect_value_reported`; later overwritten by scale harmonizer |
+| `harmonized_se` | Initially = `se_reported`; later overwritten by SE calibrator |
+| `harmonization_status` | `"harmonized"` |
+| `harmonized_scale` | Inferred from `effect_type_reported` |
+| `se_quality_tag` | `"manual_extraction"` |
+| `identification_status` | `"plausible"` |
+| `quality_rating` | = `rob_overall` or `"moderate"` |
+| `span_hash` | SHA-256 of (study_id, edge_relation_id, beta, se, n) |
+| `entered_by` | `"manual_csv_import"` |
+| `entered_at` | Current UTC timestamp |
+| `version` | `1` |
+| `active` | `1` |
+
+---
+
+## population_norms_template.csv → population_norms_v1
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `study_id` | DOI → study_id lookup |
+| *(all other columns)* | *(same name)* | Direct |
+
+---
+
+## context_priors_template.csv → node_priors_v1
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `provenance` | Stored in provenance field |
+| `source_type` | `provenance` | Appended to provenance |
+| `n_contributing` | `notes` | Folded into notes |
+| *(all other columns)* | *(same name)* | Direct |
+
+### Auto-Generated Columns
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `prior_id` | `NP_{node_id}_{cancer_type}_{treatment_phase}_{hash}` |
+| `prior_space` | `"z_score"` |
+| `dist_family` | `"normal"` |
+
+---
+
+## temporal_evidence_template.csv → temporal_evidence_v1
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `study_id` | DOI → study_id lookup |
+| `edge_relation_id` | `action_id` | Edge → action mapping |
+| *(all other columns)* | *(same name)* | Direct |
+
+---
+
+## instrument_evidence_template.csv → instrument_evidence_v1
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `study_id` | DOI → study_id lookup |
+| *(all other columns)* | *(same name)* | Direct |
+
+---
+
+## correlation_template.csv → biomarker_correlations_v1
+
+| CSV Column | DB Column | Transform |
+|-----------|-----------|-----------|
+| `doi` | `source_citation` | `"doi:{value}"` |
+| *(all other columns)* | *(same name)* | Direct |
+
+### Auto-Generated Columns
+
+| DB Column | How Generated |
+|-----------|---------------|
+| `correlation_id` | `CORR_{sha256(study_id\|node_a\|node_b)[:12]}` |
+| `rho_se` | `(1 - r²) / √(n - 2)` |
+| `d_block` | Derived from node prefixes |
+
+---
+
+## Direct-Mapping Templates (No Transforms)
+
+These templates use DB column names with zero transformation:
+
+| Template | DB Table | Columns |
+|----------|----------|---------|
+| `dose_evidence_template.csv` | `dose_evidence_v1` | 17 |
+| `subgroup_evidence_template.csv` | `subgroup_evidence_v1` | 16 |
+| `study_cohort_profile_template.csv` | `study_cohort_profiles_v1` | 33 |
+| `profile_data_stream_template.csv` | `profile_data_streams_v1` | 25 |
+| `stream_timepoint_template.csv` | `stream_timepoints_v1` | 11 |
+| `ontology_link_template.csv` | `ontology_links_v1` | 11 |
+
+---
+
+## Load Command
+
+```bash
+cd /workspaces/in-silico-crci-lab
+python scripts/load_evidence_into_db.py
+```
+
+The script auto-discovers all CSVs in `data/manual_uploads/structured/*/` subfolders.

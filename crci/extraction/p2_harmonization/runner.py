@@ -466,6 +466,18 @@ def run_p2_harmonization(
         if hasattr(id_result, "identification_status"):
             id_result.identification_status = capped_status
 
+    # ── R5.4 PG-01: RCT randomization language verification ──
+    if subtype_str:
+        methods_text = context.get("methods_text") or context.get("canonical_text", "")
+        rct_id_status = _verify_rct_randomization(subtype_str, methods_text)
+        if rct_id_status == "partially_identified":
+            logger.info(
+                "PG-01: RCT paper '%s' lacks randomization language — "
+                "demoting identification_status to partially_identified.",
+                context.get("paper_id", "unknown"),
+            )
+            context["rct_randomization_missing"] = True
+
     # ── P2-EW: Persist Evidence to edge_evidence_v1 ──
     # Write harmonized records to database for downstream queries and
     # report_status.py visibility. This bridges the in-memory→DB gap.

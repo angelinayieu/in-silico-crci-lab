@@ -1,0 +1,11 @@
+{
+    "study_id": "STUDY_LASTNAME_YEAR",
+    "title": "Full paper title",
+    "first_author": "LastName",
+    "authors": "LastName AB; SecondAuthor CD; ThirdAuthor EF",
+    "journal": "Journal Name",
+    "year": 2024,
+    "doi": "10.XXXX/journal.id",
+    "study_design": "RCT",
+    "notes": "Brief description of the study and what it contributes"
+}

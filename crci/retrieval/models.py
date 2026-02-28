@@ -143,6 +143,78 @@ class RetrievalResult(BaseModel):
     source_used: str | None = None  # which adapter provided the full text
     file_size_bytes: int | None = None
     error_message: str | None = None
+    is_preprint: bool = False
+    retrieval_format: str | None = None  # "pdf", "pmc_xml", "jats_xml"
+    attempts: list["RetrievalAttemptRecord"] = Field(default_factory=list)
+    validation: "ContentValidation | None" = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RESOLVED IDENTIFIERS (from cross-resolution)
+# ═══════════════════════════════════════════════════════════════
+
+
+class ResolvedIdentifiers(BaseModel):
+    """All known identifiers for a single paper, from cross-resolution.
+
+    Produced by id_resolver.resolve_doi().
+    Consumed by fulltext_retriever to decide which adapters are applicable
+    and to populate meta.json for P0 triage.
+    """
+
+    doi: str | None = None
+    pmid: str | None = None
+    pmcid: str | None = None
+    arxiv_id: str | None = None
+    openalex_id: str | None = None
+    oa_status: OAStatus = OAStatus.UNKNOWN
+    best_oa_pdf_url: str | None = None
+    best_oa_source: str | None = None
+    publisher: str | None = None
+    title: str | None = None
+    journal: str | None = None
+    year: int | None = None
+    resolution_source: str = "none"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RETRIEVAL ATTEMPT RECORD
+# ═══════════════════════════════════════════════════════════════
+
+
+class RetrievalAttemptRecord(BaseModel):
+    """Record of a single retrieval attempt from one source.
+
+    Stored in acquisition_queue_v1.retrieval_attempts_json as JSON array.
+    """
+
+    source: str
+    status: str  # "success", "not_applicable", "failed", "timeout", "rate_limited"
+    http_status: int | None = None
+    error: str | None = None
+    duration_ms: int | None = None
+    url_attempted: str | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CONTENT VALIDATION
+# ═══════════════════════════════════════════════════════════════
+
+
+class ContentValidation(BaseModel):
+    """Result of content validation for a retrieved file.
+
+    Checks: magic bytes, text length, title match, abstract/references presence.
+    Used to catch paywall landing pages, cover-page-only PDFs, and wrong papers.
+    """
+
+    valid: bool
+    issues: list[str] = Field(default_factory=list)
+    text_length: int | None = None
+    title_match_score: float | None = None
+    has_abstract: bool = False
+    has_references: bool = False
+    page_count: int | None = None
 
 
 # ═══════════════════════════════════════════════════════════════

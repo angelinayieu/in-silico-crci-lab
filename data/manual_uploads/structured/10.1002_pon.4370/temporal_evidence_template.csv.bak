@@ -1,0 +1,9 @@
+doi,edge_id,timepoint_weeks,value,se,is_recovery,sample_size,provenance_ref
+10.1002/pon.4370,ER_ACTIVITY_PROC_SPEED,0,0.0,0.0,0,19,baseline_by_definition
+10.1002/pon.4370,ER_ACTIVITY_PROC_SPEED,24,-1.56,0.53,0,19,"post_intervention_cohen_d; adj_mean_diff=-14.2s/SD_pooled=9.1; 24-week aerobic exercise; ANCOVA adjusted"
+10.1002/pon.4370,ER_ACTIVITY_VERBAL_FLUENCY,0,0.0,0.0,0,19,baseline_by_definition
+10.1002/pon.4370,ER_ACTIVITY_VERBAL_FLUENCY,24,0.70,0.47,0,19,"post_intervention_cohen_d; adj_mean_diff=+3.0words/SD_pooled=4.3; 24-week aerobic exercise; trend only p=0.15"
+10.1002/pon.4370,ER_ACTIVITY_EPIMEM,0,0.0,0.0,0,19,baseline_by_definition
+10.1002/pon.4370,ER_ACTIVITY_EPIMEM,24,-0.38,0.46,0,19,"post_intervention_cohen_d; adj_mean_diff=-1.5/SD_pooled=4.0; 24-week aerobic exercise; null p=0.52"
+10.1002/pon.4370,ER_ACTIVITY_COG_COMPLAINTS,0,0.0,0.0,0,19,baseline_by_definition
+10.1002/pon.4370,ER_ACTIVITY_COG_COMPLAINTS,24,0.26,0.46,0,19,"post_intervention_cohen_d; adj_mean_diff=+3.9/SD_pooled=14.8; 24-week aerobic exercise; null p=0.44"

@@ -7,7 +7,7 @@
 
 ## Evidence Tables (Populated During Extraction)
 
-### edge_evidence_v1 (101 columns)
+### edge_evidence_v1 (107 columns)
 
 The primary evidence table. Each row = one effect size from one paper.
 

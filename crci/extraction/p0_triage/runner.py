@@ -71,11 +71,16 @@ def run_p0_triage(
     else:
         context["companion_meta"] = {}
 
-    # ── P0-S1: PDF Ingestion ──
-    logger.info("P0-S1: Ingesting PDF %s", pdf_path.name)
-    from crci.extraction.p0_triage.pdf_ingestion import ingest_pdf
-
-    ingested = ingest_pdf(pdf_path)
+    # ── P0-S1: PDF or XML Ingestion ──
+    file_ext = pdf_path.suffix.lower()
+    if file_ext in (".xml", ".nxml"):
+        logger.info("P0-S1: Ingesting XML %s", pdf_path.name)
+        from crci.extraction.p0_triage.xml_ingestion import ingest_xml
+        ingested = ingest_xml(pdf_path)
+    else:
+        logger.info("P0-S1: Ingesting PDF %s", pdf_path.name)
+        from crci.extraction.p0_triage.pdf_ingestion import ingest_pdf
+        ingested = ingest_pdf(pdf_path)
     context["ingested_paper"] = ingested
 
     # Merge meta.json metadata into ingested metadata (meta.json takes priority)
@@ -220,7 +225,7 @@ def run_p0_triage(
             study_subtype=str(subtype_enum.value) if subtype_enum else None,
             pdf_path=str(pdf_path),
             canonical_text_path=None,
-            file_type="pdf",
+            file_type=ingested.get("source_format", "pdf"),
             parse_quality=ingested.get("pdf_quality", "GOOD"),
             hop_depth=0,  # Directly acquired, not a hop-derived study
         )

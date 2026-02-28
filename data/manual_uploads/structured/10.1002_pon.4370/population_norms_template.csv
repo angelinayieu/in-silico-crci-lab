@@ -1,4 +1,4 @@
-doi,node_id,instrument_id,mean,sd,sample_size,cancer_type,treatment_phase,age_range
+doi,node_id,instrument_id,mean_raw,sd_raw,N,cancer_type,treatment_phase,age_range
 10.1002/pon.4370,NODE_COG_PROC_SPEED,INST_TMT_B,33.8,9.1,9,breast,early_recovery,40-65
 10.1002/pon.4370,NODE_COG_EPISODIC_MEM,INST_HVLTR,25.2,4.0,9,breast,early_recovery,40-65
 10.1002/pon.4370,NODE_COG_VERBAL_FLUENCY,INST_COWAT,18.0,4.3,9,breast,early_recovery,40-65

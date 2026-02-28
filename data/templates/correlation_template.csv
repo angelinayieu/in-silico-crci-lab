@@ -1,1 +1,1 @@
-doi,biomarker_id_1,biomarker_id_2,correlation_r,sample_size,partial_or_zero,population,provenance_ref
+doi,node_a_id,node_b_id,rho,N,partial_or_zero

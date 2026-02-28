@@ -92,6 +92,7 @@ def run_p1_extraction(
     if subtype_val in ma_subtypes:
         from crci.extraction.p1_extraction.ma_multi_product import (
             build_ma_extraction_plan,
+            enforce_random_effects_default,
             get_product_agents,
         )
 
@@ -102,6 +103,19 @@ def run_p1_extraction(
             title=ingested.get("metadata", {}).get("title"),
         )
         context["ma_extraction_plan"] = ma_plan
+
+        # R5.6 MG-02: Flag random-effects vs fixed-effects for MA papers
+        ma_context_row = enforce_random_effects_default(
+            row={"paper_id": paper_id},
+            notes=canonical_text[:10000] if canonical_text else "",
+        )
+        if ma_context_row.get("mg02_re_preferred") is not None:
+            context["mg02_re_preferred"] = ma_context_row["mg02_re_preferred"]
+            logger.info(
+                "MG-02: RE preferred=%s for MA paper %s",
+                ma_context_row["mg02_re_preferred"], paper_id,
+            )
+
         logger.info(
             "P1-MAP: MA plan built — %d products (%d mandatory), "
             "NMA=%s, dose-response=%s",

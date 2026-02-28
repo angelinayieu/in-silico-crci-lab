@@ -20,7 +20,7 @@ import re
 from typing import Any
 
 from crci.shared import config
-from crci.retrieval.models import CandidateMetadata
+from crci.retrieval.models import CandidateMetadata, OAStatus, ResolvedIdentifiers
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +120,185 @@ def _normalize_pmid(pmid: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  PUBLIC API
+#  SINGLE-DOI RESOLUTION (OpenAlex primary, NCBI fallback)
 # ═══════════════════════════════════════════════════════════════
+
+
+def resolve_doi(
+    doi: str,
+    openalex_email: str | None = None,
+) -> ResolvedIdentifiers:
+    """Resolve a single DOI to all known identifiers.
+
+    Strategy:
+      1. OpenAlex /works/doi:{doi} — returns PMID, PMCID, arXiv, OA info
+      2. NCBI ID Converter fallback — fills PMID/PMCID gaps
+    The OpenAlex call is the primary source because it returns OA status,
+    best PDF URL, publisher, and arXiv ID in one request.
+
+    Args:
+        doi: Raw DOI string (may include URL prefix).
+        openalex_email: Email for OpenAlex polite pool. Falls back to
+            OPENALEX_EMAIL env var.
+
+    Returns:
+        ResolvedIdentifiers with all discovered cross-references.
+    """
+    try:
+        import requests
+    except ImportError:
+        logger.warning("requests not installed — DOI resolution unavailable")
+        return ResolvedIdentifiers(doi=doi, resolution_source="none")
+
+    import os
+
+    norm_doi = _normalize_doi(doi)
+    if not norm_doi:
+        return ResolvedIdentifiers(doi=doi, resolution_source="none")
+
+    email = openalex_email or os.environ.get("OPENALEX_EMAIL", "")
+
+    # ─── Step 1: OpenAlex ────────────────────────────────────
+    resolved = _resolve_via_openalex(norm_doi, email)
+
+    # ─── Step 2: NCBI fallback for PMID/PMCID gaps ──────────
+    if not resolved.pmid or not resolved.pmcid:
+        ncbi_map = _fetch_ncbi_id_mapping([norm_doi], "doi")
+        ncbi = ncbi_map.get(norm_doi, {})
+        if ncbi:
+            if not resolved.pmid and ncbi.get("pmid"):
+                resolved = resolved.model_copy(update={"pmid": ncbi["pmid"]})
+            if not resolved.pmcid and ncbi.get("pmcid"):
+                resolved = resolved.model_copy(update={"pmcid": ncbi["pmcid"]})
+            logger.info(
+                "NCBI fallback enriched DOI %s: pmid=%s, pmcid=%s",
+                norm_doi,
+                resolved.pmid,
+                resolved.pmcid,
+            )
+
+    return resolved
+
+
+def _resolve_via_openalex(doi: str, email: str) -> ResolvedIdentifiers:
+    """Call OpenAlex /works/doi:{doi} and parse into ResolvedIdentifiers."""
+    import requests
+
+    url = f"https://api.openalex.org/works/doi:{doi}"
+    params: dict[str, str] = {}
+    if email:
+        params["mailto"] = email
+
+    try:
+        resp = requests.get(
+            url,
+            params=params,
+            timeout=config.ID_RESOLVER_OPENALEX_TIMEOUT_S,
+        )
+        if resp.status_code == 404:
+            logger.debug("DOI not found in OpenAlex: %s", doi)
+            return ResolvedIdentifiers(doi=doi, resolution_source="none")
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as exc:
+        logger.warning("OpenAlex DOI lookup failed for %s: %s", doi, exc)
+        return ResolvedIdentifiers(doi=doi, resolution_source="none")
+    except ValueError as exc:
+        logger.warning("OpenAlex JSON parse error for %s: %s", doi, exc)
+        return ResolvedIdentifiers(doi=doi, resolution_source="none")
+
+    # Parse IDs
+    ids = data.get("ids", {})
+
+    # PMID: "https://pubmed.ncbi.nlm.nih.gov/12345678"
+    pmid: str | None = None
+    pmid_url = ids.get("pmid")
+    if pmid_url and isinstance(pmid_url, str):
+        match = re.search(r'(\d+)$', pmid_url)
+        if match:
+            pmid = match.group(1)
+
+    # PMCID: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567"
+    pmcid: str | None = None
+    pmcid_val = ids.get("pmcid")
+    if pmcid_val and isinstance(pmcid_val, str):
+        pmc_match = re.search(r'(PMC\d+)', pmcid_val)
+        if pmc_match:
+            pmcid = pmc_match.group(1)
+
+    # OpenAlex ID: "https://openalex.org/W1234567890"
+    openalex_id: str | None = data.get("id")
+    if openalex_id and "/" in openalex_id:
+        openalex_id = openalex_id.rsplit("/", 1)[-1]
+
+    # arXiv ID: sometimes in alternate_host_venues or locations
+    arxiv_id: str | None = None
+    for location in data.get("locations", []):
+        landing_url = location.get("landing_page_url") or ""
+        if "arxiv.org" in landing_url:
+            arxiv_match = re.search(r'arxiv\.org/abs/(\S+)', landing_url)
+            if arxiv_match:
+                arxiv_id = arxiv_match.group(1).rstrip("/")
+                break
+
+    # OA status
+    oa_info = data.get("open_access", {})
+    oa_status_str = oa_info.get("oa_status", "unknown")
+    oa_mapping = {
+        "gold": OAStatus.GOLD,
+        "green": OAStatus.GREEN,
+        "hybrid": OAStatus.HYBRID,
+        "bronze": OAStatus.BRONZE,
+        "closed": OAStatus.CLOSED,
+    }
+    oa_status = oa_mapping.get(oa_status_str, OAStatus.UNKNOWN)
+
+    # Best OA PDF URL
+    best_oa_pdf_url: str | None = oa_info.get("oa_url")
+    best_oa_source: str | None = None
+
+    # Try to get direct PDF URL from best_oa_location
+    best_loc = data.get("best_oa_location") or {}
+    pdf_url = best_loc.get("pdf_url")
+    if pdf_url:
+        best_oa_pdf_url = pdf_url
+        source_obj = best_loc.get("source") or {}
+        best_oa_source = source_obj.get("display_name") or best_loc.get("source_type")
+
+    # Title / journal / year / publisher
+    title = data.get("title")
+    year = data.get("publication_year")
+
+    primary_location = data.get("primary_location", {}) or {}
+    source_obj = primary_location.get("source", {}) or {}
+    journal = source_obj.get("display_name")
+
+    # Publisher from host_organization or primary_location
+    publisher: str | None = None
+    host_org = source_obj.get("host_organization_name")
+    if host_org:
+        publisher = host_org
+
+    logger.info(
+        "OpenAlex resolved DOI %s: pmid=%s pmcid=%s arxiv=%s oa=%s",
+        doi, pmid, pmcid, arxiv_id, oa_status.value,
+    )
+
+    return ResolvedIdentifiers(
+        doi=doi,
+        pmid=pmid,
+        pmcid=pmcid,
+        arxiv_id=arxiv_id,
+        openalex_id=openalex_id,
+        oa_status=oa_status,
+        best_oa_pdf_url=best_oa_pdf_url,
+        best_oa_source=best_oa_source,
+        publisher=publisher,
+        title=title,
+        journal=journal,
+        year=year,
+        resolution_source="openalex",
+    )
 
 
 def resolve_candidate_ids(

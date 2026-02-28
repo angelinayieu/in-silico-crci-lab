@@ -1160,10 +1160,29 @@ OPENALEX_RPS: int = 10
 EUROPE_PMC_RPS: int = 5
 UNPAYWALL_RPD: int = 100_000  # per day
 UNPAYWALL_RPS_THROTTLE: float = 10.0  # per-second throttle for base adapter interface
+ARXIV_DELAY_SEC: float = 3.0           # arXiv requires 3s between requests
+CORE_API_RPS: float = 0.5             # 5 req / 10 sec (free tier)
+SEMANTIC_SCHOLAR_RPS: float = 1.0     # 1 req/sec with API key
+PMC_EFETCH_RPS: float = 3.0           # 3/sec without NCBI key, 10 with
 
-# Full-text source priority order
+# Content validation thresholds
+RETRIEVAL_MIN_TEXT_LENGTH: int = 3000         # chars; below = probably not full text
+RETRIEVAL_MIN_TITLE_MATCH_SCORE: int = 60    # fuzzy match 0-100
+RETRIEVAL_MIN_PDF_SIZE_BYTES: int = 10_000    # 10KB; below = cover page or error PDF
+RETRIEVAL_HTTP_TIMEOUT_SEC: float = 30.0
+RETRIEVAL_PDF_DOWNLOAD_TIMEOUT_SEC: float = 120.0
+
+# Full-text source priority order (8-source chain)
 FULLTEXT_SOURCE_PRIORITY: list[str] = [
-    "europe_pmc", "unpaywall", "manual", "abstract_only",
+    "openalex_direct",    # already have PDF URL from ID resolution
+    "europe_pmc",         # free, XML, best structured
+    "pmc_xml",            # NCBI efetch JATS XML (structured, no GROBID)
+    "unpaywall",          # finds legal OA copies by DOI
+    "arxiv",              # always available for CS/physics/math, preprint
+    "core",               # 200M+ papers from institutional repos
+    "semantic_scholar",   # sometimes has unique OA PDFs
+    "manual",
+    "abstract_only",
 ]
 
 # Acquisition loop
@@ -1195,6 +1214,7 @@ HOP_MAX_TOTAL_PER_RUN: int = 100           # Global safety cap per discovery run
 # v2.0: ID cross-resolution
 ID_RESOLVER_CROSSREF_TIMEOUT_S: int = 10
 ID_RESOLVER_PUBMED_TIMEOUT_S: int = 10
+ID_RESOLVER_OPENALEX_TIMEOUT_S: int = 15
 
 # Workstream priority (higher = searched first)
 WORKSTREAM_PRIORITY: list[str] = [

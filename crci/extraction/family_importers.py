@@ -16,7 +16,7 @@ Purpose: One validate+insert function per evidence family:
 Reads: dict rows from CSV templates (population_norms, context_priors,
        temporal_evidence, instrument_evidence)
 Writes: PopulationNorms, NodePrior, TemporalEvidence, InstrumentEvidence
-        ORM objects via session.add()
+        ORM objects via session.merge() (idempotent upserte() (idempotent upsert)
 Gates: FK validation (node_id, edge_id, instrument_id must exist in DB)
        Domain validation (sd > 0, sample_size > 0, reliability ∈ (0,1))
        Provenance gate (instrument_evidence requires provenance_ref)
@@ -118,19 +118,19 @@ def import_population_norm(
     """
     # ---- Validate required fields ----
     node_id = _require_str(row, "node_id")
-    mean_val = _safe_float(row.get("mean", ""), "mean")
+    mean_val = _safe_float(row.get("mean_raw", ""), "mean_raw")
     if mean_val is None:
-        raise ValueError("mean: required but missing or empty")
-    sd_val = _safe_float(row.get("sd", ""), "sd")
+        raise ValueError("mean_raw: required but missing or empty")
+    sd_val = _safe_float(row.get("sd_raw", ""), "sd_raw")
     if sd_val is None:
-        raise ValueError("sd: required but missing or empty")
+        raise ValueError("sd_raw: required but missing or empty")
     if sd_val <= 0:
-        raise ValueError(f"sd: must be > 0, got {sd_val}")
-    sample_size = _safe_int(row.get("sample_size", ""), "sample_size")
+        raise ValueError(f"sd_raw: must be > 0, got {sd_val}")
+    sample_size = _safe_int(row.get("N", ""), "N")
     if sample_size is not None and sample_size <= 0:
-        raise ValueError(f"sample_size: must be > 0, got {sample_size}")
+        raise ValueError(f"N: must be > 0, got {sample_size}")
     if sample_size is None or sample_size == 0:
-        raise ValueError("sample_size: required and must be > 0")
+        raise ValueError("N: required and must be > 0")
 
     instrument_id = row.get("instrument_id", "").strip() if row.get("instrument_id") else None
 
@@ -172,11 +172,12 @@ def import_population_norm(
         N=sample_size,
         provenance_status="manual_csv_import",
         provenance_ref=f"doi:{row.get('doi', '').strip()}",
-        notes=f"age_range={age_range}" if age_range else None,
+        age_range=age_range,
+        notes=row.get("notes", "").strip() or None,
         version=1,
     )
 
-    session.add(orm_obj)
+    session.merge(orm_obj)
     logger.info(
         "Imported population norm %s: %s node=%s mean=%.1f sd=%.1f n=%d",
         norm_id, study_id, node_id, mean_val, sd_val, sample_size,
@@ -208,14 +209,14 @@ def import_context_prior(
     """
     # ---- Validate ----
     node_id = _require_str(row, "node_id")
-    prior_mean_z = _safe_float(row.get("prior_mean_z", ""), "prior_mean_z")
-    if prior_mean_z is None:
-        prior_mean_z = 0.0  # default mean
-    prior_sd_z = _safe_float(row.get("prior_sd_z", ""), "prior_sd_z")
-    if prior_sd_z is None:
-        prior_sd_z = 1.0  # default wide prior
-    if prior_sd_z <= 0:
-        raise ValueError(f"prior_sd_z: must be > 0, got {prior_sd_z}")
+    prior_mean = _safe_float(row.get("mean", ""), "mean")
+    if prior_mean is None:
+        prior_mean = 0.0  # default mean
+    prior_sd = _safe_float(row.get("sd", ""), "sd")
+    if prior_sd is None:
+        prior_sd = 1.0  # default wide prior
+    if prior_sd <= 0:
+        raise ValueError(f"sd: must be > 0, got {prior_sd}")
 
     # ---- FK check: node_id ----
     if session.get(BiomarkerNodeDefinition, node_id) is None:
@@ -227,7 +228,8 @@ def import_context_prior(
     cancer_type = row.get("cancer_type", "").strip() or None
     treatment_phase = row.get("treatment_phase", "").strip() or None
     source_type = row.get("source_type", "").strip() or None
-    n_contributing = row.get("n_contributing", "").strip() or None
+    n_contributing_str = row.get("n_contributing", "").strip() or None
+    n_contributing = _safe_int(n_contributing_str, "n_contributing") if n_contributing_str else None
 
     prior_id = _deterministic_id(
         "PRIOR_",
@@ -239,34 +241,32 @@ def import_context_prior(
 
     # ---- Build ORM object ----
     provenance = f"manual_csv_import;doi:{row.get('doi', '').strip()}"
-    if source_type:
-        provenance += f";source={source_type}"
 
     notes_parts = []
     if row.get("notes", "").strip():
         notes_parts.append(row["notes"].strip())
-    if n_contributing:
-        notes_parts.append(f"n_contributing={n_contributing}")
 
     orm_obj = NodePrior(
         prior_id=prior_id,
         node_id=node_id,
         prior_space="z",
-        mean=prior_mean_z,
-        sd=prior_sd_z,
+        mean=prior_mean,
+        sd=prior_sd,
         dist_family="normal",
         cancer_type=cancer_type,
         treatment_phase=treatment_phase,
+        source_type=source_type,
+        n_contributing=n_contributing,
         provenance=provenance,
         active=1,
         version=1,
         notes="; ".join(notes_parts) if notes_parts else None,
     )
 
-    session.add(orm_obj)
+    session.merge(orm_obj)
     logger.info(
-        "Imported context prior %s: %s node=%s z=%.2f sd=%.1f",
-        prior_id, study_id, node_id, prior_mean_z, prior_sd_z,
+        "Imported context prior %s: %s node=%s mean=%.2f sd=%.1f",
+        prior_id, study_id, node_id, prior_mean, prior_sd,
     )
     return prior_id
 
@@ -294,41 +294,41 @@ def import_temporal_evidence(
         ValueError: If validation fails.
     """
     # ---- Validate ----
-    edge_id = _require_str(row, "edge_id")
+    edge_relation_id = _require_str(row, "edge_relation_id")
     timepoint_weeks = _safe_float(row.get("timepoint_weeks", ""), "timepoint_weeks")
     if timepoint_weeks is None:
         raise ValueError("timepoint_weeks: required but missing or empty")
     if timepoint_weeks < 0:
         raise ValueError(f"timepoint_weeks: must be >= 0, got {timepoint_weeks}")
 
-    sample_size = _safe_int(row.get("sample_size", ""), "sample_size")
+    sample_size = _safe_int(row.get("N", ""), "N")
     if sample_size is not None and sample_size <= 0:
-        raise ValueError(f"sample_size: must be > 0, got {sample_size}")
+        raise ValueError(f"N: must be > 0, got {sample_size}")
     if sample_size is None or sample_size == 0:
-        raise ValueError("sample_size: required and must be > 0")
+        raise ValueError("N: required and must be > 0")
 
-    value = _safe_float(row.get("value", ""), "value")
+    effect = _safe_float(row.get("effect", ""), "effect")
     se = _safe_float(row.get("se", ""), "se")
     is_recovery = _safe_int(row.get("is_recovery", "0"), "is_recovery") or 0
 
-    # ---- FK check: edge_id ----
-    if session.get(EdgeRelationsDefinition, edge_id) is None:
+    # ---- FK check: edge_relation_id ----
+    if session.get(EdgeRelationsDefinition, edge_relation_id) is None:
         raise ValueError(
-            f"edge_id '{edge_id}' not found in edge_relations_definitions_v1"
+            f"edge_relation_id '{edge_relation_id}' not found in edge_relations_definitions_v1"
         )
 
     # ---- Deterministic ID ----
     temp_id = _deterministic_id(
         "TEMP_",
         study_id,
-        edge_id,
+        edge_relation_id,
         str(timepoint_weeks),
     )
 
-    # ---- Derive intervention type from edge_id ----
-    if "ACTIVITY" in edge_id and "COG" not in edge_id:
+    # ---- Derive intervention type from edge_relation_id ----
+    if "ACTIVITY" in edge_relation_id and "COG" not in edge_relation_id:
         intervention_type = "aerobic_exercise"
-    elif "COGACTIVITY" in edge_id:
+    elif "COGACTIVITY" in edge_relation_id:
         intervention_type = "cognitive_rehabilitation"
     else:
         intervention_type = "unknown"
@@ -339,10 +339,11 @@ def import_temporal_evidence(
     orm_obj = TemporalEvidence(
         id=temp_id,
         study_id=study_id,
-        action_id=edge_id,
+        edge_relation_id=edge_relation_id,
+        action_id=edge_relation_id,  # legacy FK — same value for now
         intervention_type=intervention_type,
         timepoint_weeks=timepoint_weeks,
-        effect=value,
+        effect=effect,
         se=se,
         is_recovery=is_recovery,
         N=sample_size,
@@ -353,10 +354,10 @@ def import_temporal_evidence(
         version=1,
     )
 
-    session.add(orm_obj)
+    session.merge(orm_obj)
     logger.info(
         "Imported temporal evidence %s: %s edge=%s t=%.1fw effect=%.3f",
-        temp_id, study_id, edge_id, timepoint_weeks, value or 0,
+        temp_id, study_id, edge_relation_id, timepoint_weeks, effect or 0,
     )
     return temp_id
 
@@ -390,16 +391,27 @@ def import_instrument_evidence(
     instrument_id = _require_str(row, "instrument_id")
     provenance_ref = _require_str(row, "provenance_ref")
 
-    reliability_value = _safe_float(
-        row.get("reliability_value", ""), "reliability_value"
+    # Read cronbachs_alpha directly from template column
+    cronbachs_alpha = _safe_float(
+        row.get("cronbachs_alpha", ""), "cronbachs_alpha"
     )
-    if reliability_value is not None:
-        if reliability_value <= 0 or reliability_value > 1:
+    if cronbachs_alpha is not None:
+        if cronbachs_alpha <= 0 or cronbachs_alpha > 1:
             raise ValueError(
-                f"reliability_value: must be in (0, 1], got {reliability_value}"
+                f"cronbachs_alpha: must be in (0, 1], got {cronbachs_alpha}"
             )
 
-    reliability_type = row.get("reliability_type", "").strip()
+    se_alpha = _safe_float(row.get("se_alpha", ""), "se_alpha")
+
+    # Read test_retest_reliability directly from template column
+    test_retest_reliability = _safe_float(
+        row.get("test_retest_reliability", ""), "test_retest_reliability"
+    )
+    if test_retest_reliability is not None:
+        if test_retest_reliability <= 0 or test_retest_reliability > 1:
+            raise ValueError(
+                f"test_retest_reliability: must be in (0, 1], got {test_retest_reliability}"
+            )
 
     # ---- FK check: instrument_id ----
     if session.get(InstrumentDefinition, instrument_id) is None:
@@ -407,51 +419,45 @@ def import_instrument_evidence(
             f"instrument_id '{instrument_id}' not found in instrument_definitions_v1"
         )
 
-    # ---- Map reliability_value to correct column ----
-    cronbachs_alpha = None
-    test_retest_reliability = None
-
-    if reliability_type == "cronbachs_alpha":
-        cronbachs_alpha = reliability_value
-    elif reliability_type == "test_retest":
-        test_retest_reliability = reliability_value
-
-    # Dedicated test_retest_icc column overrides
-    trt_icc = _safe_float(row.get("test_retest_icc", ""), "test_retest_icc")
-    if trt_icc is not None:
-        test_retest_reliability = trt_icc
-
     # Factor loading mean
     factor_loading_mean = _safe_float(
         row.get("factor_loading_mean", ""), "factor_loading_mean"
     )
 
+    # SEM value
+    sem_value = _safe_float(row.get("sem_value", ""), "sem_value")
+
     # Sample size (optional for instrument evidence)
-    sample_size = _safe_int(row.get("sample_size", ""), "sample_size")
+    sample_size = _safe_int(row.get("N", ""), "N")
 
     cancer_type = row.get("cancer_type", "").strip() or None
+    treatment_phase = row.get("treatment_phase", "").strip() or None
     cancer_validated = row.get("cancer_validated", "").strip() or None
+    instrument_name = row.get("instrument_name", "").strip() or None
+    instrument_subscale = row.get("instrument_subscale", "").strip() or None
+    notes = row.get("notes", "").strip() or None
 
     # ---- Deterministic ID ----
     inst_ev_id = _deterministic_id(
         "INST_EV_",
         study_id,
         instrument_id,
-        reliability_type,
+        instrument_subscale or "",
     )
 
-    # ---- Derive instrument name from registry or fallback ----
-    _INST_NAME_MAP = {
-        "INST_TMT_B": "Trail Making Test (Part B / A)",
-        "INST_HVLTR": "Hopkins Verbal Learning Test - Revised",
-        "INST_COWAT": "Controlled Oral Word Association Test",
-        "INST_FACTCOG_PCI": "FACT-Cog Perceived Cognitive Impairment",
-        "INST_CESD": "Center for Epidemiologic Studies Depression Scale",
-        "INST_FACIT_FATIGUE": "FACIT-Fatigue Scale",
-        "INST_DIGIT_SPAN": "WAIS Digit Span",
-        "INST_STROOP": "Stroop Color-Word Test",
-    }
-    instrument_name = _INST_NAME_MAP.get(instrument_id, instrument_id)
+    # ---- Derive instrument name from registry if not provided ----
+    if not instrument_name:
+        _INST_NAME_MAP = {
+            "INST_TMT_B": "Trail Making Test (Part B / A)",
+            "INST_HVLTR": "Hopkins Verbal Learning Test - Revised",
+            "INST_COWAT": "Controlled Oral Word Association Test",
+            "INST_FACTCOG_PCI": "FACT-Cog Perceived Cognitive Impairment",
+            "INST_CESD": "Center for Epidemiologic Studies Depression Scale",
+            "INST_FACIT_FATIGUE": "FACIT-Fatigue Scale",
+            "INST_DIGIT_SPAN": "WAIS Digit Span",
+            "INST_STROOP": "Stroop Color-Word Test",
+        }
+        instrument_name = _INST_NAME_MAP.get(instrument_id, instrument_id)
 
     # ---- Build ORM object ----
     orm_obj = InstrumentEvidence(
@@ -459,18 +465,23 @@ def import_instrument_evidence(
         study_id=study_id,
         instrument_id=instrument_id,
         instrument_name=instrument_name,
+        instrument_subscale=instrument_subscale,
         cronbachs_alpha=cronbachs_alpha,
+        se_alpha=se_alpha,
         test_retest_reliability=test_retest_reliability,
         factor_loading_mean=factor_loading_mean,
+        sem_value=sem_value,
         cancer_type=cancer_type,
+        treatment_phase=treatment_phase,
+        cancer_validated=cancer_validated,
         N=sample_size,
         provenance_status="manual_csv_import",
         provenance_ref=provenance_ref,
-        notes=f"cancer_validated={cancer_validated}; reliability_type={reliability_type}",
+        notes=notes,
         version=1,
     )
 
-    session.add(orm_obj)
+    session.merge(orm_obj)
     logger.info(
         "Imported instrument evidence %s: %s inst=%s α=%s trt=%s",
         inst_ev_id, study_id, instrument_id,
@@ -502,18 +513,18 @@ def import_correlation(
         ValueError: If validation fails (missing fields, bad values, FK miss).
     """
     # ---- Validate required fields ----
-    node_a = _require_str(row, "biomarker_id_1")
-    node_b = _require_str(row, "biomarker_id_2")
+    node_a = _require_str(row, "node_a_id")
+    node_b = _require_str(row, "node_b_id")
 
-    correlation_r = _safe_float(row.get("correlation_r", ""), "correlation_r")
-    if correlation_r is None:
-        raise ValueError("correlation_r: required but missing or empty")
-    if correlation_r < -1.0 or correlation_r > 1.0:
-        raise ValueError(f"correlation_r: must be in [-1, 1], got {correlation_r}")
+    rho = _safe_float(row.get("rho", ""), "rho")
+    if rho is None:
+        raise ValueError("rho: required but missing or empty")
+    if rho < -1.0 or rho > 1.0:
+        raise ValueError(f"rho: must be in [-1, 1], got {rho}")
 
-    sample_size = _safe_int(row.get("sample_size", ""), "sample_size")
+    sample_size = _safe_int(row.get("N", ""), "N")
     if sample_size is None or sample_size <= 0:
-        raise ValueError("sample_size: required and must be > 0")
+        raise ValueError("N: required and must be > 0")
 
     partial_or_zero = row.get("partial_or_zero", "").strip() or "zero_order"
     if partial_or_zero not in ("partial", "zero_order"):
@@ -524,11 +535,11 @@ def import_correlation(
     # ---- FK checks: both node IDs ----
     if session.get(BiomarkerNodeDefinition, node_a) is None:
         raise ValueError(
-            f"biomarker_id_1 '{node_a}' not found in biomarker_node_definitions_v1"
+            f"node_a_id '{node_a}' not found in biomarker_node_definitions_v1"
         )
     if session.get(BiomarkerNodeDefinition, node_b) is None:
         raise ValueError(
-            f"biomarker_id_2 '{node_b}' not found in biomarker_node_definitions_v1"
+            f"node_b_id '{node_b}' not found in biomarker_node_definitions_v1"
         )
 
     # ---- Deterministic ID ----
@@ -543,13 +554,11 @@ def import_correlation(
     import math
     n_minus_2 = sample_size - 2
     if n_minus_2 > 0:
-        rho_se = (1.0 - correlation_r ** 2) / math.sqrt(n_minus_2)
+        rho_se = (1.0 - rho ** 2) / math.sqrt(n_minus_2)
     else:
         rho_se = None
 
     # ---- Determine d_block from node layer letters ----
-    # e.g. node_a=BIO_IL6 → layer "B", node_b=COG_PROC_SPEED → layer "C"
-    # d_block = sorted pair like "BC"
     d_block = "XX"  # fallback
     _LAYER_MAP = {
         "BIO": "B", "NEURO": "N", "COG": "C", "FUNC": "F",
@@ -563,36 +572,30 @@ def import_correlation(
                     break
             break
 
-    population = row.get("population", "").strip() or None
-    provenance_ref = row.get("provenance_ref", "").strip() or None
     doi = row.get("doi", "").strip() or ""
-    source_citation = provenance_ref or f"doi:{doi}"
-
-    notes_parts = []
-    notes_parts.append(f"partial_or_zero={partial_or_zero}")
-    notes_parts.append(f"n={sample_size}")
-    if population:
-        notes_parts.append(f"population={population}")
+    source_citation = f"doi:{doi}"
 
     # ---- Build ORM object ----
     orm_obj = BiomarkerCorrelation(
         correlation_id=correlation_id,
         node_a_id=node_a,
         node_b_id=node_b,
-        rho=correlation_r,
+        rho=rho,
         rho_se=rho_se,
+        N=sample_size,
+        partial_or_zero=partial_or_zero,
         d_block=d_block,
         source_citation=source_citation,
         is_decision_critical=0,
         version=1,
         active=1,
-        notes="; ".join(notes_parts),
+        notes=None,
     )
 
-    session.add(orm_obj)
+    session.merge(orm_obj)
     logger.info(
-        "Imported correlation %s: %s %s↔%s r=%.3f n=%d",
-        correlation_id, study_id, node_a, node_b, correlation_r, sample_size,
+        "Imported correlation %s: %s %s↔%s rho=%.3f n=%d",
+        correlation_id, study_id, node_a, node_b, rho, sample_size,
     )
     return correlation_id
 

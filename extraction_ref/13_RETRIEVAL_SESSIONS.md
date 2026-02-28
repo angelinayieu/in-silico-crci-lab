@@ -7,7 +7,7 @@
 > **Companion docs:**
 > - `DEEP_RESEARCH_STRATEGY.md` — Full search keyword batteries (reference, not session-ready)
 > - `docs/05_data_management/AUTOMATED_RETRIEVAL_PLAN.md` Part 14 — Pipeline stages
-> - `extraction_ref/02_CHATBOX_CONTEXT.md` — For extraction sessions (Stage 2), NOT this doc
+> - `extraction_ref/01_PROCEDURE.md` — For extraction sessions (Stage 2), NOT this doc
 
 ---
 

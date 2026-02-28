@@ -6,7 +6,7 @@ Every gate must be enforced. Every module must connect to the next.
 
 ## Task Routing — Read This First
 
-> **Quick start:** Read **[LLM_TASK_ROUTER.md](LLM_TASK_ROUTER.md)** for a comprehensive routing table
+> **Quick start:** Read **[LLM_TASK_ROUTER.md](extraction_ref/extraction%20info/LLM_TASK_ROUTER.md)** for a comprehensive routing table
 > that maps paper types → specific instructions, and covers ALL task types
 > (extraction, Category A curation, registry updates, code implementation).
 
@@ -15,8 +15,8 @@ Every gate must be enforced. Every module must connect to the next.
 ---
 
 ### → "Extract / add a paper"
-1. Read **[EXTRACTION_PLAYBOOK.md](EXTRACTION_PLAYBOOK.md)** — full procedure (Steps 0–9)
-2. Read **[EXTRACTION_LOG.md](EXTRACTION_LOG.md)** — what's already extracted, avoid duplication
+1. Read **[01_PROCEDURE.md](extraction_ref/01_PROCEDURE.md)** — THE single extraction procedure (Steps 0–10, AI context, system prompt, analytics link)
+2. Read **[EXTRACTION_LOG.md](extraction_ref/EXTRACTION_LOG.md)** — what's already extracted, avoid duplication
 3. Read **[registries/EDGE_REGISTRY.csv](registries/EDGE_REGISTRY.csv)** header + last 10 rows — know existing edges
 4. Read **[registries/NODE_REGISTRY.csv](registries/NODE_REGISTRY.csv)** — valid node IDs
 5. Read **[registries/INSTRUMENT_REGISTRY.csv](registries/INSTRUMENT_REGISTRY.csv)** — valid instrument IDs

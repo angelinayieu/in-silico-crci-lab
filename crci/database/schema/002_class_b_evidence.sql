@@ -238,6 +238,55 @@ CREATE TABLE IF NOT EXISTS edge_evidence_v1 (
     -- Meta-analysis provenance
     parent_meta_study_id            TEXT,
 
+    -- v2.0: MA multi-product and effect size classification (Eng. Appendix §A.2)
+    meta_source_flag                TEXT,
+    heterogeneity_json              TEXT,
+    effect_size_type                TEXT,
+
+    -- v2.0: SE derivation cascade (CONVERSION_VALIDITY_AND_HARDENING.md Module 1.4)
+    se_derivation_level             TEXT,
+    se_inflation_applied            REAL        DEFAULT 1.0,
+    se_quality_tag                  TEXT,
+
+    -- v2.0: Conversion provenance (CONVERSION_VALIDITY_AND_HARDENING.md R4)
+    conversion_formula              TEXT,
+    conversion_bias_risk            TEXT,
+
+    -- v2.0: Shared control & dependency (CONVERSION_VALIDITY_AND_HARDENING.md Module 4)
+    shared_control_flag             INTEGER     DEFAULT 0,
+    shared_control_study_id         TEXT,
+    endpoint_vs_change              TEXT,
+    comparison_arm_label            TEXT,
+
+    -- v2.0: Verification escalation (CONVERSION_VALIDITY_AND_HARDENING.md Module 2)
+    verification_tier               TEXT        DEFAULT 'TIER_3',
+    verification_status             TEXT        DEFAULT 'UNVERIFIED',
+    escalation_rules_json           TEXT,
+    escalation_se_inflation         REAL        DEFAULT 1.0,
+
+    -- v2.0: Freshness provenance (CONVERSION_VALIDITY_AND_HARDENING.md Module 5)
+    parameter_family                TEXT,
+    freshness_w                     REAL,
+    freshness_superseded            INTEGER     DEFAULT 0,
+
+    -- v2.1: Idempotent evidence writes (PERSISTENCE_FIX_CHANGELOG.md S3)
+    span_hash                       TEXT,
+
+    -- v2.2: Study-level metadata (migration 013 — template alignment)
+    study_design                    TEXT,
+    cancer_type                     TEXT,
+    treatment_phase                 TEXT,
+    pub_year                        INTEGER,
+    cancer_validation_status        TEXT,
+    n_treatment                     INTEGER,
+    n_control                       INTEGER,
+
+    -- v2.3: P2–P7 pipeline columns (migration 014 — wiring audit)
+    outcome_type                    TEXT        DEFAULT 'semi_objective',
+    scope_weights_json              TEXT        DEFAULT '{}',
+    se_eff                          REAL,
+    se_layer_details_json           TEXT,
+
     notes                           TEXT
 );
 

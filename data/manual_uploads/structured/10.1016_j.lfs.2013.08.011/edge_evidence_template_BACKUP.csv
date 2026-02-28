@@ -1,0 +1,6 @@
+doi,edge_relation_id,effect_type_reported,effect_value_reported,se_reported,N_effect,study_design,cancer_type,pub_year,cancer_validation_status,effect_size_type
+10.1016/j.lfs.2013.08.011,ER_CORTISOL_HPA,correlation_r,0.35,0.08,50,cross_sectional,breast,2020,direct,BETWEEN_GROUP
+10.1016/j.lfs.2013.08.011,ER_HPA_ANXIETY,weird_stat_ive_never_seen,1.23,0.45,30,RCT,breast,2020,direct,BETWEEN_GROUP
+10.1016/j.lfs.2013.08.011,FAKE_EDGE_NOT_IN_REGISTRY,cohens_d,0.50,0.20,40,RCT,breast,2020,direct,BETWEEN_GROUP
+10.1016/j.lfs.2013.08.011,ER_HPA_FATIGUE,f_statistic,4.56,0.30,60,RCT,breast,2020,direct,BETWEEN_GROUP
+10.1016/j.lfs.2013.08.011,ER_HPA_DEPRESSION,percent_change,15.2,3.1,45,RCT,breast,2020,direct,BETWEEN_GROUP

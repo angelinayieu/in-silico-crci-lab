@@ -91,6 +91,53 @@ def run_tb_trust_boundary(
     valid_claims = [p for p in parsed_numerics if p.parse_status.value == "CLEAN"]
     failed_claims = [p for p in parsed_numerics if p.parse_status.value != "CLEAN"]
 
+    # ── R5.3 MG-04: Umbrella review numeric rejection ──
+    paper_subtype = context.get("paper_subtype", "")
+    if paper_subtype and paper_subtype.lower() in ("umbrella_review",):
+        if valid_claims:
+            logger.warning(
+                "MG-04: Umbrella review '%s' produced %d numeric spans — "
+                "rejecting all. Umbrella reviews cannot produce evidence rows.",
+                paper_id, len(valid_claims),
+            )
+            failed_claims.extend(valid_claims)
+            valid_claims = []
+
+    # ── R5.1 UG-05: Filter figure-only spans ──
+    figure_only_count = 0
+    non_figure_claims = []
+    for claim in valid_claims:
+        if _check_figure_only(claim):
+            figure_only_count += 1
+            failed_claims.append(claim)
+        else:
+            non_figure_claims.append(claim)
+    if figure_only_count > 0:
+        logger.info(
+            "UG-05: Blocked %d figure-only span(s) for %s",
+            figure_only_count, paper_id,
+        )
+    valid_claims = non_figure_claims
+
+    # ── R5.2 UG-08: Flag sensitivity analysis spans ──
+    sensitivity_count = 0
+    for claim in valid_claims:
+        if _flag_sensitivity_analysis(claim):
+            sensitivity_count += 1
+            # Tag claim for downstream weight reduction
+            if hasattr(claim, "notes"):
+                existing = getattr(claim, "notes", "") or ""
+                try:
+                    claim.notes = existing + " [SENSITIVITY_ANALYSIS]"
+                except (AttributeError, TypeError):
+                    pass  # Frozen model — tag in context instead
+    if sensitivity_count > 0:
+        logger.info(
+            "UG-08: Flagged %d sensitivity analysis span(s) for %s",
+            sensitivity_count, paper_id,
+        )
+        context["sensitivity_analysis_count"] = sensitivity_count
+
     context["parsed_claims"] = valid_claims
     context["failed_claims"] = failed_claims
     context["total_spans"] = len(raw_for_parsing)

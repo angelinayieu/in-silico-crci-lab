@@ -35,6 +35,8 @@ class RetrievalConfig:
     crossref_mailto: str | None = None
     openalex_email: str | None = None
     unpaywall_email: str | None = None
+    core_api_key: str | None = None
+    s2_api_key: str | None = None
 
     # Daily budget caps (from shared/config.py)
     max_queries_per_day: int = config.RETRIEVAL_MAX_QUERIES_PER_DAY
@@ -49,6 +51,17 @@ class RetrievalConfig:
     openalex_rps: int = config.OPENALEX_RPS
     europe_pmc_rps: int = config.EUROPE_PMC_RPS
     unpaywall_rpd: int = config.UNPAYWALL_RPD
+    arxiv_delay_sec: float = config.ARXIV_DELAY_SEC
+    core_api_rps: float = config.CORE_API_RPS
+    s2_rps: float = config.SEMANTIC_SCHOLAR_RPS
+    pmc_efetch_rps: float = config.PMC_EFETCH_RPS
+
+    # Content validation thresholds
+    min_text_length: int = config.RETRIEVAL_MIN_TEXT_LENGTH
+    min_title_match_score: int = config.RETRIEVAL_MIN_TITLE_MATCH_SCORE
+    min_pdf_size_bytes: int = config.RETRIEVAL_MIN_PDF_SIZE_BYTES
+    http_timeout_sec: float = config.RETRIEVAL_HTTP_TIMEOUT_SEC
+    pdf_download_timeout_sec: float = config.RETRIEVAL_PDF_DOWNLOAD_TIMEOUT_SEC
 
     # Source priority (from shared/config.py)
     fulltext_source_priority: list[str] | None = None
@@ -81,4 +94,6 @@ def load_retrieval_config() -> RetrievalConfig:
         crossref_mailto=os.environ.get("CROSSREF_MAILTO"),
         openalex_email=os.environ.get("OPENALEX_EMAIL"),
         unpaywall_email=os.environ.get("UNPAYWALL_EMAIL"),
+        core_api_key=os.environ.get("CORE_API_KEY"),
+        s2_api_key=os.environ.get("S2_API_KEY"),
     )

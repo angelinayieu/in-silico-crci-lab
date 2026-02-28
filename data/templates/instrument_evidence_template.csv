@@ -1,1 +1,1 @@
-doi,instrument_id,reliability_value,reliability_type,factor_loading_mean,test_retest_icc,sample_size,cancer_type,cancer_validated,provenance_ref
+doi,instrument_id,instrument_name,instrument_subscale,cronbachs_alpha,se_alpha,test_retest_reliability,factor_loading_mean,sem_value,N,cancer_type,treatment_phase,cancer_validated,provenance_ref,notes

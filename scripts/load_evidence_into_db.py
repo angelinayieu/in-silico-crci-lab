@@ -20,8 +20,8 @@ Steps performed:
   A7. Verify final state
 
 Supports two CSV formats:
-  - 12-column minimal: doi,edge_id,beta_raw,se_raw,...,confidence_note
-  - 32-column extended: adds ci_low,ci_high,p_value,...,outcome_node_id
+  - 28-column standard: doi,edge_relation_id,effect_value_reported,se_reported,...
+  - Extended: adds ci_low_reported,ci_high_reported,p_value,...,extraction_snippet
 
 Usage:
     python scripts/load_evidence_into_db.py
@@ -123,22 +123,124 @@ STUDIES = [
 # ============================================================================
 #  CSV → edge_evidence_v1 COLUMN MAPPING
 # ============================================================================
-# CSV columns → DB columns
-# CSV: doi, edge_id, beta_raw, se_raw, effect_type_original, effect_size_type,
-#      sample_size, study_design, cancer_type, treatment_phase, instrument_id,
-#      confidence_note
+# CSV columns use DB column names directly (1:1 mapping).
+# CSV: doi, edge_relation_id, effect_value_reported, se_reported,
+#      effect_type_reported, effect_size_type, N_effect, study_design,
+#      cancer_type, treatment_phase, upstream_instrument_id, notes, ...
 #
-# DB:  ler_id, edge_relation_id, study_id, edge_family, node_x, node_y,
-#      effect_type_reported, effect_value_reported, se_reported,
-#      N_effect, notes, effect_size_type, ...
+# Pipeline-resolved: doi → study_id (via DOI_TO_STUDY)
+# Auto-generated: ler_id, edge_param_id, edge_family, node_x, node_y,
+#                 harmonized_beta/se, span_hash
 
-# Map CSV edge_id → study_id (derived from DOI)
-DOI_TO_STUDY = {
+# Seed DOI→study_id mapping from known papers
+_SEED_DOI_MAP = {
     "10.1016/j.lfs.2013.08.011": "STUDY_CHERRIER_2013",
     "10.1002/pon.4370": "STUDY_CAMPBELL_2017",
     "10.1016/j.jsams.2018.11.026": "STUDY_NORTHEY_2018",
     "10.1016/j.psyneuen.2017.05.018": "STUDY_ADAM_2017",
 }
+
+
+def _doi_slug_to_doi(slug: str) -> str:
+    """Convert folder slug (e.g. '10.1002_pon.4370') → DOI ('10.1002/pon.4370').
+
+    Convention: the first '_' after the DOI prefix (e.g. '10.XXXX') is '/',
+    all subsequent underscores stay as-is (some journals have underscores in paths).
+    However, most DOIs use '/' only once, so we replace the first '_' with '/'.
+    """
+    # DOI format: 10.XXXX/suffix — the first underscore is always the slash
+    idx = slug.find("_")
+    if idx >= 0:
+        return slug[:idx] + "/" + slug[idx + 1:]
+    return slug
+
+
+def _doi_to_study_id(doi: str) -> str:
+    """Auto-derive a study_id from a DOI.
+
+    Uses first author surname + year from meta.json if available,
+    otherwise generates from DOI suffix.
+    E.g. '10.1002/pon.4370' → 'STUDY_PON_4370'
+    """
+    # Check if there's a meta.json in the structured dir for this DOI
+    doi_slug = doi.replace("/", "_")
+    meta_path = PROJECT_ROOT / "data" / "manual_uploads" / "structured" / doi_slug / "meta.json"
+    if meta_path.exists():
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+            if "study_id" in meta:
+                return meta["study_id"]
+            # Auto-derive from first_author + year
+            author = meta.get("first_author", "").upper().replace(" ", "_")
+            year = meta.get("year", "")
+            if author and year:
+                return f"STUDY_{author}_{year}"
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Fallback: derive from DOI suffix
+    suffix = doi.split("/", 1)[-1] if "/" in doi else doi
+    clean = suffix.upper().replace(".", "_").replace("-", "_")
+    return f"STUDY_{clean}"
+
+
+def _discover_doi_to_study_map() -> dict[str, str]:
+    """Build DOI→study_id map by scanning structured folders + meta.json files.
+
+    Merges hardcoded seed entries with any new papers found on disk.
+    This means you NEVER need to edit Python code to add a new paper —
+    just create the folder, drop the CSV, and optionally add meta.json.
+    """
+    mapping = dict(_SEED_DOI_MAP)
+
+    csv_dir = PROJECT_ROOT / "data" / "manual_uploads" / "structured"
+    if not csv_dir.exists():
+        return mapping
+
+    for subdir in sorted(csv_dir.iterdir()):
+        if not subdir.is_dir():
+            continue
+        slug = subdir.name
+        if slug == "README.md" or slug.startswith("."):
+            continue
+
+        doi = _doi_slug_to_doi(slug)
+
+        if doi in mapping:
+            continue  # already mapped
+
+        # Check meta.json first (preferred)
+        meta_path = subdir / "meta.json"
+        if meta_path.exists():
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                study_id = meta.get("study_id") or _doi_to_study_id(doi)
+                mapping[doi] = study_id
+                logger.info(
+                    "Auto-discovered paper %s → %s (from meta.json)",
+                    doi, study_id,
+                )
+                continue
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # No meta.json — check if edge_evidence_template.csv exists
+        csv_path = subdir / "edge_evidence_template.csv"
+        if csv_path.exists():
+            study_id = _doi_to_study_id(doi)
+            mapping[doi] = study_id
+            logger.info(
+                "Auto-discovered paper %s → %s (from folder name, no meta.json)",
+                doi, study_id,
+            )
+
+    return mapping
+
+
+# Lazy-initialized; populated at first use
+DOI_TO_STUDY: dict[str, str] = {}
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -676,12 +778,92 @@ def reseed_measure_and_pathway_definitions(engine, dry_run: bool = False) -> tup
 # ============================================================================
 #  STEP 2: Register studies in study_registry_v1
 # ============================================================================
+def _discover_studies() -> list[dict]:
+    """Build the full STUDIES list by merging hardcoded entries with auto-discovered meta.json.
+
+    For papers with meta.json, reads: study_id, title, authors, journal, year, doi,
+    study_design, notes. For papers without meta.json but with an edge_evidence CSV,
+    creates a minimal entry with study_id derived from DOI.
+    """
+    # Start with known studies
+    studies_by_id = {s["study_id"]: s for s in STUDIES}
+
+    csv_dir = PROJECT_ROOT / "data" / "manual_uploads" / "structured"
+    if not csv_dir.exists():
+        return list(studies_by_id.values())
+
+    for subdir in sorted(csv_dir.iterdir()):
+        if not subdir.is_dir() or subdir.name.startswith("."):
+            continue
+
+        doi = _doi_slug_to_doi(subdir.name)
+        study_id = DOI_TO_STUDY.get(doi)
+        if not study_id:
+            continue
+        if study_id in studies_by_id:
+            continue  # already registered
+
+        meta_path = subdir / "meta.json"
+        if meta_path.exists():
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                studies_by_id[study_id] = {
+                    "study_id": study_id,
+                    "title": meta.get("title", f"Paper {doi}"),
+                    "authors": meta.get("authors", "Unknown"),
+                    "journal": meta.get("journal", "Unknown"),
+                    "year": meta.get("year", 0),
+                    "doi": doi,
+                    "study_design": meta.get("study_design", "unknown"),
+                    "notes": meta.get("notes", f"Auto-discovered from {subdir.name}/meta.json"),
+                }
+                logger.info("Auto-discovered study metadata for %s from meta.json", study_id)
+                continue
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        # Minimal entry from folder name — at least get it registered
+        # Try to infer year from CSV pub_year column
+        year = 0
+        csv_path = subdir / "edge_evidence_template.csv"
+        if csv_path.exists():
+            try:
+                with open(csv_path) as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        y = _safe_int(row.get("pub_year"))
+                        if y and y > 1900:
+                            year = y
+                            break
+            except Exception:
+                pass
+
+        studies_by_id[study_id] = {
+            "study_id": study_id,
+            "title": f"Paper {doi}",
+            "authors": "Unknown",
+            "journal": "Unknown",
+            "year": year,
+            "doi": doi,
+            "study_design": "unknown",
+            "notes": f"Auto-discovered from folder {subdir.name} (add meta.json for full metadata)",
+        }
+        logger.info("Auto-registered study %s from folder %s (no meta.json)", study_id, subdir.name)
+
+    return list(studies_by_id.values())
+
+
 def register_studies(engine, dry_run: bool = False) -> int:
-    """Register manually extracted studies, skipping duplicates."""
+    """Register manually extracted studies, skipping duplicates.
+
+    Auto-discovers studies from meta.json files beyond the hardcoded STUDIES list.
+    """
+    all_studies = _discover_studies()
     registered = 0
 
     with engine.begin() as conn:
-        for study in STUDIES:
+        for study in all_studies:
             result = conn.execute(
                 text("SELECT study_id FROM study_registry_v1 WHERE study_id = :sid"),
                 {"sid": study["study_id"]},
@@ -760,6 +942,10 @@ def _csv_str(row: dict, key: str) -> str | None:
     return val if val else None
 
 
+# Column aliasing removed — CSVs now use DB column names directly.
+# See 013_template_alignment.sql for migration history.
+
+
 def load_csv_evidence(engine, dry_run: bool = False) -> int:
     """Load edge evidence from manual CSV templates into edge_evidence_v1.
 
@@ -822,6 +1008,7 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
             shared_control_flag, endpoint_vs_change, comparison_arm_label,
             study_design, cancer_type, treatment_phase, pub_year,
             covariates_adjusted, sd_x, sd_y, cancer_validation_status,
+            n_treatment, n_control,
             entered_by, entered_at, version, active,
             span_hash
         ) VALUES (
@@ -838,6 +1025,7 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
             :shared_control_flag, :endpoint_vs_change, :comparison_arm_label,
             :study_design, :cancer_type, :treatment_phase, :pub_year,
             :covariates_adjusted, :sd_x, :sd_y, :cancer_validation_status,
+            :n_treatment, :n_control,
             :entered_by, :entered_at, :version, :active,
             :span_hash
         )
@@ -856,7 +1044,7 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                 continue
 
             for row in rows:
-                edge_id = _csv_str(row, "edge_id")
+                edge_id = _csv_str(row, "edge_relation_id")
                 doi = _csv_str(row, "doi")
                 study_id = DOI_TO_STUDY.get(doi) if doi else None
 
@@ -865,20 +1053,20 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                     continue
 
                 if not edge_id:
-                    logger.warning("Empty edge_id in %s, skipping row", csv_path)
+                    logger.warning("Empty edge_relation_id in %s, skipping row", csv_path)
                     continue
 
-                beta_raw = _safe_float(row.get("beta_raw"))
-                se_raw = _safe_float(row.get("se_raw"))
-                sample_size = _safe_int(row.get("sample_size"))
+                beta_raw = _safe_float(row.get("effect_value_reported"))
+                se_raw = _safe_float(row.get("se_reported"))
+                sample_size = _safe_int(row.get("N_effect"))
 
                 if beta_raw is None:
-                    logger.warning("Missing beta_raw for %s × %s, skipping", study_id, edge_id)
+                    logger.warning("Missing effect_value_reported for %s × %s, skipping", study_id, edge_id)
                     continue
 
                 if se_raw is None or se_raw <= 0:
                     logger.warning(
-                        "Missing or invalid se_raw (%.4f) for %s × %s, skipping",
+                        "Missing or invalid se_reported (%.4f) for %s × %s, skipping",
                         se_raw or 0, study_id, edge_id,
                     )
                     continue
@@ -895,9 +1083,15 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                 # Look up edge definition for node_x/node_y
                 edge_def = edge_defs.get(edge_id, {})
                 if not edge_def:
-                    logger.warning(
-                        "Edge %s not in edge_relations_definitions_v1, using defaults",
-                        edge_id,
+                    logger.error(
+                        "❌ UNKNOWN EDGE: '%s' not found in edge_relations_definitions_v1 "
+                        "(EDGE_REGISTRY.csv). This row will be inserted with "
+                        "node_x='unknown', node_y='unknown' — IVW pooling and "
+                        "Chain B will still process it but with wrong node linkage. "
+                        "Fix: add this edge to registries/EDGE_REGISTRY.csv, or "
+                        "correct the edge_relation_id in your CSV. "
+                        "Paper: %s, Study: %s",
+                        edge_id, csv_path, study_id,
                     )
 
                 # Build deterministic ler_id
@@ -905,26 +1099,88 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
 
                 # Determine harmonized_scale from effect_size_type
                 effect_size_type = _csv_str(row, "effect_size_type") or "BETWEEN_GROUP"
-                effect_type_original = _csv_str(row, "effect_type_original") or ""
+                effect_type_original = _csv_str(row, "effect_type_reported") or ""
 
                 # Map effect type to a harmonized scale label
-                if "cohen" in effect_type_original.lower() or "cohens_d" in effect_type_original.lower():
+                # IMPORTANT: Every recognized type maps to its correct scale.
+                # Unrecognized types get flagged — NOT silently defaulted.
+                _et = effect_type_original.lower()
+                harmonization_status_val = "harmonized"  # default; overridden below on problems
+                if "cohen" in _et or "cohens_d" in _et:
                     harmonized_scale = "cohens_d"
-                elif "mean_diff" in effect_type_original.lower():
+                elif "hedges" in _et or "hedges_g" in _et:
+                    # Hedges' g ≈ Cohen's d (bias-corrected); treat as SMD
+                    harmonized_scale = "cohens_d"
+                elif "mean_diff" in _et or "group_diff" in _et:
                     harmonized_scale = "mean_diff_raw"
-                elif "odds_ratio" in effect_type_original.lower() or "log_or" in effect_type_original.lower():
+                elif "odds_ratio" in _et or "log_or" in _et:
                     harmonized_scale = "log_odds_ratio"
-                elif "hazard" in effect_type_original.lower():
+                elif "hazard" in _et or "log_hr" in _et:
                     harmonized_scale = "log_hazard_ratio"
+                elif "risk_ratio" in _et or "log_rr" in _et or _et == "rr":
+                    harmonized_scale = "log_risk_ratio"
+                elif "correlation" in _et or "pearson" in _et or _et == "r":
+                    # r cannot be directly pooled with d — needs r→d conversion
+                    harmonized_scale = "correlation_r"
+                    harmonization_status_val = "needs_conversion"
+                    logger.warning(
+                        "⚠ SCALE ALERT: %s × %s has effect_type='%s' → stored as "
+                        "correlation_r (NOT converted to cohens_d). This row will be "
+                        "EXCLUDED from IVW pooling until r→d conversion is added. "
+                        "Paper: %s",
+                        study_id, edge_id, effect_type_original, csv_path,
+                    )
+                elif "percent_change" in _et or "pct_change" in _et:
+                    harmonized_scale = "percent_change"
+                    harmonization_status_val = "needs_conversion"
+                    logger.warning(
+                        "⚠ SCALE ALERT: %s × %s has effect_type='%s' → stored as "
+                        "percent_change (NOT converted to cohens_d). This row will "
+                        "be EXCLUDED from IVW pooling until conversion is added. "
+                        "Paper: %s",
+                        study_id, edge_id, effect_type_original, csv_path,
+                    )
+                elif "f_statistic" in _et or "f_stat" in _et or _et == "f":
+                    harmonized_scale = "f_statistic"
+                    harmonization_status_val = "needs_conversion"
+                    logger.warning(
+                        "⚠ SCALE ALERT: %s × %s has effect_type='%s' → stored as "
+                        "f_statistic (NOT converted to cohens_d). This row will be "
+                        "EXCLUDED from IVW pooling until F→d conversion is added. "
+                        "Paper: %s",
+                        study_id, edge_id, effect_type_original, csv_path,
+                    )
+                elif "std_beta" in _et or "standardized_beta" in _et:
+                    # Standardized regression beta ≈ partial r, close to SMD
+                    harmonized_scale = "cohens_d"
+                elif "unstd_beta" in _et or "unstandardized" in _et:
+                    harmonized_scale = "mean_diff_raw"
+                elif _et == "" or _et is None:
+                    # No effect type provided — assume cohens_d but flag it
+                    harmonized_scale = "cohens_d"
+                    logger.warning(
+                        "⚠ MISSING effect_type_reported for %s × %s — "
+                        "defaulting to cohens_d. Verify this is correct. Paper: %s",
+                        study_id, edge_id, csv_path,
+                    )
                 else:
-                    harmonized_scale = "cohens_d"  # safe default for CRCI
+                    # UNRECOGNIZED effect type — DO NOT silently default
+                    harmonized_scale = "UNRECOGNIZED"
+                    harmonization_status_val = "unrecognized_scale"
+                    logger.error(
+                        "❌ UNRECOGNIZED effect_type_reported='%s' for %s × %s. "
+                        "This row will be EXCLUDED from IVW pooling. "
+                        "Add conversion logic for this type, or correct the CSV. "
+                        "Paper: %s",
+                        effect_type_original, study_id, edge_id, csv_path,
+                    )
 
                 # Determine quality from rob_overall or default
                 rob_overall = _csv_str(row, "rob_overall")
                 quality_rating = rob_overall or "moderate"
 
                 # SE derivation level from CSV (extended format)
-                se_derivation = _csv_str(row, "se_derivation_method") or "direct"
+                se_derivation = _csv_str(row, "se_derivation_level") or "direct"
 
                 # Identification status: manually extracted → at least "plausible"
                 identification_status = "plausible"
@@ -948,20 +1204,20 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                     "edge_family": edge_def.get("edge_family", "unknown"),
                     "node_x": edge_def.get("node_x", "unknown"),
                     "node_y": edge_def.get("node_y", "unknown"),
-                    "upstream_instrument_id": _csv_str(row, "instrument_id"),
+                    "upstream_instrument_id": _csv_str(row, "upstream_instrument_id"),
                     # Raw columns
                     "effect_type_reported": effect_type_original,
                     "effect_value_reported": beta_raw,
                     "se_reported": se_raw,
-                    "ci_low_reported": _safe_float(row.get("ci_low")),
-                    "ci_high_reported": _safe_float(row.get("ci_high")),
+                    "ci_low_reported": _safe_float(row.get("ci_low_reported")),
+                    "ci_high_reported": _safe_float(row.get("ci_high_reported")),
                     "p_value": _safe_float(row.get("p_value")),
                     "N_effect": sample_size,
                     "effect_size_type": effect_size_type,
                     # HARMONIZED columns — CRITICAL for evidence_loader
                     "harmonized_beta": beta_raw,
                     "harmonized_se": se_raw,
-                    "harmonization_status": "harmonized",
+                    "harmonization_status": harmonization_status_val,
                     "harmonized_scale": harmonized_scale,
                     # SE provenance
                     "se_derivation_level": se_derivation,
@@ -970,8 +1226,8 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                     "rob_overall": rob_overall,
                     "identification_status": identification_status,
                     "quality_rating": quality_rating,
-                    "notes": _csv_str(row, "confidence_note") or "",
-                    "extraction_snippet": extraction_snippet,
+                    "notes": _csv_str(row, "notes") or "",
+                    "extraction_snippet": _csv_str(row, "extraction_snippet") or extraction_snippet,
                     # Extended columns
                     "shared_control_flag": 1 if _csv_str(row, "shared_control_flag") == "1" else 0,
                     "endpoint_vs_change": _csv_str(row, "endpoint_vs_change"),
@@ -982,9 +1238,12 @@ def load_csv_evidence(engine, dry_run: bool = False) -> int:
                     "treatment_phase": _csv_str(row, "treatment_phase"),
                     "pub_year": _safe_int(row.get("pub_year")),
                     "covariates_adjusted": _csv_str(row, "covariates_adjusted"),
-                    "sd_x": _safe_float(row.get("sd_treatment")),
-                    "sd_y": _safe_float(row.get("sd_control")),
-                    "cancer_validation_status": _csv_str(row, "cancer_validated"),
+                    "sd_x": _safe_float(row.get("sd_x")),
+                    "sd_y": _safe_float(row.get("sd_y")),
+                    "cancer_validation_status": _csv_str(row, "cancer_validation_status"),
+                    # Sample size breakdown
+                    "n_treatment": _safe_int(row.get("n_treatment")),
+                    "n_control": _safe_int(row.get("n_control")),
                     # Audit
                     "entered_by": "manual_csv_import",
                     "entered_at": datetime.now(timezone.utc).isoformat(),
@@ -1093,17 +1352,20 @@ def load_family_csvs(engine, dry_run: bool = False) -> dict[str, int]:
                 family_count += len(rows)
                 continue
 
-            # Use ORM session for family importers (they use session.add())
+            # Use ORM session for family importers (they use session.merge() for upsert)
             with get_session() as session:
                 for row_dict in rows:
                     # Inject doi for provenance
                     row_dict["doi"] = doi
                     try:
-                        importer_fn(session, row_dict, study_id)
+                        # Use savepoint so a single-row failure doesn't
+                        # poison the entire session transaction.
+                        with session.begin_nested():
+                            importer_fn(session, row_dict, study_id)
                         family_count += 1
                     except Exception as exc:
                         logger.warning(
-                            "Failed to import %s row (study=%s): %s",
+                            "Skipped duplicate/invalid %s row (study=%s): %s",
                             family_name, study_id, exc,
                         )
                 # Session auto-commits on exit from context manager
@@ -1851,9 +2113,54 @@ def compile_edges(engine, dry_run: bool = False) -> int:
             betas = [r[1] for r in evidence_rows]
             ses = [r[2] for r in evidence_rows]
             ns = [r[3] or 0 for r in evidence_rows]
-            scale = evidence_rows[0][4] or "cohens_d"
+            scales = [r[4] or "cohens_d" for r in evidence_rows]
             study_ids = [r[5] for r in evidence_rows]
 
+            # ── SCALE CONSISTENCY CHECK ──
+            # Only pool rows on the SAME harmonized scale.
+            # Rows with needs_conversion or unrecognized scales are excluded.
+            POOLABLE_SCALES = {"cohens_d", "log_odds_ratio", "log_hazard_ratio", "log_risk_ratio"}
+            poolable_idx = [i for i, s in enumerate(scales) if s in POOLABLE_SCALES]
+            excluded_idx = [i for i, s in enumerate(scales) if s not in POOLABLE_SCALES]
+
+            if excluded_idx:
+                excluded_details = [
+                    f"{study_ids[i]}(scale={scales[i]})" for i in excluded_idx
+                ]
+                logger.warning(
+                    "⚠ IVW EXCLUSION for edge %s: %d/%d rows excluded due to "
+                    "non-poolable scale: %s",
+                    edge_id, len(excluded_idx), k, ", ".join(excluded_details),
+                )
+
+            if not poolable_idx:
+                logger.warning(
+                    "⚠ SKIPPING edge %s entirely: no rows on a poolable scale "
+                    "(all %d rows need conversion)",
+                    edge_id, k,
+                )
+                continue
+
+            # Filter to poolable rows only
+            betas = [betas[i] for i in poolable_idx]
+            ses = [ses[i] for i in poolable_idx]
+            ns = [ns[i] for i in poolable_idx]
+            study_ids = [study_ids[i] for i in poolable_idx]
+            scales_poolable = [scales[i] for i in poolable_idx]
+            k = len(betas)
+
+            # Check that remaining rows are all on the SAME scale
+            unique_scales = set(scales_poolable)
+            if len(unique_scales) > 1:
+                logger.error(
+                    "❌ MIXED SCALES for edge %s: cannot IVW-pool %s together. "
+                    "Skipping this edge. Each study must be converted to the "
+                    "same scale before pooling.",
+                    edge_id, unique_scales,
+                )
+                continue
+
+            scale = scales_poolable[0]
             total_n = sum(ns)
 
             if k == 1:
@@ -2102,6 +2409,14 @@ def main() -> int:
     print()
 
     engine = init_db()
+
+    # Auto-discover all papers from folders + meta.json
+    global DOI_TO_STUDY
+    DOI_TO_STUDY = _discover_doi_to_study_map()
+    print(f"  Papers:   {len(DOI_TO_STUDY)} DOI→study mappings discovered")
+    for doi, sid in sorted(DOI_TO_STUDY.items()):
+        print(f"    {doi} → {sid}")
+    print()
 
     # Optional reset
     if args.reset and not args.dry_run:
